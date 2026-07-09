@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-const API_URL = '/api';
+const API_URL = 'http://localhost:5000/api';
 
 const AuthPage = () => {
   const [authMode, setAuthMode] = useState('login'); // 'login' | 'signup'
@@ -14,16 +14,91 @@ const AuthPage = () => {
     name: '', email: '', password: '', confirmPassword: '', phone: '', address: ''
   });
   const [otpCode, setOtpCode] = useState('');
+  const [verificationEmail, setVerificationEmail] = useState('');
 
   const navigate = useNavigate();
+
+  const handleVerifyOtp = async () => {
+    if (!verificationEmail || !otpCode) {
+      setMessage('Please enter your email and OTP.');
+      setMessageType('error');
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_URL}/auth/verify-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: verificationEmail, otp: otpCode })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || data.message || 'OTP verification failed.');
+      }
+
+      setMessage('Email verified successfully. Redirecting...');
+      setMessageType('success');
+      setTimeout(() => navigate('/'), 800);
+    } catch (err) {
+      console.error(err);
+      setMessage(err.message || 'OTP verification failed.');
+      setMessageType('error');
+    }
+  };
+
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    const enteredEmail = (userCredentials.email || '').trim().toLowerCase();
+
+    if (!enteredEmail) {
+      setMessage('Please enter your email address first.');
+      setMessageType('error');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const res = await fetch(`${API_URL}/auth/forgot-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: enteredEmail })
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.message || 'Unable to send reset link.');
+      }
+
+      setMessage(data?.message || 'Password reset link sent to your email.');
+      setMessageType('success');
+    } catch (err) {
+      console.error(err);
+      setMessage(err.message || 'Unable to send reset link.');
+      setMessageType('error');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage('');
     setMessageType('');
 
+    if (authMode === 'verify') {
+      await handleVerifyOtp();
+      return;
+    }
+
     if (authMode === 'signup' && userCredentials.password !== userCredentials.confirmPassword) {
       setMessage('Passwords do not match.');
+      setMessageType('error');
+      return;
+    }
+
+    if (authMode === 'signup' && !/^\d{10}$/.test(userCredentials.phone || '')) {
+      setMessage('Phone number must be exactly 10 digits.');
       setMessageType('error');
       return;
     }
@@ -49,34 +124,7 @@ const AuthPage = () => {
         setMessage('Login successful. Redirecting...');
         setMessageType('success');
         setTimeout(() => navigate('/'), 800);
-      } else if (authMode === 'verify-otp') {
-        const res = await fetch(`${API_URL}/auth/verify-otp`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: userCredentials.email.trim().toLowerCase(), otp: otpCode.trim() })
-        });
-
-        if (!res.ok) {
-          const errorData = await res.json();
-          throw new Error(errorData.message || 'OTP verification failed.');
-        }
-
-        const data = await res.json();
-        const user = data.user || data;
-        const token = data.token;
-
-        // Persist session locally so App can read it
-        try {
-          if (token) localStorage.setItem('sriTechToken', token);
-          if (user) localStorage.setItem('sriTechUser', JSON.stringify(user));
-        } catch (err) {
-          console.warn('Unable to persist auth session:', err);
-        }
-
-        setMessage('Email verified. Account created. Redirecting...');
-        setMessageType('success');
-        setTimeout(() => navigate('/'), 800);
-      } else {
+        } else {
         const res = await fetch(`${API_URL}/auth/signup`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -89,14 +137,31 @@ const AuthPage = () => {
           })
         });
 
+        const data = await res.json();
         if (!res.ok) {
-          const errorData = await res.json();
-          throw new Error(errorData.message || 'Signup failed.');
+          const message = data.error || data.message || 'Signup failed.';
+          if (/account already created|already registered|please sign in/i.test(message)) {
+            setAuthMode('login');
+            setUserCredentials(prev => ({
+              ...prev,
+              email: userCredentials.email.trim().toLowerCase(),
+              password: '',
+              confirmPassword: ''
+            }));
+          }
+          throw new Error(message);
         }
 
-        setAuthMode('verify-otp');
-        setMessage('Account request received. Check your email for OTP verification.');
+        setVerificationEmail(data.email || userCredentials.email.trim().toLowerCase());
+        setOtpCode('');
+        setMessage(data.message || 'OTP sent to your email. Please verify your account.');
         setMessageType('success');
+        setAuthMode('verify');
+        setUserCredentials(prev => ({
+          ...prev,
+          password: '',
+          confirmPassword: ''
+        }));
       }
     } catch (err) {
       console.error(err);
@@ -140,8 +205,8 @@ const AuthPage = () => {
         <div className="auth-glass-card">
           <button className="auth-close-btn" onClick={() => navigate('/')}>✕</button>
           <div className="auth-header">
-            <h3>{authMode === 'login' ? 'Welcome Back' : 'Create Account'}</h3>
-            <p>{authMode === 'login' ? 'Sign in to your premium account' : 'Start your sustainable journey today'}</p>
+            <h3>{authMode === 'login' ? 'Welcome Back' : authMode === 'verify' ? 'Verify Your Email' : 'Create Account'}</h3>
+            <p>{authMode === 'login' ? 'Sign in to your premium account' : authMode === 'verify' ? 'Enter the code we sent to your inbox.' : 'Start your sustainable journey today'}</p>
           </div>
           <div className="auth-toggle-group">
             <button
@@ -154,14 +219,35 @@ const AuthPage = () => {
             >Sign Up</button>
           </div>
           <form className="auth-fields-grid" onSubmit={handleSubmit}>
-            {authMode === 'signup' && (
+            {authMode === 'verify' ? (
+              <div className="auth-form-group">
+                <label htmlFor="otpCode">Verification Code</label>
+                <div className="auth-input-wrapper">
+                  <i className="fa-regular fa-key prefix-icon" />
+                  <input
+                    id="otpCode"
+                    name="otpCode"
+                    type="text"
+                    inputMode="numeric"
+                    className="auth-input"
+                    placeholder="Enter 6-digit OTP"
+                    required
+                    value={otpCode}
+                    onChange={e => setOtpCode(e.target.value)}
+                  />
+                </div>
+              </div>
+            ) : authMode === 'signup' && (
               <>
                 <div className="auth-form-group">
-                  <label>Full Name</label>
+                  <label htmlFor="name">Full Name</label>
                   <div className="auth-input-wrapper">
                     <i className="fa-regular fa-user prefix-icon" />
                     <input
+                      id="name"
+                      name="name"
                       type="text"
+                      autoComplete="name"
                       className="auth-input"
                       placeholder="John Doe"
                       required
@@ -171,25 +257,35 @@ const AuthPage = () => {
                   </div>
                 </div>
                 <div className="auth-form-group">
-                  <label>Mobile Number</label>
+                  <label htmlFor="phone">Mobile Number</label>
                   <div className="auth-input-wrapper">
                     <i className="fa-solid fa-phone prefix-icon" />
                     <input
+                      id="phone"
+                      name="phone"
                       type="tel"
+                      inputMode="numeric"
+                      autoComplete="tel"
                       className="auth-input"
-                      placeholder="+1 (555) 000-0000"
+                      placeholder="9876543210"
                       required
                       value={userCredentials.phone}
-                      onChange={e => setUserCredentials({ ...userCredentials, phone: e.target.value })}
+                      onChange={e => {
+                        const digitsOnly = e.target.value.replace(/\D/g, '').slice(0, 10);
+                        setUserCredentials({ ...userCredentials, phone: digitsOnly });
+                      }}
                     />
                   </div>
                 </div>
                 <div className="auth-form-group">
-                  <label>Address</label>
+                  <label htmlFor="address">Address</label>
                   <div className="auth-input-wrapper">
                     <i className="fa-solid fa-map-location-dot prefix-icon" />
                     <input
+                      id="address"
+                      name="address"
                       type="text"
+                      autoComplete="street-address"
                       className="auth-input"
                       placeholder="123 Street Name"
                       required
@@ -200,29 +296,17 @@ const AuthPage = () => {
                 </div>
               </>
             )}
-            {authMode === 'verify-otp' && (
-              <div className="auth-form-group">
-                <label>Verification Code</label>
-                <div className="auth-input-wrapper">
-                  <i className="fa-solid fa-key prefix-icon" />
-                  <input
-                    type="text"
-                    className="auth-input"
-                    placeholder="Enter 6-digit code"
-                    required
-                    value={otpCode}
-                    onChange={e => setOtpCode(e.target.value)}
-                  />
-                </div>
-              </div>
-            )}
+
 
             <div className="auth-form-group">
-              <label>Email Address</label>
+              <label htmlFor="email">Email Address</label>
               <div className="auth-input-wrapper">
                 <i className="fa-regular fa-envelope prefix-icon" />
                 <input
+                  id="email"
+                  name="email"
                   type="email"
+                  autoComplete="email"
                   className="auth-input"
                   placeholder="hello@example.com"
                   required
@@ -232,11 +316,14 @@ const AuthPage = () => {
               </div>
             </div>
             <div className="auth-form-group">
-              <label>Password</label>
+              <label htmlFor="password">Password</label>
               <div className="auth-input-wrapper">
                 <i className="fa-solid fa-lock prefix-icon" />
                 <input
+                  id="password"
+                  name="password"
                   type={showPassword ? 'text' : 'password'}
+                  autoComplete={authMode === 'login' ? 'current-password' : 'new-password'}
                   className="auth-input"
                   placeholder="••••••••"
                   required
@@ -249,12 +336,15 @@ const AuthPage = () => {
               </div>
             </div>
             {authMode === 'signup' && (
-              <div className="auth-form-group">
-                <label>Confirm Password</label>
+                <div className="auth-form-group">
+                  <label htmlFor="confirmPassword">Confirm Password</label>
                 <div className="auth-input-wrapper">
                   <i className="fa-solid fa-shield-check prefix-icon" />
                   <input
+                    id="confirmPassword"
+                    name="confirmPassword"
                     type={showConfirmPassword ? 'text' : 'password'}
+                    autoComplete="new-password"
                     className="auth-input"
                     placeholder="••••••••"
                     required
@@ -269,14 +359,17 @@ const AuthPage = () => {
             )}
             {authMode === 'login' && (
               <div className="auth-options">
-                <label className="remember-me">
-                  <input type="checkbox" /> Remember me
-                </label>
-                <a href="#" className="forgot-pwd" onClick={e => e.preventDefault()}>Forgot Password?</a>
+                <input type="checkbox" id="rememberMe" name="rememberMe" />
+                <label className="remember-me" htmlFor="rememberMe">Remember me</label>
+                <a href="#" className="forgot-pwd" onClick={handleForgotPassword}>Forgot Password?</a>
               </div>
             )}
             <button type="submit" className="auth-submit-btn" disabled={isSubmitting}>
-              {authMode === 'login' ? (isSubmitting ? 'Signing In…' : 'Sign In') : (authMode === 'verify-otp' ? (isSubmitting ? 'Verifying…' : 'Verify Code') : (isSubmitting ? 'Creating Account…' : 'Create Account'))}
+              {authMode === 'login'
+                ? (isSubmitting ? 'Signing In…' : 'Sign In')
+                : authMode === 'verify'
+                  ? (isSubmitting ? 'Verifying…' : 'Verify Email')
+                  : (isSubmitting ? 'Creating Account…' : 'Create Account')}
             </button>
           </form>
           {message && (

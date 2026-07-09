@@ -7,6 +7,8 @@ const validateRequest = require('../middleware/validateRequest');
 const router = express.Router();
 
 router.get('/', protect, authorizeRoles('admin'), userController.getUsers);
+router.get('/me', protect, userController.getMe);
+router.put('/me', protect, userController.updateMe);
 router.patch('/:id/status', protect, authorizeRoles('admin'), userController.toggleUserStatus);
 router.delete('/:id', protect, authorizeRoles('admin'), userController.deleteUser);
 

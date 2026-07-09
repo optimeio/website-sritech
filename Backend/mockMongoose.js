@@ -201,6 +201,12 @@ function createModelClass(modelName, schema) {
     }
   }
 
+  Model.create = async function(data) {
+    const doc = new Model(data);
+    await doc.save();
+    return doc;
+  };
+
   Model.find = function(query) {
     const promise = Promise.resolve().then(() => {
       const db = loadDB();
@@ -310,11 +316,16 @@ function createModelClass(modelName, schema) {
 
 class Schema {
   constructor(definition) {
-    this.definition = definition;
+    this.definition = definition || {};
     this.methods = {};
     this.statics = {};
     this.virtuals = {};
     this.options = {};
+  }
+
+  add(definition) {
+    this.definition = { ...this.definition, ...definition };
+    return this;
   }
 
   index() {}
@@ -346,6 +357,7 @@ function model(name, schema) {
 }
 
 const connection = {
+  readyState: 1,
   db: {
     listCollections() {
       return {

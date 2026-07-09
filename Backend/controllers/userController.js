@@ -72,3 +72,38 @@ exports.toggleWaitlist = asyncHandler(async (req, res) => {
   await user.save();
   res.json(user.waitlist);
 });
+
+exports.getMe = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id).select('-password -resetPasswordToken -resetPasswordExpires -otp -otpExpires');
+  if (!user) return res.status(404).json({ message: 'User not found.' });
+  res.json(user);
+});
+
+exports.updateMe = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id);
+  if (!user) return res.status(404).json({ message: 'User not found.' });
+
+  const { name, email, phone, address, addresses, password, currentPassword } = req.body || {};
+
+  if (name !== undefined) user.name = name;
+  if (email !== undefined) user.email = email;
+  if (phone !== undefined) user.phone = phone;
+  if (address !== undefined) user.address = address;
+  if (Array.isArray(addresses)) {
+    user.addresses = addresses.map((entry, index) => ({
+      ...entry,
+      _id: entry._id || entry.id || undefined,
+      isDefault: index === 0 ? true : Boolean(entry.isDefault)
+    }));
+  }
+
+  if (password) {
+    if (!currentPassword) return res.status(400).json({ message: 'Current password is required.' });
+    const isMatch = await user.matchPassword(currentPassword);
+    if (!isMatch) return res.status(400).json({ message: 'Current password is incorrect.' });
+    user.password = password;
+  }
+
+  await user.save();
+  res.json(user);
+});

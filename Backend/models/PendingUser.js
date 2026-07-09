@@ -22,4 +22,39 @@ pendingUserSchema.methods.matchPassword = async function (enteredPassword) {
   return bcrypt.compare(enteredPassword, this.password);
 };
 
-module.exports = mongoose.model('PendingUser', pendingUserSchema);
+const overrides = new Map();
+const getActiveMongoose = () => (mongoose.getActive ? mongoose.getActive() : mongoose);
+
+const getActivePendingUserModel = () => {
+  const activeMongoose = getActiveMongoose();
+  const existingModel = activeMongoose.models?.PendingUser;
+  if (existingModel) {
+    return existingModel;
+  }
+  return activeMongoose.model('PendingUser', pendingUserSchema);
+};
+
+const PendingUserModelProxy = new Proxy(function PendingUserModelProxy() {}, {
+  construct(target, args) {
+    const activeModel = getActivePendingUserModel();
+    return new activeModel(...args);
+  },
+  get(target, prop) {
+    if (overrides.has(prop)) {
+      return overrides.get(prop);
+    }
+
+    const activeModel = getActivePendingUserModel();
+    const value = activeModel[prop];
+    if (typeof value === 'function') {
+      return value.bind(activeModel);
+    }
+    return value;
+  },
+  set(target, prop, value) {
+    overrides.set(prop, value);
+    return true;
+  }
+});
+
+module.exports = PendingUserModelProxy;

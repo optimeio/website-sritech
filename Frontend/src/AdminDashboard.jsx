@@ -7,16 +7,25 @@ const AdminDashboard = ({
   onAddProduct, 
   onDeleteProduct,
   onUpdateProduct,
+  offers = [],
   offerData, 
   onUpdateOffer, 
+  onDeleteOffer,
+  onToggleOffer,
+  onDuplicateOffer,
   categories, 
   onAddCategory,
+  onUpdateCategory,
+  onDeleteCategory,
   onAddCoupon,
   onDeleteCoupon,
   onUpdateCoupon,
+  onUpdateOrder,
   orders = [],
   coupons = [],
   supportQueries = [],
+  returnRequests = [],
+  refundRequests = [],
   activityLogs = [],
   leads = [],
   users = [],
@@ -24,21 +33,108 @@ const AdminDashboard = ({
   onDeleteUser,
   onRefresh,
   isRefreshing,
+  onViewPublicProducts,
   heroBanners = [],
   onAddHeroBanner,
   onDeleteHeroBanner,
   onRespondToSupport
 }) => {
+  const buildOfferFormState = (data = {}) => ({
+    _id: data._id || data.id || '',
+    title: data.title || 'Special Offer! 🎉',
+    description: data.description || '',
+    code: data.code || '',
+    type: data.type || 'product',
+    targetValue: data.targetValue || data.category || data.productName || '',
+    discountType: data.discountType || 'percentage',
+    discountValue: data.discountValue ?? data.discountPercent ?? '',
+    priority: data.priority ?? 0,
+    poster: data.poster || '',
+    images: Array.isArray(data.images) ? data.images.filter(Boolean) : [],
+    productName: data.productName || '',
+    category: data.category || '',
+    condition: data.condition || 'New',
+    badgeLabel: data.badgeLabel || 'Featured Offer',
+    originalPrice: data.originalPrice ?? '',
+    offerPrice: data.offerPrice ?? '',
+    mrpIllusion: data.mrpIllusion ?? '',
+    discountPercent: data.discountPercent ?? '',
+    stockUnits: data.stockUnits ?? '',
+    rating: data.rating ?? '',
+    startDate: data.startDate || '',
+    endDate: data.endDate || '',
+    comboContents: data.comboContents || '',
+    isActive: data.isActive !== false,
+    isPublished: Boolean(data.isPublished)
+  });
+
   const [activeTab, setActiveTab] = useState('Overview');
-  const [offerForm, setOfferForm] = useState(offerData);
+  const [offerForm, setOfferForm] = useState(() => buildOfferFormState(offerData));
+  const [editingOfferId, setEditingOfferId] = useState(null);
+  const [offerSearch, setOfferSearch] = useState('');
+  const [offerStatusFilter, setOfferStatusFilter] = useState('all');
+  const [offerSort, setOfferSort] = useState('priority');
+  const [offerImageUrl, setOfferImageUrl] = useState('');
   const [newHeroBanner, setNewHeroBanner] = useState({ image: '', caption: '' });
   const [supportReplies, setSupportReplies] = useState({});
+  const [inventoryStockDrafts, setInventoryStockDrafts] = useState({});
+
+  const [selectedOrderId, setSelectedOrderId] = useState(null);
+  const [orderShippingForm, setOrderShippingForm] = useState({
+    status: '',
+    courierPartner: '',
+    trackingNumber: '',
+    trackingUrl: '',
+    shipmentDate: '',
+    estimatedDelivery: '',
+    currentLocation: '',
+    deliveryPersonName: '',
+    deliveryPhone: '',
+    note: ''
+  });
+
+  const orderStatusOptions = [
+    'Payment Successful',
+    'Order Confirmed',
+    'Processing',
+    'Packed',
+    'Shipped',
+    'In Transit',
+    'Out For Delivery',
+    'Delivered',
+    'Cancelled',
+    'Return Requested',
+    'Return Approved',
+    'Return Rejected',
+    'Returned',
+    'Refund Initiated',
+    'Refund Completed'
+  ];
+
+  const orderProgressStages = [
+    { key: 'Ordered', label: 'Ordered' },
+    { key: 'Shipped', label: 'Shipped' },
+    { key: 'Out For Delivery', label: 'Out for Delivery' },
+    { key: 'Delivered', label: 'Delivered' }
+  ];
+
+  const getOrderProgressIndex = (status = '') => {
+    const normalized = String(status || '').trim();
+    if (!normalized) return 0;
+    if (['Payment Successful', 'Order Confirmed', 'Processing', 'Packed', 'Ordered'].includes(normalized)) return 0;
+    if (['Shipped', 'In Transit'].includes(normalized)) return 1;
+    if (['Out For Delivery', 'Out for Delivery'].includes(normalized)) return 2;
+    if (['Delivered'].includes(normalized)) return 3;
+    if (['Cancelled', 'Returned', 'Return Requested', 'Return Approved', 'Return Rejected', 'Refund Initiated', 'Refund Completed'].includes(normalized)) return -1;
+    return 0;
+  };
   
   useEffect(() => {
-    setOfferForm(offerData);
+    setOfferForm(buildOfferFormState(offerData));
   }, [offerData]);
 
   const [newCategory, setNewCategory] = useState('');
+  const [editingCategoryId, setEditingCategoryId] = useState(null);
   
   const [newCoupon, setNewCoupon] = useState({
     code: '',
@@ -71,6 +167,52 @@ const AdminDashboard = ({
       linkedProduct: coupon.linkedProduct || '',
       expiryDate: formatExipryDate(coupon.expiryDate)
     });
+  };
+
+  const selectedOrder = orders.find(o => (o._id || o.id) === selectedOrderId) || null;
+
+  useEffect(() => {
+    if (!selectedOrder) return;
+    setOrderShippingForm({
+      status: selectedOrder.status || '',
+      courierPartner: selectedOrder.courierPartner || '',
+      trackingNumber: selectedOrder.trackingNumber || '',
+      trackingUrl: selectedOrder.trackingUrl || '',
+      shipmentDate: selectedOrder.shipmentDate ? new Date(selectedOrder.shipmentDate).toISOString().split('T')[0] : '',
+      estimatedDelivery: selectedOrder.estimatedDelivery ? new Date(selectedOrder.estimatedDelivery).toISOString().split('T')[0] : '',
+      currentLocation: selectedOrder.currentLocation || '',
+      deliveryPersonName: selectedOrder.deliveryPersonName || '',
+      deliveryPhone: selectedOrder.deliveryPhone || '',
+      note: ''
+    });
+  }, [selectedOrder]);
+
+  const handleSelectOrder = (order) => {
+    setSelectedOrderId(order._id || order.id);
+  };
+
+  const updateShippingFormField = (field, value) => {
+    setOrderShippingForm(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleUpdateOrder = async (e) => {
+    e.preventDefault();
+    if (!selectedOrder) return;
+
+    const payload = {
+      status: orderShippingForm.status,
+      courierPartner: orderShippingForm.courierPartner,
+      trackingNumber: orderShippingForm.trackingNumber,
+      trackingUrl: orderShippingForm.trackingUrl,
+      shipmentDate: orderShippingForm.shipmentDate || undefined,
+      estimatedDelivery: orderShippingForm.estimatedDelivery || undefined,
+      currentLocation: orderShippingForm.currentLocation,
+      deliveryPersonName: orderShippingForm.deliveryPersonName,
+      deliveryPhone: orderShippingForm.deliveryPhone,
+      note: orderShippingForm.note
+    };
+
+    await onUpdateOrder(selectedOrder._id || selectedOrder.id, payload);
   };
 
   const cancelEditCoupon = () => {
@@ -161,6 +303,10 @@ const AdminDashboard = ({
 
   const handleUpdateProduct = async (e) => {
     e.preventDefault();
+    if (!editingProductId) {
+      alert('No product selected for editing.');
+      return;
+    }
     if (!editProduct.name || !editProduct.price || !editProduct.category || !editProduct.description) {
       alert('Please fill in all required fields before saving.');
       return;
@@ -180,12 +326,38 @@ const AdminDashboard = ({
       })
     };
 
-    await onUpdateProduct(editingProductId, payload);
-    cancelEditProduct();
+    try {
+      const success = await onUpdateProduct(editingProductId, payload);
+      if (success) {
+        cancelEditProduct();
+      } else {
+        alert('Failed to save changes. Please try again.');
+      }
+    } catch (err) {
+      console.error('Error saving product changes:', err);
+      alert('Failed to save changes. Please try again.');
+    }
   };
 
   const handleDelete = (productId) => {
     onDeleteProduct(productId);
+  };
+
+  const handleTabChange = (tabName) => {
+    setActiveTab(tabName);
+  };
+
+  const handleInventoryStockSave = async (productId, rawValue) => {
+    const nextStock = Number(rawValue);
+    if (!productId || !Number.isFinite(nextStock) || nextStock < 0) {
+      return;
+    }
+
+    try {
+      await onUpdateProduct(productId, { stock: nextStock });
+    } catch (err) {
+      console.error('Error updating inventory stock:', err);
+    }
   };
 
   const menuItems = [
@@ -196,13 +368,96 @@ const AdminDashboard = ({
     { name: 'Categories', icon: 'fa-list-ul' },
     { name: 'Inventory', icon: 'fa-warehouse' },
     { name: 'Customers', icon: 'fa-users' },
+    { name: 'View Product', icon: 'fa-eye' },
     { name: 'Orders', icon: 'fa-cart-shopping' },
     { name: 'Coupons', icon: 'fa-ticket' },
     { name: 'Support', icon: 'fa-headset' },
-    { name: 'Activity Logs', icon: 'fa-clock-rotate-left' },
+    { name: 'Activity Logs', icon: 'fa-file-lines' },
   ];
 
-  const handleAddProduct = (e) => {
+  const getCustomerActivityFeed = () => {
+    const feed = [];
+
+    users.forEach((user) => {
+      if (!user) return;
+      const createdAt = user.createdAt || user.created_at;
+      if (createdAt) {
+        feed.push({
+          id: `user-${user._id || user.id}`,
+          type: 'Registration',
+          title: 'Customer registered',
+          description: `${user.name || user.email || 'A customer'} joined the store.`,
+          timestamp: createdAt,
+          customerName: user.name || user.email || 'Customer',
+          customerEmail: user.email || '—',
+          status: user.status || 'active'
+        });
+      }
+    });
+
+    orders.forEach((order) => {
+      if (!order) return;
+      const timestamp = order.createdAt || order.placedAt || order.updatedAt;
+      feed.push({
+        id: `order-${order._id || order.id}`,
+        type: 'Order',
+        title: `Order ${order.orderId || order.invoiceNumber || 'updated'}`,
+        description: `${order.customerName || order.customerEmail || 'Customer'} has an order with status ${order.status || 'Pending'}.`,
+        timestamp,
+        customerName: order.customerName || order.customerEmail || 'Customer',
+        customerEmail: order.customerEmail || '—',
+        status: order.status || 'Pending'
+      });
+    });
+
+    supportQueries.forEach((query) => {
+      if (!query) return;
+      feed.push({
+        id: `support-${query._id || query.id}`,
+        type: 'Support',
+        title: `Support ${query.status || 'Open'}`,
+        description: `${query.subject || 'Support request'} raised by ${query.customerName || query.email || 'a customer'}.`,
+        timestamp: query.createdAt || query.updatedAt,
+        customerName: query.customerName || query.email || 'Customer',
+        customerEmail: query.email || '—',
+        status: query.status || 'Open'
+      });
+    });
+
+    returnRequests.forEach((request) => {
+      if (!request) return;
+      feed.push({
+        id: `return-${request._id || request.id}`,
+        type: 'Return',
+        title: `Return ${request.status || 'Requested'}`,
+        description: `${request.customerName || request.customerEmail || 'Customer'} requested a return for order ${request.orderId || request.orderNumber || '—'}.`,
+        timestamp: request.createdAt || request.updatedAt,
+        customerName: request.customerName || request.customerEmail || 'Customer',
+        customerEmail: request.customerEmail || '—',
+        status: request.status || 'Requested'
+      });
+    });
+
+    refundRequests.forEach((request) => {
+      if (!request) return;
+      feed.push({
+        id: `refund-${request._id || request.id}`,
+        type: 'Refund',
+        title: `Refund ${request.status || 'Pending'}`,
+        description: `${request.customerName || request.customerEmail || 'Customer'} requested a refund for order ${request.orderId || request.orderNumber || '—'}.`,
+        timestamp: request.createdAt || request.updatedAt,
+        customerName: request.customerName || request.customerEmail || 'Customer',
+        customerEmail: request.customerEmail || '—',
+        status: request.status || 'Pending'
+      });
+    });
+
+    return feed.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0)).slice(0, 120);
+  };
+
+  const customerActivityFeed = getCustomerActivityFeed();
+
+  const handleAddProduct = async (e) => {
     e.preventDefault();
     if (!newProduct.name || !newProduct.price || !newProduct.category || !newProduct.description) {
       alert('Please fill in all required fields before saving.');
@@ -215,6 +470,14 @@ const AdminDashboard = ({
 
     const payload = {
       ...newProduct,
+      name: String(newProduct.name || '').trim(),
+      price: String(newProduct.price || '').trim(),
+      category: String(newProduct.category || '').trim(),
+      description: String(newProduct.description || '').trim(),
+      specifications: String(newProduct.specifications || '').trim(),
+      stock: Number(newProduct.stock || 0),
+      icon: String(newProduct.icon || 'fa-box').trim(),
+      isNewArrival: Boolean(newProduct.isNewArrival),
       images: (Array.isArray(newProduct.images) ? newProduct.images : []).map((img) => {
         if (typeof img !== 'string' || !img) return img;
         if (img.startsWith('data:')) return img;
@@ -223,9 +486,18 @@ const AdminDashboard = ({
       })
     };
 
-    onAddProduct(payload);
-    alert('Product added successfully!');
-    setNewProduct({ name: '', price: '', description: '', specifications: '', stock: 0, category: categories[0]?.slug || categories[0]?.name || 'stoves', icon: 'fa-box', isNewArrival: false, images: [] });
+    try {
+      const success = await onAddProduct(payload);
+      if (success) {
+        alert('Product added successfully!');
+        setNewProduct({ name: '', price: '', description: '', specifications: '', stock: 0, category: categories[0]?.slug || categories[0]?.name || 'stoves', icon: 'fa-box', isNewArrival: false, images: [] });
+      } else {
+        alert('Failed to add product. Please try again.');
+      }
+    } catch (err) {
+      console.error('Error adding product:', err);
+      alert('Failed to add product. Please try again.');
+    }
   };
 
   const handleFileChange = (e) => {
@@ -258,32 +530,148 @@ const AdminDashboard = ({
 
   const handleUpdateOffer = (e) => {
     e.preventDefault();
-    onUpdateOffer(offerForm);
-    alert('Offer updated successfully!');
+    const normalizedOffer = {
+      ...offerForm,
+      _id: offerForm._id || undefined,
+      poster: offerForm.poster || (offerForm.images || [])[0] || '',
+      images: (offerForm.images || []).filter(Boolean),
+      originalPrice: Number(offerForm.originalPrice) || 0,
+      offerPrice: Number(offerForm.offerPrice) || 0,
+      mrpIllusion: Number(offerForm.mrpIllusion) || 0,
+      discountPercent: Number(offerForm.discountPercent) || 0,
+      discountValue: Number(offerForm.discountValue) || 0,
+      stockUnits: Number(offerForm.stockUnits) || 0,
+      rating: Number(offerForm.rating) || 0,
+      priority: Number(offerForm.priority) || 0,
+      isActive: Boolean(offerForm.isActive),
+      isPublished: Boolean(offerForm.isPublished),
+      category: offerForm.type === 'category' ? offerForm.targetValue : offerForm.category,
+      productName: offerForm.type === 'product' ? offerForm.targetValue : offerForm.productName
+    };
+    onUpdateOffer(normalizedOffer);
+    setEditingOfferId(null);
+    setOfferForm(buildOfferFormState());
+    alert('Offer saved successfully!');
   };
 
-  const handlePosterChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setOfferForm({ ...offerForm, poster: reader.result });
-      };
-      reader.readAsDataURL(file);
+  const startOfferEdit = (offer) => {
+    setEditingOfferId(offer._id || offer.id);
+    setOfferForm(buildOfferFormState(offer));
+  };
+
+  const applyOfferToTarget = (type, targetValue) => {
+    // find existing offer for this target
+    const existing = (offers || []).find(o => {
+      if (!o) return false;
+      if ((o.type || 'product') !== type) return false;
+      const tv = (o.targetValue || o.productName || o.category || '').toString();
+      if (!tv) return false;
+      return tv === String(targetValue) || tv === (targetValue._id || targetValue.id) || tv.toLowerCase() === String(targetValue).toLowerCase();
+    });
+    if (existing) {
+      startOfferEdit(existing);
+      window.scrollTo({ top: 200, behavior: 'smooth' });
+      return;
     }
+    // no existing offer: prefill form for new offer
+    setEditingOfferId(null);
+    const pre = buildOfferFormState({ type, targetValue: typeof targetValue === 'string' ? targetValue : (targetValue._id || targetValue.id || targetValue.name || '') });
+    setOfferForm(pre);
+    window.scrollTo({ top: 200, behavior: 'smooth' });
   };
 
-  const handleAddCategory = (e) => {
+  const resetOfferForm = () => {
+    setEditingOfferId(null);
+    setOfferForm(buildOfferFormState());
+  };
+
+  const filteredOffers = Array.isArray(offers)
+    ? offers.filter(offer => {
+        const haystack = `${offer.title || ''} ${offer.description || ''} ${offer.code || ''} ${offer.type || ''}`.toLowerCase();
+        const matchesSearch = haystack.includes(offerSearch.toLowerCase());
+        const status = offer.isPublished ? 'published' : 'draft';
+        const matchesStatus = offerStatusFilter === 'all' || status === offerStatusFilter || (offerStatusFilter === 'active' && offer.isActive !== false);
+        return matchesSearch && matchesStatus;
+      }).sort((a, b) => {
+        if (offerSort === 'title') return (a.title || '').localeCompare(b.title || '');
+        if (offerSort === 'created') return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+        return (Number(b.priority) || 0) - (Number(a.priority) || 0);
+      })
+    : [];
+
+  const addOfferImage = (e) => {
+    if (e) e.preventDefault();
+    const url = offerImageUrl.trim();
+    if (!url) return;
+    if ((offerForm.images || []).length >= 5) {
+      alert('Maximum 5 images allowed for an offer.');
+      return;
+    }
+    setOfferForm(prev => ({
+      ...prev,
+      images: [...(prev.images || []), url],
+      poster: prev.poster || url
+    }));
+    setOfferImageUrl('');
+  };
+
+  const removeOfferImage = (index) => {
+    setOfferForm(prev => {
+      const nextImages = (prev.images || []).filter((_, i) => i !== index);
+      return {
+        ...prev,
+        images: nextImages,
+        poster: nextImages[0] || ''
+      };
+    });
+  };
+
+  const handleAddCategory = async (e) => {
     e.preventDefault();
     if (!newCategory.trim()) return;
+
+    if (editingCategoryId) {
+      const categoryName = newCategory.trim();
+      if (categories.some(cat => (cat._id || cat.id) !== editingCategoryId && (cat.name || '').toLowerCase() === categoryName.toLowerCase())) {
+        alert('Category already exists!');
+        return;
+      }
+      const success = await onUpdateCategory(editingCategoryId, categoryName);
+      if (!success) {
+        alert('Failed to update category. Please try again.');
+        return;
+      }
+      setEditingCategoryId(null);
+      setNewCategory('');
+      alert('Category updated successfully!');
+      return;
+    }
+
     const slug = newCategory.toLowerCase().trim().replace(/\s+/g, '-');
     if (categories.some(cat => (cat.slug || cat.name || '').toLowerCase() === slug.toLowerCase())) {
       alert('Category already exists!');
       return;
     }
-    onAddCategory(slug);
+    const success = await onAddCategory(slug);
+    if (!success) {
+      alert('Failed to add category. Please try again.');
+      return;
+    }
     setNewCategory('');
     alert('Category added successfully!');
+  };
+
+  const startCategoryEdit = (cat) => {
+    const categoryId = cat._id || cat.id;
+    const categoryName = cat.name || '';
+    setEditingCategoryId(categoryId);
+    setNewCategory(categoryName);
+    setTimeout(() => document.getElementById('category-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+  };
+
+  const cancelCategoryEdit = () => {
+    setEditingCategoryId(null);
+    setNewCategory('');
   };
 
   const handleCreateCoupon = (e) => {
@@ -325,6 +713,52 @@ const AdminDashboard = ({
     return isNaN(parsed) ? 0 : parsed;
   };
 
+  const inventoryStats = (() => {
+    const safeProducts = Array.isArray(products) ? products : [];
+    const totalProducts = safeProducts.length;
+    const totalStockUnits = safeProducts.reduce((sum, product) => sum + (Number(product.stock) || 0), 0);
+    const outOfStock = safeProducts.filter((product) => Number(product.stock) <= 0).length;
+    const lowStock = safeProducts.filter((product) => Number(product.stock) > 0 && Number(product.stock) < 10).length;
+    return { totalProducts, totalStockUnits, outOfStock, lowStock };
+  })();
+
+  const inventoryItems = (Array.isArray(products) ? products : [])
+    .map((product) => ({
+      ...product,
+      stockValue: Number(product.stock) || 0
+    }))
+    .sort((a, b) => a.stockValue - b.stockValue);
+
+  const getCustomerContact = (user) => {
+    const phone = user?.phone || '';
+    const email = user?.email || '';
+    const parts = [phone, email].filter(Boolean);
+    return parts.length > 0 ? parts.join(' / ') : '—';
+  };
+
+  const getCustomerAddress = (user) => {
+    if (!user) return '—';
+
+    const defaultAddress = Array.isArray(user.addresses)
+      ? user.addresses.find((address) => address?.isDefault) || user.addresses[0]
+      : null;
+
+    const addressParts = [
+      defaultAddress?.addressLine1,
+      defaultAddress?.addressLine2,
+      defaultAddress?.city,
+      defaultAddress?.state,
+      defaultAddress?.zipCode,
+      defaultAddress?.country,
+    ].filter(Boolean);
+
+    if (addressParts.length > 0) {
+      return addressParts.join(', ');
+    }
+
+    return user.address || '—';
+  };
+
   return (
     <div className="admin-container">
       {/* Sidebar */}
@@ -337,8 +771,15 @@ const AdminDashboard = ({
           {menuItems.map((item) => (
             <button
               key={item.name}
+              type="button"
               className={`admin-nav-item ${activeTab === item.name ? 'active' : ''}`}
-              onClick={() => setActiveTab(item.name)}
+              onClick={() => {
+                if (item.name === 'View Product') {
+                  onViewPublicProducts?.();
+                } else {
+                  handleTabChange(item.name);
+                }
+              }}
             >
               <i className={`fa-solid ${item.icon}`}></i>
               <span>{item.name}</span>
@@ -369,9 +810,7 @@ const AdminDashboard = ({
             >
               <i className="fa-solid fa-arrows-rotate"></i> Refresh
             </button>
-            <button className="admin-btn header-logout" onClick={onLogout} style={{ padding: '0.5rem 1rem' }}>
-              <i className="fa-solid fa-right-from-bracket"></i> Logout
-            </button>
+            
             <div style={{ width: '1.5px', height: '24px', background: 'rgba(0,0,0,0.08)', margin: '0 0.5rem' }}></div>
             <div className="admin-info">
               <span className="admin-name">Sankarganesh R</span>
@@ -457,6 +896,7 @@ const AdminDashboard = ({
                     </div>
                   </div>
                 </div>
+                
               </div>
 
               {/* Quick Actions Panel */}
@@ -496,8 +936,9 @@ const AdminDashboard = ({
                   <form onSubmit={handleUpdateProduct}>
                     <div className="admin-form-grid" style={{ marginBottom: '1.25rem' }}>
                       <div className="admin-form-group">
-                        <label>Product Name</label>
+                        <label htmlFor="editProductName">Product Name</label>
                         <input
+                          id="editProductName"
                           type="text"
                           placeholder="Product name"
                           required
@@ -506,10 +947,11 @@ const AdminDashboard = ({
                         />
                       </div>
                       <div className="admin-form-group">
-                        <label>Price (₹)</label>
+                        <label htmlFor="editProductPrice">Price (₹)</label>
                         <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                           <span style={{ position: 'absolute', left: '1rem', color: 'var(--primary-color)', fontWeight: 'bold' }}>₹</span>
                           <input
+                            id="editProductPrice"
                             type="text"
                             placeholder="e.g. 1499"
                             required
@@ -521,8 +963,9 @@ const AdminDashboard = ({
                         </div>
                       </div>
                       <div className="admin-form-group">
-                        <label>Description</label>
+                        <label htmlFor="editProductDescription">Description</label>
                         <textarea
+                          id="editProductDescription"
                           placeholder="Short product description"
                           value={editProduct.description}
                           onChange={(e) => setEditProduct({ ...editProduct, description: e.target.value })}
@@ -530,8 +973,9 @@ const AdminDashboard = ({
                         />
                       </div>
                       <div className="admin-form-group">
-                        <label>Specifications</label>
+                        <label htmlFor="editProductSpecifications">Specifications</label>
                         <textarea
+                          id="editProductSpecifications"
                           placeholder="Product specifications"
                           value={editProduct.specifications}
                           onChange={(e) => setEditProduct({ ...editProduct, specifications: e.target.value })}
@@ -539,8 +983,9 @@ const AdminDashboard = ({
                         />
                       </div>
                       <div className="admin-form-group">
-                        <label>Stock</label>
+                        <label htmlFor="editProductStock">Stock</label>
                         <input
+                          id="editProductStock"
                           type="number"
                           min="0"
                           placeholder="Stock quantity"
@@ -549,8 +994,9 @@ const AdminDashboard = ({
                         />
                       </div>
                       <div className="admin-form-group">
-                        <label>Category</label>
+                        <label htmlFor="editProductCategory">Category</label>
                         <select
+                          id="editProductCategory"
                           value={editProduct.category}
                           onChange={(e) => setEditProduct({ ...editProduct, category: e.target.value })}
                         >
@@ -578,7 +1024,7 @@ const AdminDashboard = ({
                     </div>
 
                     <div className="admin-form-group" style={{ marginBottom: '1.5rem' }}>
-                      <label>Product Images (Max 5)</label>
+                      <div>Product Images (Max 5)</div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.5rem' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                           <input
@@ -606,10 +1052,10 @@ const AdminDashboard = ({
                             </div>
                           ))}
                           {(replaceEditImages || editProduct.images.length < 5) && (
-                            <label style={{ width: '80px', height: '80px', borderRadius: '8px', border: '2px dashed var(--primary-light)', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', cursor: 'pointer' }}>
+                            <label htmlFor="editProductImageUpload" style={{ width: '80px', height: '80px', borderRadius: '8px', border: '2px dashed var(--primary-light)', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', cursor: 'pointer' }}>
                               <i className="fa-solid fa-plus" style={{ color: 'var(--primary-color)', fontSize: '1.2rem' }}></i>
                               <span style={{ fontSize: '0.65rem', color: 'var(--primary-color)', marginTop: '4px' }}>Upload Images</span>
-                              <input type="file" accept="image/*" multiple onChange={handleEditFileChange} style={{ display: 'none' }} />
+                              <input id="editProductImageUpload" name="editProductImageUpload" type="file" accept="image/*" multiple onChange={handleEditFileChange} style={{ display: 'none' }} />
                             </label>
                           )}
                         </div>
@@ -629,8 +1075,9 @@ const AdminDashboard = ({
                 <form onSubmit={handleAddProduct}>
                   <div className="admin-form-grid" style={{ marginBottom: '1.25rem' }}>
                     <div className="admin-form-group">
-                      <label>Product Name</label>
+                      <label htmlFor="newProductName">Product Name</label>
                       <input 
+                        id="newProductName"
                         type="text" 
                         placeholder="e.g. Sustainable Rocket Stove" 
                         required 
@@ -639,10 +1086,11 @@ const AdminDashboard = ({
                       />
                     </div>
                     <div className="admin-form-group">
-                      <label>Price (₹)</label>
+                      <label htmlFor="newProductPrice">Price (₹)</label>
                       <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                         <span style={{ position: 'absolute', left: '1rem', color: '#818cf8', fontWeight: 'bold' }}>₹</span>
                         <input 
+                          id="newProductPrice"
                           type="text" 
                           placeholder="e.g. 1499" 
                           required 
@@ -654,8 +1102,9 @@ const AdminDashboard = ({
                       </div>
                     </div>
                     <div className="admin-form-group">
-                      <label>Description</label>
+                      <label htmlFor="newProductDescription">Description</label>
                       <textarea
+                        id="newProductDescription"
                         placeholder="Short product description"
                         required
                         value={newProduct.description}
@@ -664,8 +1113,9 @@ const AdminDashboard = ({
                       />
                     </div>
                     <div className="admin-form-group">
-                      <label>Specifications</label>
+                      <label htmlFor="newProductSpecifications">Specifications</label>
                       <textarea
+                        id="newProductSpecifications"
                         placeholder="Product specifications"
                         value={newProduct.specifications}
                         onChange={(e) => setNewProduct({...newProduct, specifications: e.target.value})}
@@ -673,8 +1123,9 @@ const AdminDashboard = ({
                       />
                     </div>
                     <div className="admin-form-group">
-                      <label>Stock</label>
+                      <label htmlFor="newProductStock">Stock</label>
                       <input
+                        id="newProductStock"
                         type="number"
                         min="0"
                         placeholder="Stock quantity"
@@ -683,8 +1134,9 @@ const AdminDashboard = ({
                       />
                     </div>
                     <div className="admin-form-group">
-                      <label>Category</label>
+                      <label htmlFor="newProductCategory">Category</label>
                       <select 
+                        id="newProductCategory"
                         value={newProduct.category}
                         onChange={(e) => setNewProduct({...newProduct, category: e.target.value})}
                       >
@@ -712,7 +1164,7 @@ const AdminDashboard = ({
                   </div>
 
                   <div className="admin-form-group" style={{ marginBottom: '1.5rem' }}>
-                    <label>Product Images (Upload - Max 5)</label>
+                    <div>Product Images (Upload - Max 5)</div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', marginTop: '0.5rem' }}>
                       {newProduct.images.map((base64, index) => (
                         <div key={index} style={{ position: 'relative', width: '80px', height: '80px', borderRadius: '8px', overflow: 'hidden', border: '2px solid #818cf8' }}>
@@ -727,14 +1179,14 @@ const AdminDashboard = ({
                         </div>
                       ))}
                       {newProduct.images.length < 5 && (
-                        <label style={{ 
+                        <label htmlFor="newProductImageUpload" style={{ 
                           width: '80px', height: '80px', borderRadius: '8px', border: '2px dashed rgba(0,0,0,0.1)', 
                           display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', 
                           cursor: 'pointer', transition: 'var(--transition)' 
                         }} className="upload-btn">
                           <i className="fa-solid fa-plus" style={{ color: '#64748b', fontSize: '1.2rem' }}></i>
                           <span style={{ fontSize: '0.65rem', color: '#64748b', marginTop: '4px' }}>Add Image</span>
-                          <input type="file" accept="image/*" multiple onChange={handleFileChange} style={{ display: 'none' }} />
+                          <input id="newProductImageUpload" name="newProductImageUpload" type="file" accept="image/*" multiple onChange={handleFileChange} style={{ display: 'none' }} />
                         </label>
                       )}
                     </div>
@@ -819,11 +1271,12 @@ const AdminDashboard = ({
           {activeTab === 'Categories' && (
             <div className="admin-categories-management">
               <div className="admin-card-glass">
-                <h3>Add New Category</h3>
-                <form onSubmit={handleAddCategory} style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end' }}>
-                  <div className="admin-form-group" style={{ flex: 1 }}>
-                    <label>Category Name</label>
+                <h3>{editingCategoryId ? 'Edit Category' : 'Add New Category'}</h3>
+                <form id="category-form" onSubmit={handleAddCategory} style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                  <div className="admin-form-group" style={{ flex: 1, minWidth: '220px' }}>
+                    <label htmlFor="newCategoryInput">Category Name</label>
                     <input 
+                      id="newCategoryInput"
                       type="text" 
                       placeholder="e.g. Electronics & Gadgets" 
                       required 
@@ -832,22 +1285,70 @@ const AdminDashboard = ({
                     />
                   </div>
                   <button type="submit" className="admin-btn admin-btn-primary" style={{ height: '44px', marginBottom: '2px' }}>
-                    Add Category
+                    {editingCategoryId ? 'Save Category' : 'Add Category'}
                   </button>
+                  {editingCategoryId && (
+                    <button type="button" className="admin-btn admin-btn-danger" onClick={cancelCategoryEdit} style={{ height: '44px', marginBottom: '2px' }}>
+                      Cancel
+                    </button>
+                  )}
                 </form>
               </div>
 
               <div className="admin-card-glass">
-                <h3>Existing Categories</h3>
-                <div className="admin-category-grid">
-                  {categories.map(cat => (
-                    <div key={cat._id} className="admin-category-card">
-                      <span>{cat.name}</span>
-                      <i className="fa-solid fa-tag"></i>
-                      <button className="admin-btn admin-btn-small" onClick={() => onUpdateCategory(cat._id, prompt('New name', cat.name) || cat.name)} title="Edit Category"><i className="fa-solid fa-pen"></i></button>
-                      <button className="admin-btn admin-btn-small" onClick={() => onDeleteCategory(cat._id)} title="Delete Category"><i className="fa-solid fa-trash"></i></button>
-                    </div>
-                  ))}
+                <h3>Category Overview</h3>
+                <div className="admin-table-wrapper">
+                  <table className="admin-table">
+                    <thead>
+                      <tr>
+                        <th>Category</th>
+                        <th>Price</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {categories.map(cat => {
+                        const categoryProducts = (Array.isArray(products) ? products : []).filter(product => {
+                          const productCategory = (product.category || '').toString().toLowerCase();
+                          const categoryName = (cat.name || cat.slug || '').toString().toLowerCase();
+                          return productCategory === categoryName || productCategory.includes(categoryName) || categoryName.includes(productCategory);
+                        });
+                        const categoryPrice = categoryProducts.length > 0
+                          ? Math.min(...categoryProducts.map(product => Number(product.price) || 0))
+                          : 0;
+                        const hasStock = categoryProducts.some(product => Number(product.stock) > 0);
+                        const status = hasStock ? 'Active' : 'Out of Stock';
+                        return (
+                          <tr key={cat._id || cat.id}>
+                            <td style={{ fontWeight: '600', color: '#0f172a' }}>{cat.name}</td>
+                            <td>₹{categoryPrice}</td>
+                            <td>
+                              <span className={`status-pill ${hasStock ? 'active' : 'blocked'}`}>{status}</span>
+                            </td>
+                            <td>
+                              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                <button
+                                  type="button"
+                                  className="admin-btn admin-btn-small"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    startCategoryEdit(cat);
+                                  }}
+                                  title={`Edit ${cat.name || 'category'}`}
+                                  aria-label={`Edit ${cat.name || 'category'}`}
+                                >
+                                  <i className="fa-solid fa-pen"></i>
+                                </button>
+                                <button className="admin-btn admin-btn-small admin-btn-danger" onClick={() => onDeleteCategory(cat._id || cat.id)} title="Delete Category"><i className="fa-solid fa-trash"></i></button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>
@@ -855,132 +1356,436 @@ const AdminDashboard = ({
 
           {activeTab === 'Offers' && (
             <div className="admin-offers-management">
-              <div className="admin-card-glass">
-                <h3>Manage Storefront Promotion Banner</h3>
-                <p style={{ marginBottom: '1.5rem', color: '#94a3b8', fontSize: '0.85rem' }}>Configure the promotional discount banner displayed at the top of the main catalog pages.</p>
-                
-                <form onSubmit={handleUpdateOffer} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                    <div className="admin-form-group">
-                      <label>Offer Title</label>
-                      <input 
-                        type="text" 
-                        value={offerForm.title}
-                        onChange={(e) => setOfferForm({...offerForm, title: e.target.value})}
-                        placeholder="e.g. Grand Monsoon Sale!"
-                        required
-                      />
+              <div className="admin-card-glass" style={{ display: 'grid', gap: '1.25rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                  <div>
+                    <h3>{editingOfferId ? 'Edit Offer' : 'Create New Offer'}</h3>
+                    <p style={{ margin: 0, color: '#64748b', fontSize: '0.9rem' }}>Create, schedule, and manage product, category, and store-wide offers from one place.</p>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                    <button type="button" className="admin-btn admin-btn-small" onClick={resetOfferForm}>New Offer</button>
+                  </div>
+                </div>
+
+                <form onSubmit={handleUpdateOffer} style={{ display: 'grid', gap: '2rem' }}>
+                  {/* OFFER IMAGES SECTION */}
+                  <div className="admin-form-group">
+                    <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Offer Images (Up to 5)</label>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.75rem', marginBottom: '1rem' }}>
+                      {[0, 1, 2, 3, 4].map(index => (
+                        <div key={index} style={{
+                          aspect: '1',
+                          border: '2px dashed #cbd5e1',
+                          borderRadius: '0.5rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          backgroundColor: '#f8fafc',
+                          cursor: 'pointer',
+                          overflow: 'hidden',
+                          position: 'relative'
+                        }}>
+                          {(offerForm.images || [])[index] ? (
+                            <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+                              <img src={(offerForm.images || [])[index]} alt={`Offer ${index + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              <button type="button" onClick={() => removeOfferImage(index)} style={{
+                                position: 'absolute',
+                                top: '4px',
+                                right: '4px',
+                                background: 'rgba(0,0,0,0.7)',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '50%',
+                                width: '24px',
+                                height: '24px',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                              }}>
+                                <i className="fa-solid fa-xmark" style={{ fontSize: '12px' }}></i>
+                              </button>
+                            </div>
+                          ) : (
+                            <div style={{ textAlign: 'center', color: '#cbd5e1', fontSize: '1.5rem' }}>
+                              <i className="fa-solid fa-image"></i>
+                            </div>
+                          )}
+                        </div>
+                      ))}
                     </div>
-                    <div className="admin-form-group">
-                      <label>Description</label>
-                      <textarea 
-                        value={offerForm.description}
-                        onChange={(e) => setOfferForm({...offerForm, description: e.target.value})}
-                        placeholder="Describe the offer details..."
-                        style={{ minHeight: '80px' }}
-                        required
-                      />
+                    <label style={{ fontSize: '0.75rem', fontWeight: '600', color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '0.5rem' }}>
+                      Paste Image URL
+                    </label>
+                    <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+                      <input type="url" value={offerImageUrl} onChange={(e) => setOfferImageUrl(e.target.value)} placeholder="https://example.com/image.jpg" style={{ flex: 1 }} />
+                      <button type="button" className="admin-btn admin-btn-small" onClick={addOfferImage}>Add</button>
                     </div>
-                    <div className="admin-form-group">
-                      <label>Promo Voucher Code</label>
-                      <input 
-                        type="text" 
-                        value={offerForm.code}
-                        onChange={(e) => setOfferForm({...offerForm, code: e.target.value})}
-                        placeholder="e.g. MONSOON30"
-                        required
-                      />
-                    </div>
-                    <button type="submit" className="admin-btn admin-btn-primary" style={{ justifyContent: 'center' }}>
-                      Update Promo Banner
-                    </button>
                   </div>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                    <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#475569' }}>Banner Poster Image</label>
-                    <div style={{ 
-                      width: '100%', height: '220px', border: '2px dashed rgba(0,0,0,0.1)', 
-                      borderRadius: '10px', display: 'flex', flexDirection: 'column', justifyContent: 'center', 
-                      alignItems: 'center', overflow: 'hidden', position: 'relative', background: '#f8fafc' 
-                    }}>
-                      {offerForm.poster ? (
-                        <>
-                          <img src={offerForm.poster} alt="Poster Banner" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-                          <button 
-                            type="button" 
-                            onClick={() => setOfferForm({...offerForm, poster: null})}
-                            style={{ position: 'absolute', top: '10px', right: '10px', background: '#ef4444', color: 'white', border: 'none', borderRadius: '50%', width: '22px', height: '22px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                          >
-                            &times;
-                          </button>
-                        </>
-                      ) : (
-                        <div style={{ textAlign: 'center', padding: '1rem' }}>
-                          <i className="fa-solid fa-image" style={{ fontSize: '2.5rem', color: '#cbd5e1', marginBottom: '0.5rem' }}></i>
-                          <p style={{ color: '#64748b', fontSize: '0.8rem' }}>No poster uploaded</p>
-                        </div>
-                      )}
+                  {/* PRODUCT DETAILS TABLE-LIKE SECTION */}
+                  <div style={{ overflowX: 'auto' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '1rem', minWidth: '100%' }}>
+                      {/* Row 1: Product Name, Category, Condition, Badge Label, Original Price */}
+                      <div className="admin-form-group" style={{ marginBottom: 0 }}>
+                        <label htmlFor="offerProductName" style={{ fontSize: '0.75rem', color: '#0f172a', fontWeight: '600' }}>Product Name *</label>
+                        <input id="offerProductName" type="text" value={offerForm.productName} onChange={(e) => setOfferForm({...offerForm, productName: e.target.value})} placeholder="Please fill out this field" required />
+                      </div>
+                      <div className="admin-form-group" style={{ marginBottom: 0 }}>
+                        <label htmlFor="offerCategory" style={{ fontSize: '0.75rem', color: '#0f172a', fontWeight: '600' }}>Category</label>
+                        <select id="offerCategory" value={offerForm.category} onChange={(e) => setOfferForm({...offerForm, category: e.target.value})}>
+                          <option value="">Select Category</option>
+                          {products.map(p => p.category).filter((v, i, a) => a.indexOf(v) === i).map(cat => (
+                            <option key={cat} value={cat}>{cat}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="admin-form-group" style={{ marginBottom: 0 }}>
+                        <label htmlFor="offerCondition" style={{ fontSize: '0.75rem', color: '#0f172a', fontWeight: '600' }}>Condition</label>
+                        <input id="offerCondition" type="text" value={offerForm.condition} onChange={(e) => setOfferForm({...offerForm, condition: e.target.value})} placeholder="e.g. First 60 customers only" />
+                      </div>
+                      <div className="admin-form-group" style={{ marginBottom: 0 }}>
+                        <label htmlFor="offerBadgeLabel" style={{ fontSize: '0.75rem', color: '#0f172a', fontWeight: '600' }}>Badge Label</label>
+                        <input id="offerBadgeLabel" type="text" value={offerForm.badgeLabel} onChange={(e) => setOfferForm({...offerForm, badgeLabel: e.target.value})} placeholder="e.g. Limited Offer" />
+                      </div>
+                      <div className="admin-form-group" style={{ marginBottom: 0 }}>
+                        <label htmlFor="offerOriginalPrice" style={{ fontSize: '0.75rem', color: '#0f172a', fontWeight: '600' }}>Original Price (₹) *</label>
+                        <input id="offerOriginalPrice" type="number" value={offerForm.originalPrice} onChange={(e) => setOfferForm({...offerForm, originalPrice: e.target.value})} placeholder="e.g. 500" required />
+                      </div>
                     </div>
-                    <input 
-                      type="file" 
-                      id="posterInput" 
-                      accept="image/*" 
-                      onChange={handlePosterChange} 
-                      style={{ display: 'none' }} 
-                    />
-                    <label 
-                      htmlFor="posterInput" 
-                      className="admin-btn" 
-                      style={{ 
-                        justifyContent: 'center', background: '#ffffff', 
-                        border: '1px solid #cbd5e1', color: '#334155', cursor: 'pointer' 
-                      }}
-                    >
-                      {offerForm.poster ? 'Change Banner Image' : 'Upload Banner Image'}
+
+                    {/* Row 2: Offer Price, MRP Illusion, Discount %, Stock Units, Rating */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '1rem', marginTop: '1rem', minWidth: '100%' }}>
+                      <div className="admin-form-group" style={{ marginBottom: 0 }}>
+                        <label htmlFor="offerPrice" style={{ fontSize: '0.75rem', color: '#0f172a', fontWeight: '600' }}>Offer Price (₹) *</label>
+                        <input id="offerPrice" type="number" value={offerForm.offerPrice} onChange={(e) => setOfferForm({...offerForm, offerPrice: e.target.value})} placeholder="e.g. 550" required />
+                      </div>
+                      <div className="admin-form-group" style={{ marginBottom: 0 }}>
+                        <label htmlFor="offerMrpIllusion" style={{ fontSize: '0.75rem', color: '#0f172a', fontWeight: '600' }}>MRP Illusion (₹)</label>
+                        <input id="offerMrpIllusion" type="number" value={offerForm.mrpIllusion} onChange={(e) => setOfferForm({...offerForm, mrpIllusion: e.target.value})} placeholder="Displayed strikethrough" />
+                      </div>
+                      <div className="admin-form-group" style={{ marginBottom: 0 }}>
+                        <label htmlFor="offerDiscount" style={{ fontSize: '0.75rem', color: '#0f172a', fontWeight: '600' }}>Discount (%)</label>
+                        <input id="offerDiscount" type="number" value={offerForm.discountPercent} onChange={(e) => setOfferForm({...offerForm, discountPercent: e.target.value})} placeholder="Auto-calculated or set" />
+                      </div>
+                      <div className="admin-form-group" style={{ marginBottom: 0 }}>
+                        <label htmlFor="offerStockUnits" style={{ fontSize: '0.75rem', color: '#0f172a', fontWeight: '600' }}>Stock Units *</label>
+                        <input id="offerStockUnits" type="number" value={offerForm.stockUnits} onChange={(e) => setOfferForm({...offerForm, stockUnits: e.target.value})} placeholder="e.g. 60" required />
+                      </div>
+                      <div className="admin-form-group" style={{ marginBottom: 0 }}>
+                        <label htmlFor="offerRating" style={{ fontSize: '0.75rem', color: '#0f172a', fontWeight: '600' }}>Rating (0-5)</label>
+                        <input id="offerRating" type="number" min="0" max="5" step="0.1" value={offerForm.rating} onChange={(e) => setOfferForm({...offerForm, rating: e.target.value})} placeholder="e.g. 4.5" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* DATE RANGE SECTION */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div className="admin-form-group">
+                      <label htmlFor="offerStartDate" style={{ fontSize: '0.75rem', color: '#0f172a', fontWeight: '600' }}>Start Date *</label>
+                      <input id="offerStartDate" type="date" value={offerForm.startDate} onChange={(e) => setOfferForm({...offerForm, startDate: e.target.value})} required />
+                    </div>
+                    <div className="admin-form-group">
+                      <label htmlFor="offerEndDate" style={{ fontSize: '0.75rem', color: '#0f172a', fontWeight: '600' }}>End Date *</label>
+                      <input id="offerEndDate" type="date" value={offerForm.endDate} onChange={(e) => setOfferForm({...offerForm, endDate: e.target.value})} required />
+                    </div>
+                  </div>
+
+                  {/* ADDITIONAL FIELDS */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div className="admin-form-group">
+                      <label htmlFor="offerTitle">Offer Title</label>
+                      <input id="offerTitle" type="text" value={offerForm.title} onChange={(e) => setOfferForm({...offerForm, title: e.target.value})} placeholder="e.g. Grand Monsoon Sale!" />
+                    </div>
+                    <div className="admin-form-group">
+                      <label htmlFor="offerCode">Promo Code</label>
+                      <input id="offerCode" type="text" value={offerForm.code} onChange={(e) => setOfferForm({...offerForm, code: e.target.value})} placeholder="e.g. MONSOON30" />
+                    </div>
+                  </div>
+
+                  {/* DESCRIPTION */}
+                  <div className="admin-form-group">
+                    <label htmlFor="offerDescription">Description *</label>
+                    <textarea id="offerDescription" value={offerForm.description} onChange={(e) => setOfferForm({...offerForm, description: e.target.value})} placeholder="Describe the offer details..." style={{ minHeight: '100px' }} required />
+                  </div>
+
+                  {/* TOGGLES & SUBMIT */}
+                  <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <label className="offer-toggle" htmlFor="offerPublish">
+                      <input id="offerPublish" type="checkbox" checked={offerForm.isPublished} onChange={(e) => setOfferForm({...offerForm, isPublished: e.target.checked})} />
+                      <span>Publish on storefront</span>
                     </label>
+                    <label className="offer-toggle" htmlFor="offerActive">
+                      <input id="offerActive" type="checkbox" checked={offerForm.isActive} onChange={(e) => setOfferForm({...offerForm, isActive: e.target.checked})} />
+                      <span>Active now</span>
+                    </label>
+                    <button type="submit" className="admin-btn admin-btn-primary" style={{ marginLeft: 'auto' }}>
+                      {editingOfferId ? 'Save Offer' : 'Publish Offer'}
+                    </button>
                   </div>
                 </form>
+              </div>
+              <div className="admin-card-glass" style={{ marginTop: '0.5rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', alignItems: 'center', marginBottom: '1rem' }}>
+                  <h3>Offer Library</h3>
+                  <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                    <input type="search" value={offerSearch} onChange={(e) => setOfferSearch(e.target.value)} placeholder="Search offers" style={{ minWidth: '180px' }} />
+                    <select value={offerStatusFilter} onChange={(e) => setOfferStatusFilter(e.target.value)}>
+                      <option value="all">All</option>
+                      <option value="active">Active</option>
+                      <option value="published">Published</option>
+                      <option value="draft">Draft</option>
+                    </select>
+                    <select value={offerSort} onChange={(e) => setOfferSort(e.target.value)}>
+                      <option value="priority">Priority</option>
+                      <option value="title">Title</option>
+                      <option value="created">Recently Added</option>
+                    </select>
+                  </div>
+                </div>
+                {filteredOffers.length > 0 ? (
+                  <div className="admin-table-wrapper">
+                    <table className="admin-table">
+                      <thead>
+                        <tr>
+                          <th>Offer</th>
+                          <th>Scope</th>
+                          <th>Status</th>
+                          <th>Priority</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredOffers.map(offer => {
+                          const offerId = offer._id || offer.id;
+                          const status = offer.isPublished ? 'Published' : 'Draft';
+                          return (
+                            <tr key={offerId}>
+                              <td>
+                                <div style={{ fontWeight: 600, color: '#0f172a' }}>{offer.title}</div>
+                                <div style={{ fontSize: '0.8rem', color: '#64748b' }}>{offer.code}</div>
+                              </td>
+                              <td>{offer.type || 'product'}</td>
+                              <td>
+                                <span className={`status-pill ${offer.isPublished ? 'active' : 'blocked'}`}>{status}</span>
+                              </td>
+                              <td>{offer.priority || 0}</td>
+                              <td>
+                                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                                  <button type="button" className="admin-btn admin-btn-small" onClick={() => startOfferEdit(offer)}><i className="fa-solid fa-pen"></i></button>
+                                  <button type="button" className="admin-btn admin-btn-small" onClick={() => onToggleOffer(offerId)}><i className="fa-solid fa-power-off"></i></button>
+                                  <button type="button" className="admin-btn admin-btn-small" onClick={() => onDuplicateOffer(offer)}><i className="fa-solid fa-copy"></i></button>
+                                  <button type="button" className="admin-btn admin-btn-small admin-btn-danger" onClick={() => onDeleteOffer(offerId)}><i className="fa-solid fa-trash"></i></button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="admin-empty-state">No offers match the current search or filters.</div>
+                )}
               </div>
             </div>
           )}
 
           {activeTab === 'Orders' && (
             <div className="admin-orders-management">
-              <div className="admin-card-glass">
-                <h3>Recent Orders</h3>
-                {orders.length > 0 ? (
-                  <div className="admin-table-wrapper">
-                    <table className="admin-table">
-                      <thead>
-                        <tr>
-                          <th>Order ID</th>
-                          <th>Customer</th>
-                          <th>Amount</th>
-                          <th>Status</th>
-                          <th>Date</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {orders.map(o => (
-                          <tr key={o._id || o.id}>
-                            <td style={{ fontWeight: '700', color: '#818cf8' }}>#{o.orderId}</td>
-                            <td>{o.customerName}</td>
-                            <td style={{ fontWeight: 'bold', color: 'white' }}>
-                              {o.totalAmount?.toString().startsWith('₹') ? o.totalAmount : `₹${o.totalAmount}`}
-                            </td>
-                            <td>
-                              <span className={`status-pill ${o.status === 'Delivered' ? 'delivered' : 'processing'}`}>
-                                {o.status}
-                              </span>
-                            </td>
-                            <td style={{ color: '#94a3b8' }}>{new Date(o.createdAt).toLocaleDateString()}</td>
+              <div style={{ display: 'grid', gridTemplateColumns: selectedOrder ? '1.4fr 1fr' : '1fr', gap: '1.5rem' }}>
+                <div className="admin-card-glass">
+                  <h3>Recent Orders</h3>
+                  {orders.length > 0 ? (
+                    <div className="admin-table-wrapper">
+                      <table className="admin-table">
+                        <thead>
+                          <tr>
+                            <th>Order ID</th>
+                            <th>Customer</th>
+                            <th>Amount</th>
+                            <th>Status</th>
+                            <th>Date</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody>
+                          {orders.map(o => (
+                            <tr
+                              key={o._id || o.id}
+                              onClick={() => handleSelectOrder(o)}
+                              style={{ cursor: 'pointer', background: selectedOrderId === (o._id || o.id) ? 'rgba(79, 70, 229, 0.08)' : 'transparent' }}
+                            >
+                              <td style={{ fontWeight: '700', color: '#818cf8' }}>#{o.orderId}</td>
+                              <td>{o.customerName}</td>
+                              <td style={{ fontWeight: 'bold', color: 'black' }}>
+                                {o.totalAmount?.toString().startsWith('₹') ? o.totalAmount : `₹${o.totalAmount}`}
+                              </td>
+                              <td>
+                                <span className={`status-pill ${o.status === 'Delivered' ? 'delivered' : 'processing'}`}>
+                                  {o.status}
+                                </span>
+                              </td>
+                              <td style={{ color: '#94a3b8' }}>{new Date(o.createdAt).toLocaleDateString()}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="admin-empty-state">No orders placed yet.</div>
+                  )}
+                </div>
+
+                {selectedOrder ? (
+                  <div className="admin-card-glass" style={{ minWidth: '320px' }}>
+                    <h3>Order Progress</h3>
+                    <div style={{ display: 'grid', gap: '0.75rem', marginBottom: '1rem' }}>
+                      {orderProgressStages.map((stage, index) => {
+                        const stageIndex = getOrderProgressIndex(selectedOrder.status);
+                        const isCompleted = stageIndex >= index + 1;
+                        const isActive = stageIndex === index;
+                        const isCancelled = stageIndex < 0;
+                        return (
+                          <div key={stage.key} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.7rem 0.8rem', borderRadius: '0.9rem', background: isCompleted ? 'rgba(22, 163, 74, 0.12)' : isActive ? 'rgba(79, 70, 229, 0.14)' : 'rgba(15, 23, 42, 0.04)', border: isCompleted ? '1px solid rgba(22, 163, 74, 0.25)' : isActive ? '1px solid rgba(79, 70, 229, 0.25)' : '1px solid rgba(15, 23, 42, 0.08)' }}>
+                            <div style={{ width: '2rem', height: '2rem', borderRadius: '999px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, color: isCompleted || isActive ? '#fff' : '#475569', background: isCompleted ? 'linear-gradient(135deg, #16a34a, #22c55e)' : isActive ? 'linear-gradient(135deg, #4f46e5, #818cf8)' : '#e2e8f0' }}>
+                              {isCompleted ? '✓' : index + 1}
+                            </div>
+                            <div>
+                              <div style={{ fontWeight: 700, color: '#0f172a' }}>{stage.label}</div>
+                              <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                                {isCancelled ? 'Order ended' : isCompleted ? 'Completed' : isActive ? 'Current step' : 'Pending'}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <h3 style={{ marginTop: '1rem' }}>Update Shipping / Status</h3>
+                    <form onSubmit={handleUpdateOrder} style={{ display: 'grid', gap: '1rem' }}>
+                      <div className="admin-form-group">
+                        <label htmlFor="orderStatus">Status</label>
+                        <select
+                          id="orderStatus"
+                          value={orderShippingForm.status}
+                          onChange={(e) => updateShippingFormField('status', e.target.value)}
+                        >
+                          <option value="">Select status</option>
+                          {orderStatusOptions.map(status => (
+                            <option key={status} value={status}>{status}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="admin-form-group">
+                        <label htmlFor="courierPartner">Courier Partner</label>
+                        <input
+                          id="courierPartner"
+                          type="text"
+                          value={orderShippingForm.courierPartner}
+                          onChange={(e) => updateShippingFormField('courierPartner', e.target.value)}
+                          placeholder="e.g. XYZ Couriers"
+                        />
+                      </div>
+
+                      <div className="admin-form-group">
+                        <label htmlFor="trackingNumber">Tracking Number</label>
+                        <input
+                          id="trackingNumber"
+                          type="text"
+                          value={orderShippingForm.trackingNumber}
+                          onChange={(e) => updateShippingFormField('trackingNumber', e.target.value)}
+                          placeholder="AWB / consignment no"
+                        />
+                      </div>
+
+                      <div className="admin-form-group">
+                        <label htmlFor="trackingUrl">Tracking URL</label>
+                        <input
+                          id="trackingUrl"
+                          type="text"
+                          value={orderShippingForm.trackingUrl}
+                          onChange={(e) => updateShippingFormField('trackingUrl', e.target.value)}
+                          placeholder="https://track.example.com/awb"
+                        />
+                      </div>
+
+                      <div className="admin-form-group">
+                        <label htmlFor="shipmentDate">Shipment Date</label>
+                        <input
+                          id="shipmentDate"
+                          type="date"
+                          value={orderShippingForm.shipmentDate}
+                          onChange={(e) => updateShippingFormField('shipmentDate', e.target.value)}
+                        />
+                      </div>
+
+                      <div className="admin-form-group">
+                        <label htmlFor="estimatedDelivery">Estimated Delivery</label>
+                        <input
+                          id="estimatedDelivery"
+                          type="date"
+                          value={orderShippingForm.estimatedDelivery}
+                          onChange={(e) => updateShippingFormField('estimatedDelivery', e.target.value)}
+                        />
+                      </div>
+
+                      <div className="admin-form-group">
+                        <label htmlFor="currentLocation">Current Location</label>
+                        <input
+                          id="currentLocation"
+                          type="text"
+                          value={orderShippingForm.currentLocation}
+                          onChange={(e) => updateShippingFormField('currentLocation', e.target.value)}
+                          placeholder="Current transit location"
+                        />
+                      </div>
+
+                      <div className="admin-form-group">
+                        <label htmlFor="deliveryPersonName">Delivery Agent</label>
+                        <input
+                          id="deliveryPersonName"
+                          type="text"
+                          value={orderShippingForm.deliveryPersonName}
+                          onChange={(e) => updateShippingFormField('deliveryPersonName', e.target.value)}
+                          placeholder="Agent name"
+                        />
+                      </div>
+
+                      <div className="admin-form-group">
+                        <label htmlFor="deliveryPhone">Agent Phone</label>
+                        <input
+                          id="deliveryPhone"
+                          type="tel"
+                          value={orderShippingForm.deliveryPhone}
+                          onChange={(e) => updateShippingFormField('deliveryPhone', e.target.value)}
+                          placeholder="Agent contact number"
+                        />
+                      </div>
+
+                      <div className="admin-form-group">
+                        <label htmlFor="orderNote">Update Note</label>
+                        <textarea
+                          id="orderNote"
+                          rows="3"
+                          value={orderShippingForm.note}
+                          onChange={(e) => updateShippingFormField('note', e.target.value)}
+                          placeholder="Optional note for the customer"
+                        />
+                      </div>
+
+                      <button type="submit" className="admin-btn admin-btn-primary" style={{ justifyContent: 'center' }}>
+                        Save order update
+                      </button>
+                    </form>
                   </div>
                 ) : (
-                  <div className="admin-empty-state">No orders placed yet.</div>
+                  <div className="admin-card-glass" style={{ minWidth: '320px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
+                    <div style={{ textAlign: 'center', color: '#475569' }}>
+                      <h4 style={{ marginBottom: '0.5rem' }}>Select an order</h4>
+                      <p>Click an order row to update courier tracking and shipment details.</p>
+                    </div>
+                  </div>
                 )}
               </div>
             </div>
@@ -992,8 +1797,9 @@ const AdminDashboard = ({
                 <h3>{editingCouponId ? 'Edit Coupon' : 'Add New Coupon'}</h3>
                 <form onSubmit={handleCreateCoupon}>
                   <div className="admin-form-group" style={{ marginBottom: '1rem' }}>
-                    <label>Coupon Code</label>
+                    <label htmlFor="couponCode">Coupon Code</label>
                     <input 
+                      id="couponCode"
                       type="text" 
                       placeholder="e.g. STOVE15" 
                       required 
@@ -1002,8 +1808,9 @@ const AdminDashboard = ({
                     />
                   </div>
                   <div className="admin-form-group" style={{ marginBottom: '1rem' }}>
-                    <label>Discount Type</label>
+                    <label htmlFor="couponDiscountType">Discount Type</label>
                     <select 
+                      id="couponDiscountType"
                       value={newCoupon.discountType}
                       onChange={(e) => setNewCoupon({...newCoupon, discountType: e.target.value})}
                     >
@@ -1012,8 +1819,9 @@ const AdminDashboard = ({
                     </select>
                   </div>
                   <div className="admin-form-group" style={{ marginBottom: '1rem' }}>
-                    <label>Discount Value</label>
+                    <label htmlFor="couponDiscountValue">Discount Value</label>
                     <input 
+                      id="couponDiscountValue"
                       type="number" 
                       placeholder="e.g. 15" 
                       required 
@@ -1023,8 +1831,9 @@ const AdminDashboard = ({
                     />
                   </div>
                   <div className="admin-form-group" style={{ marginBottom: '1rem' }}>
-                    <label>Linked Product</label>
+                    <label htmlFor="couponLinkedProduct">Linked Product</label>
                     <select 
+                      id="couponLinkedProduct"
                       value={newCoupon.linkedProduct}
                       onChange={(e) => setNewCoupon({...newCoupon, linkedProduct: e.target.value})}
                     >
@@ -1037,8 +1846,9 @@ const AdminDashboard = ({
                     </select>
                   </div>
                   <div className="admin-form-group" style={{ marginBottom: '1.5rem' }}>
-                    <label>Expiry Date</label>
+                    <label htmlFor="couponExpiry">Expiry Date</label>
                     <input 
+                      id="couponExpiry"
                       type="date" 
                       required 
                       value={newCoupon.expiryDate}
@@ -1123,8 +1933,9 @@ const AdminDashboard = ({
                   setNewHeroBanner({ image: '', caption: '' });
                 }}>
                   <div className="admin-form-group" style={{ marginBottom: '1.25rem' }}>
-                    <label>Caption / Text (Optional)</label>
+                    <label htmlFor="heroCaption">Caption / Text (Optional)</label>
                     <input 
+                      id="heroCaption"
                       type="text" 
                       placeholder="e.g. Premium Sustainable Engineering"
                       value={newHeroBanner.caption}
@@ -1344,37 +2155,78 @@ const AdminDashboard = ({
           {activeTab === 'Inventory' && (
             <div className="admin-inventory-management">
               <div className="admin-card-glass">
-                <h3>Visitor Leads (WhatsApp Submissions)</h3>
-                {leads.length > 0 ? (
-                  <div className="admin-table-wrapper">
-                    <table className="admin-table">
-                      <thead>
-                        <tr>
-                          <th>Name</th>
-                          <th>WhatsApp Link</th>
-                          <th>Location</th>
-                          <th>Date Joined</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {leads.map(lead => (
-                          <tr key={lead._id || lead.id}>
-                            <td style={{ fontWeight: '600', color: '#0f172a' }}>{lead.name}</td>
-                            <td>
-                              <a href={`https://wa.me/${lead.whatsapp}`} target="_blank" rel="noopener noreferrer" style={{ color: '#0284c7', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                                <i className="fa-brands fa-whatsapp"></i> {lead.whatsapp}
-                              </a>
-                            </td>
-                            <td>{lead.location}</td>
-                            <td style={{ color: '#64748b' }}>{new Date(lead.createdAt).toLocaleDateString()}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                <h3>Inventory Overview</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.25rem' }}>
+                  <div style={{ background: 'linear-gradient(135deg, #eff6ff, #dbeafe)', borderRadius: '12px', padding: '1rem', border: '1px solid #bfdbfe' }}>
+                    <div style={{ color: '#1d4ed8', fontSize: '0.9rem', fontWeight: 600 }}>Total Products</div>
+                    <div style={{ fontSize: '1.6rem', fontWeight: 700, color: '#0f172a', marginTop: '0.35rem' }}>{inventoryStats.totalProducts}</div>
                   </div>
-                ) : (
-                  <div className="admin-empty-state">No visitor leads found.</div>
-                )}
+                  <div style={{ background: 'linear-gradient(135deg, #f0fdf4, #dcfce7)', borderRadius: '12px', padding: '1rem', border: '1px solid #bbf7d0' }}>
+                    <div style={{ color: '#15803d', fontSize: '0.9rem', fontWeight: 600 }}>Total Stock Units</div>
+                    <div style={{ fontSize: '1.6rem', fontWeight: 700, color: '#0f172a', marginTop: '0.35rem' }}>{inventoryStats.totalStockUnits}</div>
+                  </div>
+                  <div style={{ background: 'linear-gradient(135deg, #fef2f2, #fee2e2)', borderRadius: '12px', padding: '1rem', border: '1px solid #fecaca' }}>
+                    <div style={{ color: '#b91c1c', fontSize: '0.9rem', fontWeight: 600 }}>Out of Stock</div>
+                    <div style={{ fontSize: '1.6rem', fontWeight: 700, color: '#0f172a', marginTop: '0.35rem' }}>{inventoryStats.outOfStock}</div>
+                  </div>
+                  <div style={{ background: 'linear-gradient(135deg, #fffbeb, #fef3c7)', borderRadius: '12px', padding: '1rem', border: '1px solid #fde68a' }}>
+                    <div style={{ color: '#b45309', fontSize: '0.9rem', fontWeight: 600 }}>Low Stock</div>
+                    <div style={{ fontSize: '1.6rem', fontWeight: 700, color: '#0f172a', marginTop: '0.35rem' }}>{inventoryStats.lowStock}</div>
+                  </div>
+                </div>
+
+                <div className="admin-table-wrapper">
+                  <table className="admin-table">
+                    <thead>
+                      <tr>
+                        <th>Product</th>
+                        <th>Category</th>
+                        <th>Stock</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {inventoryItems.length > 0 ? inventoryItems.map((product) => {
+                        const productId = product._id || product.id;
+                        const stock = Number(product.stockValue) || 0;
+                        const draftValue = inventoryStockDrafts[productId] ?? String(stock);
+                        const status = stock <= 0 ? 'Out of Stock' : stock < 10 ? 'Low Stock' : 'In Stock';
+                        const statusClass = stock <= 0 ? 'blocked' : stock < 10 ? 'processing' : 'active';
+                        return (
+                          <tr key={productId}>
+                            <td style={{ fontWeight: '600', color: '#0f172a' }}>{product.name}</td>
+                            <td>{(product.category || '').replace(/-/g, ' ')}</td>
+                            <td>
+                              <input
+                                type="number"
+                                min="0"
+                                value={draftValue}
+                                onChange={(e) => setInventoryStockDrafts(prev => ({ ...prev, [productId]: e.target.value }))}
+                                onBlur={() => handleInventoryStockSave(productId, draftValue)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    handleInventoryStockSave(productId, draftValue);
+                                  }
+                                }}
+                                style={{ width: '90px', padding: '0.4rem 0.5rem', borderRadius: '8px', border: '1px solid #cbd5e1' }}
+                              />
+                            </td>
+                            <td>
+                              <span className={`status-pill ${statusClass}`}>{status}</span>
+                            </td>
+                          </tr>
+                        );
+                      }) : (
+                        <tr>
+                          <td colSpan="4">
+                            <div className="admin-empty-state">No inventory data available yet.</div>
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           )}
@@ -1388,24 +2240,20 @@ const AdminDashboard = ({
                     <table className="admin-table">
                       <thead>
                         <tr>
-                          <th>Name</th>
-                          <th>Email</th>
-                          <th>Joined Date</th>
-                          <th>Status</th>
-                          <th>Actions</th>
+                          <th>Customer</th>
+                          <th>Contact</th>
+                          <th>Delivery Address</th>
+                          <th>Joined</th>
+                          <th>Action</th>
                         </tr>
                       </thead>
                       <tbody>
                         {users.map(user => (
                           <tr key={user._id || user.id}>
                             <td style={{ fontWeight: '600', color: '#0f172a' }}>{user.name}</td>
-                            <td>{user.email}</td>
+                            <td style={{ color: '#334155' }}>{getCustomerContact(user)}</td>
+                            <td style={{ color: '#334155', minWidth: '220px' }}>{getCustomerAddress(user)}</td>
                             <td style={{ color: '#64748b' }}>{new Date(user.createdAt).toLocaleDateString()}</td>
-                            <td>
-                              <span className={`status-pill ${user.status === 'blocked' ? 'blocked' : 'active'}`}>
-                                {user.status}
-                              </span>
-                            </td>
                             <td>
                               <div style={{ display: 'flex', gap: '0.5rem' }}>
                                 <button 
@@ -1433,8 +2281,50 @@ const AdminDashboard = ({
                   <div className="admin-empty-state">No customers registered yet.</div>
                 )}
               </div>
+
+              <div className="admin-card-glass" style={{ marginTop: '1.25rem' }}>
+                <h3>Customer Requests & Activity</h3>
+                <div className="admin-table-wrapper">
+                  <table className="admin-table">
+                    <thead>
+                      <tr>
+                        <th>Type</th>
+                        <th>Customer</th>
+                        <th>Details</th>
+                        <th>Status</th>
+                        <th>Time</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {customerActivityFeed.length > 0 ? customerActivityFeed.map((item) => (
+                        <tr key={item.id}>
+                          <td style={{ fontWeight: 600, color: '#0f172a' }}>{item.type}</td>
+                          <td>
+                            <div style={{ fontWeight: 600, color: '#0f172a' }}>{item.customerName}</div>
+                            <div style={{ fontSize: '0.8rem', color: '#64748b' }}>{item.customerEmail}</div>
+                          </td>
+                          <td style={{ color: '#334155' }}>{item.description}</td>
+                          <td>
+                            <span className={`status-pill ${item.status === 'blocked' ? 'blocked' : item.status === 'Resolved' || item.status === 'Delivered' || item.status === 'active' || item.status === 'Approved' ? 'active' : 'processing'}`}>
+                              {item.status}
+                            </span>
+                          </td>
+                          <td style={{ color: '#64748b', whiteSpace: 'nowrap' }}>{item.timestamp ? new Date(item.timestamp).toLocaleString() : '—'}</td>
+                        </tr>
+                      )) : (
+                        <tr>
+                          <td colSpan="5">
+                            <div className="admin-empty-state">No customer requests or activity available yet.</div>
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
           )}
+
         </section>
       </main>
     </div>

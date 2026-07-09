@@ -15,4 +15,42 @@ const productSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now }
 });
 
-module.exports = mongoose.model('Product', productSchema);
+const overrides = new Map();
+
+const getActiveMongoose = () => (mongoose.getActive ? mongoose.getActive() : mongoose);
+
+const getActiveProductModel = () => {
+  const activeMongoose = getActiveMongoose();
+  const existingModel = activeMongoose.models?.Product;
+  if (existingModel) {
+    return existingModel;
+  }
+  return activeMongoose.model('Product', productSchema);
+};
+
+const ProductModelProxy = new Proxy(function ProductModelProxy() {}, {
+  construct(target, args) {
+    const activeModel = getActiveProductModel();
+    return new activeModel(...args);
+  },
+  get(target, prop) {
+    if (overrides.has(prop)) {
+      return overrides.get(prop);
+    }
+
+    const activeModel = getActiveProductModel();
+    const value = activeModel[prop];
+
+    if (typeof value === 'function') {
+      return value.bind(activeModel);
+    }
+
+    return value;
+  },
+  set(target, prop, value) {
+    overrides.set(prop, value);
+    return true;
+  }
+});
+
+module.exports = ProductModelProxy;

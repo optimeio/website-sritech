@@ -4,18 +4,19 @@ const dotenv = require('dotenv');
 
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
-const { RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET } = process.env;
+const keyId = process.env.RAZORPAY_KEY_ID?.trim();
+const keySecret = process.env.RAZORPAY_KEY_SECRET?.trim();
 
 let razorpayInstance = null;
 
-if (RAZORPAY_KEY_ID && RAZORPAY_KEY_SECRET) {
+if (keyId && keySecret) {
   razorpayInstance = new Razorpay({
-    key_id: RAZORPAY_KEY_ID,
-    key_secret: RAZORPAY_KEY_SECRET
+    key_id: keyId,
+    key_secret: keySecret
   });
   console.log('✅ Razorpay initialized successfully');
 } else {
-  console.warn('⚠️ Razorpay credentials not found in environment variables. Payment features will be disabled.');
+  console.warn('⚠️ Razorpay credentials not found or invalid in environment variables. Payment features will be disabled.');
 }
 
 module.exports = razorpayInstance;

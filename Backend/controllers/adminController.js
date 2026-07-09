@@ -1,6 +1,16 @@
 const asyncHandler = require('../middleware/asyncHandler');
 const generateToken = require('../utils/token');
 
+exports.verifyAdmin = asyncHandler(async (req, res) => {
+  res.json({
+    success: true,
+    message: 'Admin authenticated.',
+    admin: {
+      username: req.admin?.username || req.admin?.email || 'admin'
+    }
+  });
+});
+
 exports.adminLogin = asyncHandler(async (req, res) => {
   const { username, password } = req.body;
   const adminUsername = process.env.ADMIN_USERNAME || 'thesmgroups@gmail.com';

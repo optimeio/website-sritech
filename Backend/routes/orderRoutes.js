@@ -2,10 +2,12 @@ const express = require('express');
 const { body } = require('express-validator');
 const orderController = require('../controllers/orderController');
 const validateRequest = require('../middleware/validateRequest');
+const { protect } = require('../middleware/auth');
 
 const router = express.Router();
 
 router.get('/', orderController.getOrders);
+router.get('/me', protect, orderController.getOrdersForUser);
 router.get('/:id', orderController.getOrderById);
 router.post('/',
   [

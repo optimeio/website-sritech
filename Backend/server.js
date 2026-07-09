@@ -90,6 +90,9 @@ const setupRoutes = () => {
   const heroBannerRoutes = require('./routes/heroBannerRoutes');
   const logRoutes = require('./routes/logRoutes');
   const paymentRoutes = require('./routes/paymentRoutes');
+  const invoiceRoutes = require('./routes/invoiceRoutes');
+  const returnRoutes = require('./routes/returnRoutes');
+  const refundRoutes = require('./routes/refundRoutes');
 
   console.log('🔌 Registering routes...');
   app.use('/api/auth', authRoutes);
@@ -99,6 +102,9 @@ const setupRoutes = () => {
   app.use('/api/products', productRoutes);
   app.use('/api/products/:productId/reviews', reviewRoutes);
   app.use('/api/orders', orderRoutes);
+  app.use('/api/invoices', invoiceRoutes);
+  app.use('/api/returns', returnRoutes);
+  app.use('/api/refunds', refundRoutes);
   app.use('/api/offers', offerRoutes);
   app.use('/api/support', supportRoutes);
   app.use('/api/subscribers', subscriberRoutes);

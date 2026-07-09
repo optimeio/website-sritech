@@ -1,8 +1,10 @@
 const razorpay = require('../services/razorpayService');
 const asyncHandler = require('../middleware/asyncHandler');
 
+const mockPaymentsEnabled = process.env.PAYMENT_MOCK_MODE === 'true';
+
 exports.getKey = asyncHandler(async (req, res) => {
-  const key = process.env.RAZORPAY_KEY_ID;
+  const key = process.env.RAZORPAY_KEY_ID?.trim();
   if (!key) {
     return res.status(503).json({ message: 'Razorpay key is not configured.' });
   }
@@ -10,10 +12,6 @@ exports.getKey = asyncHandler(async (req, res) => {
 });
 
 exports.createPaymentOrder = asyncHandler(async (req, res) => {
-  if (!razorpay) {
-    return res.status(503).json({ message: 'Payment service is not available. Razorpay credentials are not configured.' });
-  }
-
   const { amount, currency = 'INR', receipt } = req.body;
 
   if (!amount || amount <= 0) {
@@ -26,20 +24,62 @@ exports.createPaymentOrder = asyncHandler(async (req, res) => {
     receipt: receipt || `order_rcptid_${Date.now()}`
   };
 
-  const order = await razorpay.orders.create(options);
-  res.status(201).json(order);
-});
-
-exports.verifyPayment = asyncHandler(async (req, res) => {
-  if (!process.env.RAZORPAY_KEY_SECRET) {
+  if (!razorpay) {
+    if (mockPaymentsEnabled) {
+      return res.status(201).json({
+        id: `mock_order_${Date.now()}`,
+        amount: options.amount,
+        currency: options.currency,
+        receipt: options.receipt,
+        status: 'created',
+        mock: true
+      });
+    }
     return res.status(503).json({ message: 'Payment service is not available. Razorpay credentials are not configured.' });
   }
 
+  try {
+    const order = await razorpay.orders.create(options);
+    return res.status(201).json(order);
+  } catch (err) {
+    if (mockPaymentsEnabled) {
+      return res.status(201).json({
+        id: `mock_order_${Date.now()}`,
+        amount: options.amount,
+        currency: options.currency,
+        receipt: options.receipt,
+        status: 'created',
+        mock: true
+      });
+    }
+
+    const message = err.error?.description || err.message || 'Failed to create Razorpay payment order.';
+    const status = err.statusCode || 502;
+    return res.status(status).json({ message: `Razorpay error: ${message}` });
+  }
+});
+
+exports.verifyPayment = asyncHandler(async (req, res) => {
   const {
     razorpay_order_id,
     razorpay_payment_id,
-    razorpay_signature
+    razorpay_signature,
+    mock
   } = req.body;
+
+  if (mock && mockPaymentsEnabled) {
+    return res.json({
+      message: 'Mock payment verified successfully.',
+      verified: true,
+      razorpay_order_id,
+      razorpay_payment_id,
+      mock: true
+    });
+  }
+
+  if (!process.env.RAZORPAY_KEY_SECRET) {
+    return res.status(503).json({ message: 'Payment service is not available. Razorpay credentials are not configured.' });
+  }
 
   if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
     return res.status(400).json({ message: 'Missing Razorpay payment response fields.' });
