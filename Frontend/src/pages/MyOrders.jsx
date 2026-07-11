@@ -418,7 +418,9 @@ const MyOrders = () => {
     setLoading(true);
     try {
       const queryParam = encodeURIComponent(query || '');
-      const res = await fetch(`${API_URL}/orders/me?search=${queryParam}`);
+      const token = localStorage.getItem('sriTechToken');
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const res = await fetch(`${API_URL}/orders/me?search=${queryParam}`, { headers });
       if (!res.ok) throw new Error('Failed to load orders');
       const data = await res.json();
       setOrders(Array.isArray(data) ? data : data.orders || []);

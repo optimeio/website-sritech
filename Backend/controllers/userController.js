@@ -2,6 +2,12 @@ const User = require('../models/User');
 const ActivityLog = require('../models/ActivityLog');
 const asyncHandler = require('../middleware/asyncHandler');
 
+const canAccessUserResource = (req, userId) => {
+  if (!req.user) return false;
+  if (req.user.role === 'admin') return true;
+  return String(req.user._id) === String(userId);
+};
+
 exports.getUsers = asyncHandler(async (req, res) => {
   const users = await User.find().select('-password -resetPasswordToken -resetPasswordExpires').sort({ createdAt: -1 });
   res.json(users);
@@ -28,6 +34,10 @@ exports.deleteUser = asyncHandler(async (req, res) => {
 
 exports.addToCart = asyncHandler(async (req, res) => {
   const { productId } = req.body;
+  if (!canAccessUserResource(req, req.params.id)) {
+    return res.status(403).json({ message: 'Forbidden. You are not authorized to modify this cart.' });
+  }
+
   const user = await User.findById(req.params.id);
   if (!user) return res.status(404).json({ message: 'User not found.' });
 
@@ -40,6 +50,10 @@ exports.addToCart = asyncHandler(async (req, res) => {
 });
 
 exports.removeFromCart = asyncHandler(async (req, res) => {
+  if (!canAccessUserResource(req, req.params.id)) {
+    return res.status(403).json({ message: 'Forbidden. You are not authorized to modify this cart.' });
+  }
+
   const user = await User.findById(req.params.id);
   if (!user) return res.status(404).json({ message: 'User not found.' });
 
@@ -49,6 +63,10 @@ exports.removeFromCart = asyncHandler(async (req, res) => {
 });
 
 exports.clearCart = asyncHandler(async (req, res) => {
+  if (!canAccessUserResource(req, req.params.id)) {
+    return res.status(403).json({ message: 'Forbidden. You are not authorized to modify this cart.' });
+  }
+
   const user = await User.findById(req.params.id);
   if (!user) return res.status(404).json({ message: 'User not found.' });
 
@@ -59,6 +77,10 @@ exports.clearCart = asyncHandler(async (req, res) => {
 
 exports.toggleWaitlist = asyncHandler(async (req, res) => {
   const { productId } = req.body;
+  if (!canAccessUserResource(req, req.params.id)) {
+    return res.status(403).json({ message: 'Forbidden. You are not authorized to modify this waitlist.' });
+  }
+
   const user = await User.findById(req.params.id);
   if (!user) return res.status(404).json({ message: 'User not found.' });
 

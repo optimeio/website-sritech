@@ -181,6 +181,13 @@ exports.getOrderById = asyncHandler(async (req, res) => {
   });
 
   if (!order) return res.status(404).json({ message: 'Order not found.' });
+
+  const isAdmin = req.user?.role === 'admin';
+  const isOrderOwner = req.user && order.customerId && String(order.customerId) === String(req.user._id);
+  if (!isAdmin && !isOrderOwner) {
+    return res.status(403).json({ message: 'Forbidden. You are not authorized to view this order.' });
+  }
+
   res.json(order);
 });
 

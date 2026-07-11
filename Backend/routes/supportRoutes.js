@@ -1,11 +1,12 @@
 const express = require('express');
 const { body } = require('express-validator');
+const { protectAdmin } = require('../middleware/auth');
 const supportController = require('../controllers/supportController');
 const validateRequest = require('../middleware/validateRequest');
 
 const router = express.Router();
 
-router.get('/', supportController.getSupportQueries);
+router.get('/', protectAdmin, supportController.getSupportQueries);
 router.post('/',
   [
     body('customerName').notEmpty().withMessage('Name is required'),
@@ -17,6 +18,7 @@ router.post('/',
   supportController.createSupportQuery
 );
 router.post('/:id/respond',
+  protectAdmin,
   [
     body('response').notEmpty().withMessage('Response is required')
   ],

@@ -1,5 +1,6 @@
 const express = require('express');
 const { body } = require('express-validator');
+const { protectAdmin } = require('../middleware/auth');
 const categoryController = require('../controllers/categoryController');
 const validateRequest = require('../middleware/validateRequest');
 
@@ -7,6 +8,7 @@ const router = express.Router();
 
 router.get('/', categoryController.getCategories);
 router.post('/',
+  protectAdmin,
   [
     body('name').notEmpty().withMessage('Category name is required'),
     body('slug').optional().isString()
@@ -15,6 +17,7 @@ router.post('/',
   categoryController.createCategory
 );
 router.put('/:id',
+  protectAdmin,
   [
     body('name').notEmpty().withMessage('Category name is required'),
     body('slug').optional().isString()
@@ -22,6 +25,6 @@ router.put('/:id',
   validateRequest,
   categoryController.updateCategory
 );
-router.delete('/:id', categoryController.deleteCategory);
+router.delete('/:id', protectAdmin, categoryController.deleteCategory);
 
 module.exports = router;

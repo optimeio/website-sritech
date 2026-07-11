@@ -14,6 +14,7 @@ const connectDatabase = require('./config/db');
 require('./config/cloudinary');
 require('./config/razorpay');
 const errorHandler = require('./middleware/errorHandler');
+const { ensureDemoUser } = require('./utils/ensureDemoUser');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -272,6 +273,8 @@ const startServer = async () => {
       await seedCategories();
       console.log('📍 Seeding default products...');
       await seedProducts();
+      console.log('📍 Ensuring demo user account...');
+      await ensureDemoUser();
     } else {
       console.warn('⚠️ Skipping category and product seeding because no usable database mode is available.');
     }

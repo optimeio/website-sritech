@@ -817,7 +817,17 @@ const AdminDashboard = ({
               <span className="admin-role">CEO & Super Admin</span>
             </div>
             <div className="admin-avatar">
-              <img src="/sri-tech-logo-final.png" alt="SriTech Logo" style={{ width: '100%', height: '100%', objectFit: 'contain', background: 'transparent' }} />
+              <img
+                src="/sri-tech-logo-final.png"
+                alt="SriTech Logo"
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'contain',
+                  background: 'transparent',
+                  filter: 'hue-rotate(12deg) saturate(1.08) drop-shadow(0 1px 2px rgba(0,0,0,0.08))'
+                }}
+              />
             </div>
           </div>
         </header>

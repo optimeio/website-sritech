@@ -4,6 +4,7 @@ import './index.css'
 import { createPortal } from 'react-dom'
 import AdminDashboard from './AdminDashboard'
 import UserDashboard from './components/UserDashboard'
+import Footer from './components/Footer'
 import MyOrders from './pages/MyOrders.jsx'
 
 const API_URL = 'http://localhost:5000/api';
@@ -12,6 +13,55 @@ const DEFAULT_BANNERS = [
   { _id: 'default-1', image: '/hero-image.png', caption: 'Premium Sustainable Engineering Solutions' },
   { _id: 'default-2', image: '/hero-banner.png', caption: 'Precision Agro, Food & Poultry Machineries' },
   { _id: 'default-3', image: '/rocket-stove.png', caption: 'Eco-Friendly High Efficiency Rocket Stoves' }
+];
+
+const FALLBACK_PRODUCTS = [
+  {
+    _id: 'fallback-rocket-stove',
+    name: 'Rocket Stove',
+    price: '₹3,999',
+    category: 'Stoves',
+    description: 'High-efficiency rocket stove for cleaner, faster cooking.',
+    icon: 'fa-fire',
+    isNewArrival: true,
+    images: ['/rocket-stove.png']
+  },
+  {
+    _id: 'fallback-10-stove',
+    name: '10" Stove',
+    price: '₹4,499',
+    category: 'Stoves',
+    description: 'Compact stove for homes, canteens, and small kitchens.',
+    icon: 'fa-burn',
+    images: ['/hero-image.png']
+  },
+  {
+    _id: 'fallback-rocket-stove-pro',
+    name: 'Rocket Stove Pro',
+    price: '₹5,499',
+    category: 'Stoves',
+    description: 'Premium stove with enhanced heat retention and durability.',
+    icon: 'fa-fire-flame-simple',
+    images: ['/rocket-stove.png']
+  },
+  {
+    _id: 'fallback-stove-plate-kit',
+    name: 'Stove Cooking Plate Kit',
+    price: '₹1,299',
+    category: 'Stoves',
+    description: 'Convenient cooking plate attachment for household use.',
+    icon: 'fa-hot-tub-person',
+    images: ['/hero-image.png']
+  },
+  {
+    _id: 'fallback-home-kit',
+    name: 'Home Appliance Starter Kit',
+    price: '₹1,999',
+    category: 'Home Appliances',
+    description: 'Starter kit for sustainable household appliances.',
+    icon: 'fa-house',
+    images: ['/hero-banner.png']
+  }
 ];
 
 function App() {
@@ -58,7 +108,7 @@ function App() {
 
   const normalizeCategorySlug = (value) => {
     if (!value) return '';
-    return value.toString().toLowerCase().trim().replace(/\s+/g, '-');
+    return value.toString().toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
   };
 
   const getCategorySlug = (value) => {
@@ -308,10 +358,25 @@ function App() {
     localStorage.removeItem('sriTechAdminToken');
   };
 
-  const getAdminHeaders = () => {
-    const token = localStorage.getItem('sriTechAdminToken');
-    return token ? { Authorization: `Bearer ${token}` } : {};
+  const getAuthHeaders = ({ contentType = false, admin = false } = {}) => {
+    const headers = {};
+
+    if (contentType) {
+      headers['Content-Type'] = 'application/json';
+    }
+
+    const token = admin
+      ? localStorage.getItem('sriTechAdminToken')
+      : localStorage.getItem('sriTechToken');
+
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+
+    return headers;
   };
+
+  const getAdminHeaders = () => getAuthHeaders({ admin: true });
 
   const clearAuthSession = () => {
     localStorage.removeItem('sriTechToken');
@@ -437,16 +502,18 @@ function App() {
       }
 
       const prodData = await prodRes.json();
-      if (!Array.isArray(prodData)) {
-        throw new Error('Unexpected product response from backend.');
+      if (!Array.isArray(prodData) || prodData.length === 0) {
+        const fallbackProducts = FALLBACK_PRODUCTS;
+        setProducts(fallbackProducts);
+        return fallbackProducts;
       }
 
       setProducts(prodData);
       return prodData;
     } catch (err) {
       console.error('Error refreshing products:', err);
-      setProducts([]);
-      return [];
+      setProducts(FALLBACK_PRODUCTS);
+      return FALLBACK_PRODUCTS;
     }
   };
 
@@ -495,14 +562,16 @@ function App() {
       console.error("Error fetching offers:", err);
     }
 
-    // Fetch admin orders
-    try {
-      const orderRes = await fetch(`${API_URL}/orders?t=${t}`);
-      if (orderRes.ok) {
-        setOrders(await orderRes.json());
+    // Fetch admin orders (admin-only endpoint)
+    if (isAdmin) {
+      try {
+        const orderRes = await fetch(`${API_URL}/orders?t=${t}`, { headers: getAdminHeaders() });
+        if (orderRes.ok) {
+          setOrders(await orderRes.json());
+        }
+      } catch (err) {
+        console.error("Error fetching orders:", err);
       }
-    } catch (err) {
-      console.error("Error fetching orders:", err);
     }
 
     // Fetch logged-in user orders
@@ -529,14 +598,16 @@ function App() {
       console.error("Error fetching coupons:", err);
     }
 
-    // Fetch support queries
-    try {
-      const supportRes = await fetch(`${API_URL}/support?t=${t}`);
-      if (supportRes.ok) {
-        setSupportQueries(await supportRes.json());
+    // Fetch support queries (admin-only)
+    if (isAdmin) {
+      try {
+        const supportRes = await fetch(`${API_URL}/support?t=${t}`, { headers: getAdminHeaders() });
+        if (supportRes.ok) {
+          setSupportQueries(await supportRes.json());
+        }
+      } catch (err) {
+        console.error("Error fetching support queries:", err);
       }
-    } catch (err) {
-      console.error("Error fetching support queries:", err);
     }
 
     const isAdminArea = window.location.pathname.startsWith('/admin') || isAdmin;
@@ -612,18 +683,20 @@ function App() {
   useEffect(() => {
     const restoreUserSession = async () => {
       const savedToken = localStorage.getItem('sriTechToken');
-      const savedUserRaw = localStorage.getItem('sriTechUser');
-
-      if (!savedToken || !savedUserRaw) {
+      if (!savedToken) {
         setActiveUser(null);
         setIsUserLoggedIn(false);
         return;
       }
 
       try {
-        const savedUser = JSON.parse(savedUserRaw);
-        if (savedUser && savedUser._id) {
-          applyAuthenticatedUser(savedToken, savedUser);
+        const res = await fetch(`${API_URL}/auth/me`, {
+          headers: { Authorization: `Bearer ${savedToken}` }
+        });
+
+        if (res.ok) {
+          const user = await res.json();
+          applyAuthenticatedUser(savedToken, user);
           return;
         }
       } catch (err) {
@@ -754,7 +827,7 @@ function App() {
     try {
       const res = await fetch(`${API_URL}/hero-banners`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ contentType: true, admin: true }),
         body: JSON.stringify(newBanner)
       });
       if (res.ok) {
@@ -777,7 +850,8 @@ function App() {
     if (!window.confirm("Are you sure you want to delete this hero banner?")) return;
     try {
       const res = await fetch(`${API_URL}/hero-banners/${bannerId}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: getAuthHeaders({ admin: true })
       });
       if (res.ok) {
         setHeroBanners(prev => prev.filter(b => (b._id || b.id) !== bannerId));
@@ -811,13 +885,9 @@ function App() {
           : []
       };
 
-      const adminToken = localStorage.getItem('sriTechAdminToken');
       const res = await fetch(`${API_URL}/products`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(adminToken ? { Authorization: `Bearer ${adminToken}` } : {})
-        },
+        headers: getAuthHeaders({ contentType: true, admin: true }),
         body: JSON.stringify(normalizedPayload)
       });
 
@@ -841,7 +911,8 @@ function App() {
     if (!window.confirm("Are you sure you want to permanently delete this product?")) return;
     try {
       const res = await fetch(`${API_URL}/products/${productId}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: getAdminHeaders()
       });
       if (res.ok) {
         await refreshProducts();
@@ -863,7 +934,7 @@ function App() {
     try {
       const res = await fetch(`${API_URL}/products/${productId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ contentType: true, admin: true }),
         body: JSON.stringify(updatedData)
       });
       if (res.ok) {
@@ -895,7 +966,7 @@ function App() {
       const isEditing = Boolean(newOffer?._id || newOffer?.id);
       const res = await fetch(`${API_URL}/offers${isEditing ? `/${newOffer._id || newOffer.id}` : ''}`, {
         method: isEditing ? 'PUT' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ contentType: true, admin: true }),
         body: JSON.stringify(newOffer)
       });
       const savedOffer = await res.json();
@@ -920,7 +991,10 @@ function App() {
 
   const deleteOffer = async (offerId) => {
     try {
-      const res = await fetch(`${API_URL}/offers/${offerId}`, { method: 'DELETE' });
+      const res = await fetch(`${API_URL}/offers/${offerId}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders({ admin: true })
+      });
       if (res.ok) {
         setOffers(prev => prev.filter(offer => (offer._id || offer.id) !== offerId));
         setOfferData(prev => ((prev._id || prev.id) === offerId) ? {
@@ -942,7 +1016,10 @@ function App() {
 
   const toggleOffer = async (offerId) => {
     try {
-      const res = await fetch(`${API_URL}/offers/${offerId}/toggle`, { method: 'PATCH' });
+      const res = await fetch(`${API_URL}/offers/${offerId}/toggle`, {
+        method: 'PATCH',
+        headers: getAuthHeaders({ admin: true })
+      });
       if (res.ok) {
         const toggledOffer = await res.json();
         setOffers(prev => prev.map(offer => ((offer._id || offer.id) === offerId) ? toggledOffer : offer));
@@ -977,7 +1054,7 @@ function App() {
     try {
       const res = await fetch(`${API_URL}/coupons`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ contentType: true, admin: true }),
         body: JSON.stringify(newCouponData)
       });
       if (res.ok) {
@@ -1003,7 +1080,7 @@ function App() {
         .join(' ');
       const res = await fetch(`${API_URL}/categories`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ contentType: true, admin: true }),
         body: JSON.stringify({ name: formattedName, slug: categorySlug })
       });
       if (res.ok) {
@@ -1027,7 +1104,7 @@ function App() {
       const newSlug = newName.toLowerCase().trim().replace(/\s+/g, '-');
       const res = await fetch(`${API_URL}/categories/${categoryId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ contentType: true, admin: true }),
         body: JSON.stringify({ name: newName, slug: newSlug })
       });
       if (res.ok) {
@@ -1050,7 +1127,8 @@ function App() {
     if (!window.confirm('Are you sure you want to delete this category?')) return;
     try {
       const res = await fetch(`${API_URL}/categories/${categoryId}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: getAuthHeaders({ admin: true })
       });
       if (res.ok) {
         setCategories(prev => prev.filter(cat => (cat._id || cat.id) !== categoryId));
@@ -1071,7 +1149,8 @@ function App() {
     if (!window.confirm("Are you sure you want to permanently delete this coupon?")) return;
     try {
       const res = await fetch(`${API_URL}/coupons/${couponId}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: getAuthHeaders({ admin: true })
       });
       if (res.ok) {
         setCoupons(prev => prev.filter(c => (c._id || c.id) !== couponId));
@@ -1091,7 +1170,7 @@ function App() {
     try {
       const res = await fetch(`${API_URL}/orders/${orderId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ contentType: true, admin: true }),
         body: JSON.stringify(orderData)
       });
       if (res.ok) {
@@ -1134,7 +1213,7 @@ function App() {
     try {
       const res = await fetch(`${API_URL}/coupons/${couponId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ contentType: true, admin: true }),
         body: JSON.stringify(updatedCouponData)
       });
       if (res.ok) {
@@ -1157,6 +1236,7 @@ function App() {
     try {
       const res = await fetch(`${API_URL}/users/${userId}/status`, {
         method: 'PATCH',
+        headers: getAuthHeaders({ admin: true })
       });
       if (res.ok) {
         const updatedUser = await res.json();
@@ -1177,6 +1257,7 @@ function App() {
     try {
       const res = await fetch(`${API_URL}/users/${userId}`, {
         method: 'DELETE',
+        headers: getAuthHeaders({ admin: true })
       });
       if (res.ok) {
         setUsers(users.filter(u => u._id !== userId));
@@ -1227,14 +1308,14 @@ function App() {
     try {
       const res = await fetch(`${API_URL}/support/${queryId}/respond`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ contentType: true, admin: true }),
         body: JSON.stringify({ response: responseText })
       });
       if (res.ok) {
         const updatedQuery = await res.json();
         setSupportQueries(prev => prev.map(q => (q._id || q.id) === queryId ? updatedQuery : q));
         showToast('Response sent to customer successfully!', 'success');
-        const logRes = await fetch(`${API_URL}/logs`);
+        const logRes = await fetch(`${API_URL}/logs`, { headers: getAuthHeaders({ admin: true }) });
         if (logRes.ok) setActivityLogs(await logRes.json());
         // Notify customer that support has responded
         try {
@@ -1286,10 +1367,7 @@ function App() {
     setShowEntryModal(false);
     setTimeout(() => setShowOfferModal(true), 500);
   };
-  const getUserHeaders = () => {
-    const token = localStorage.getItem('sriTechToken');
-    return token ? { Authorization: `Bearer ${token}` } : {};
-  };
+  const getUserHeaders = () => getAuthHeaders();
 
   const normalizeSearchTerm = (value) => {
     return String(value || '').trim().toLowerCase();
@@ -1408,21 +1486,28 @@ function App() {
     };
   }, [activeUser]);
 
-  const handleOpenOrderDashboard = () => {
+  const openUserDashboard = (tab = 'Overview') => {
+    setCustomerDashboardOpen(true);
+    setCustomerDashboardTab(tab);
+    setShowOrderDetails(false);
+    setSelectedOrder(null);
+    setShowCart(false);
+    setShowWishlist(false);
+    setShowCheckout(false);
+  };
+
+  const handleOpenOrderDashboard = ({ forceOpen = false } = {}) => {
     if (isAdmin && isViewingPublicProducts) {
       showToast('You are currently browsing products as admin. Use the admin dashboard controls to return.', 'info');
       return;
     }
 
-    if (!isUserLoggedIn) {
+    if (!forceOpen && !isUserLoggedIn) {
       setAuthMode('login');
       setShowAuthModal(true);
       return;
     }
-    setCustomerDashboardOpen(true);
-    setCustomerDashboardTab('Overview');
-    setShowOrderDetails(false);
-    setSelectedOrder(null);
+    openUserDashboard();
   };
 
   const handleOpenAdminDashboard = () => {
@@ -1794,6 +1879,30 @@ function App() {
     }
 
     setCart(nextCart);
+    try {
+      const res = await fetch(`${API_URL}/users/${activeUser._id}/cart`, {
+        method: 'POST',
+        headers: getAuthHeaders({ contentType: true }),
+        body: JSON.stringify({ productId })
+      });
+
+      if (res.ok) {
+        const updatedCart = await res.json().catch(() => null);
+        if (Array.isArray(updatedCart)) {
+          setActiveUser(prev => prev ? { ...prev, cart: updatedCart } : prev);
+        } else {
+          setActiveUser(prev => {
+            if (!prev) return prev;
+            const existingCart = Array.isArray(prev.cart) ? prev.cart.map(String) : [];
+            if (existingCart.includes(String(productId))) return prev;
+            return { ...prev, cart: [...existingCart, String(productId)] };
+          });
+        }
+      }
+    } catch (err) {
+      console.error('Error syncing cart to backend:', err);
+    }
+
     showToast(`✅ ${product.name} added to cart!`, 'success');
   };
 
@@ -1909,7 +2018,7 @@ function App() {
 
       // Step 2: Get Razorpay key from backend or use hardcoded
       const keyRes = await fetch(`${API_URL}/payments/get-key`).catch(() => null);
-      const razorpayKey = keyRes ? (await keyRes.json()).key : process.env.VITE_RAZORPAY_KEY_ID;
+      const razorpayKey = keyRes ? (await keyRes.json()).key : import.meta.env.VITE_RAZORPAY_KEY_ID;
 
       if (!razorpayKey) {
         showToast('Razorpay key not configured. Please contact support.', 'error');
@@ -2309,6 +2418,9 @@ function App() {
               console.error('Failed to update users after signup:', e);
             }
             setShowAuthModal(false);
+            if (!isAdmin) {
+              setTimeout(() => openUserDashboard('Overview'), 0);
+            }
             showToast('✅ Account created and logged in successfully!', 'success');
             return;
           }
@@ -2354,6 +2466,9 @@ function App() {
               setShowAuthModal(false);
               setAuthErrorMessage(null);
               setAuthFieldErrors({ email: '', password: '' });
+              if (!isAdmin) {
+                setTimeout(() => openUserDashboard('Overview'), 0);
+              }
               showToast('✅ Email verified successfully!', 'success');
               return;
             }
@@ -2367,18 +2482,32 @@ function App() {
         }
 
         // Intercept admin credentials to log into the Admin Dashboard
-        const adminUsername = 'thesmgroups@gmail.com';
-        const adminPassword = 'TSMGPVT@2026';
+        const adminUsername = import.meta.env.VITE_ADMIN_USERNAME || 'thesmgroups@gmail.com';
+        const adminPassword = import.meta.env.VITE_ADMIN_PASSWORD || 'TSMGPVT@2026';
         if (currentValues.email === adminUsername && currentValues.password === adminPassword) {
-          persistAdminSession('admin-session');
-          setIsAdmin(true);
-          setIsViewingPublicProducts(false);
-          setShowAuthModal(false);
-          setShowAdminLogin(false);
-          setUserCredentials({ name: '', phone: '', address: '', email: '', password: '', confirmPassword: '' });
-          fetchData();
-          navigate('/admin');
-          showToast('Admin authenticated successfully!', 'success');
+          const adminRes = await fetch(`${API_URL}/admin/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: currentValues.email, password: currentValues.password })
+          });
+
+          const adminData = await adminRes.json().catch(() => ({}));
+          if (adminRes.ok && adminData.token) {
+            persistAdminSession(adminData.token);
+            setIsAdmin(true);
+            setIsViewingPublicProducts(false);
+            setShowAuthModal(false);
+            setShowAdminLogin(false);
+            setUserCredentials({ name: '', phone: '', address: '', email: '', password: '', confirmPassword: '' });
+            setAuthErrorMessage(null);
+            setAuthFieldErrors({ email: '', password: '' });
+            await fetchData();
+            navigate('/admin');
+            showToast('Admin authenticated successfully!', 'success');
+            return;
+          }
+
+          showToast(adminData.message || 'Invalid admin credentials.', 'error');
           return;
         }
 
@@ -2397,6 +2526,9 @@ function App() {
           setAuthFieldErrors({ email: '', password: '' });
           loginSuccess = true;
           showToast('✅ Login successful!', 'success');
+          if (!isAdmin) {
+            setTimeout(() => openUserDashboard('Overview'), 0);
+          }
         } else {
           const error = await res.json().catch(() => ({}));
           const msg = error?.message || 'Invalid email or password';
@@ -2610,7 +2742,9 @@ const resolvedCartItems = cart
   const gstAmount = Math.round((checkoutTotal - discountAmount + shippingFee) * 0.18);
   const checkoutGrandTotal = Math.max(0, checkoutTotal - discountAmount + shippingFee + gstAmount);
 
-  const matchedSuggestions = searchTerm.trim() === "" ? [] : products.filter(product => {
+  const displayedProducts = Array.isArray(products) && products.length > 0 ? products : FALLBACK_PRODUCTS;
+
+  const matchedSuggestions = searchTerm.trim() === "" ? [] : displayedProducts.filter(product => {
     const productCategorySlug = getCategorySlug(product.category);
     const nameMatch = (product.name || '').toLowerCase().includes(searchTerm.toLowerCase());
     const categoryMatch = getCategoryDisplayName(product.category).toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -2624,7 +2758,7 @@ const resolvedCartItems = cart
     setShowSuggestions(false);
   };
 
-  const filteredProducts = products.filter(product => {
+  const filteredProducts = displayedProducts.filter(product => {
     const productCategorySlug = getCategorySlug(product.category);
     const selectedCatClean = getCategorySlug(selectedCategory);
 
@@ -3525,20 +3659,20 @@ const resolvedCartItems = cart
 
               {/* Continue as Guest */}
               <div style={{ textAlign: 'center', marginTop: '2rem' }}>
-                <button 
-                  type="button"
-                  onClick={() => {
+                <a
+                  href="#"
+                  className="guest"
+                  onClick={(e) => {
+                    e.preventDefault();
                     setShowAuthModal(false);
                     setAuthPortalIsGate(false);
                     setAuthMode('login');
                     setAuthErrorMessage(null);
                     setAuthFieldErrors({ email: '', password: '' });
                   }}
-                  style={{ background: 'transparent', border: 'none', color: '#94a3b8', fontSize: '0.9rem', cursor: 'pointer' }}
                 >
-                  <i className="fa-solid fa-arrow-right" style={{ marginRight: '8px' }}></i>
-                  Continue as Guest
-                </button>
+                  Continue as guest →
+                </a>
               </div>
 
             </div>
@@ -3670,8 +3804,18 @@ const resolvedCartItems = cart
       {/* Header */}
       <header className="top-header">
         <div className="header-container">
-          <a href="#" className="logo" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
-            <img src="/sri-tech-logo-final.png" alt="SriTech Logo" style={{ height: '100px', width: 'auto', objectFit: 'contain', background: 'transparent' }} />
+            <a href="#" className="logo" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
+            <img
+              src="/sri-tech-logo-final.png"
+              alt="SriTech Logo"
+              style={{
+                height: '130px',
+                width: 'auto',
+                objectFit: 'contain',
+                background: 'transparent',
+                filter: 'hue-rotate(12deg) saturate(1.08) drop-shadow(0 2px 4px rgba(0,0,0,0.12))'
+              }}
+            />
           </a>
 
           <nav className="header-nav">
@@ -3681,18 +3825,39 @@ const resolvedCartItems = cart
             <a href="#product" className="action-btn" onClick={(e) => { scrollToSection(e, 'product'); }}>
               Products
             </a>
+            <a href="#about" className="action-btn" onClick={(e) => { scrollToSection(e, 'about'); }}>
+              About
+            </a>
             <a href="#footer" className="action-btn" onClick={(e) => { scrollToSection(e, 'footer'); }}>
               Contact
             </a>
           </nav>
 
           <div className="header-actions">
-            {/* 7. Login Page */}
-            {!isUserLoggedIn && !isAdmin && (
-              <button 
-                className="header-login-btn" 
-                onClick={() => { 
-                  setAuthMode('login'); 
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <button
+                className="action-btn"
+                title="Search products"
+                aria-label="Search products"
+                onClick={handleNavbarSearchToggle}
+              >
+                <i className="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+              </button>
+              <button className="action-btn cart-btn" title="Cart" aria-label={`View shopping cart with ${cart.length} items`} onClick={() => setShowCart(true)}>
+                <i className="fa-solid fa-cart-shopping" aria-hidden="true"></i>
+                <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>Cart</span>
+                {cart.length > 0 && <span className="cart-count">{cart.length}</span>}
+              </button>
+              <button className="action-btn" title="Wishlist" aria-label="Wishlist" onClick={() => setShowWishlist(true)}>
+                <i className={waitlist.length > 0 ? "fa-solid fa-heart" : "fa-regular fa-heart"} aria-hidden="true" style={waitlist.length > 0 ? { color: 'var(--accent-yellow)' } : {}}></i>
+                <span style={{ fontSize: '0.9rem', fontWeight: 600, marginLeft: '0.35rem' }}>Wishlist</span>
+              </button>
+              <button
+                className="action-btn header-login-btn"
+                title="Login"
+                aria-label="Login"
+                onClick={() => {
+                  setAuthMode('login');
                   setAuthErrorMessage(null);
                   setShowAuthModal(true);
                   setUserCredentials({ name: '', phone: '', address: '', email: '', password: '', confirmPassword: '' });
@@ -3700,122 +3865,80 @@ const resolvedCartItems = cart
               >
                 Login
               </button>
-            )}
+            </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                <button
-                  className="action-btn"
-                  title="Search products"
-                  aria-label="Search products"
-                  onClick={handleNavbarSearchToggle}
-                >
-                  <i className="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
-                </button>
-                {showNavbarSearch && (
-                  <div style={{ position: 'relative', marginLeft: '0.4rem' }}>
-                    <input
-                      type="text"
-                      ref={navbarSearchInputRef}
-                      value={searchTerm}
-                      onChange={(e) => handleNavbarSearchChange(e.target.value)}
-                      placeholder="Search products"
-                      style={{
-                        border: '1px solid rgba(255,255,255,0.2)',
-                        borderRadius: '999px',
-                        padding: '0.45rem 0.8rem',
-                        minWidth: '220px',
-                        color: '#0f172a',
-                        background: '#fff'
-                      }}
-                      autoFocus
-                    />
-                    {searchTerm.trim() && (
-                      <div style={{
-                        position: 'absolute',
-                        top: 'calc(100% + 0.35rem)',
-                        left: 0,
-                        right: 0,
-                        background: '#fff',
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '12px',
-                        boxShadow: '0 8px 25px rgba(0, 0, 0, 0.12)',
-                        zIndex: 60,
-                        maxHeight: '280px',
-                        overflowY: 'auto'
-                      }}>
-                        {matchedSuggestions.length > 0 ? (
-                          matchedSuggestions.slice(0, 6).map(product => (
-                            <button
-                              key={product._id || product.id}
-                              type="button"
-                              onClick={() => {
-                                setSelectedProduct(product);
-                                setSelectedProductImageIndex(0);
-                                setShowNavbarSearch(false);
-                                setSearchTerm('');
-                              }}
-                              style={{
-                                width: '100%',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'flex-start',
-                                gap: '0.2rem',
-                                padding: '0.7rem 0.8rem',
-                                border: 'none',
-                                background: 'transparent',
-                                textAlign: 'left',
-                                cursor: 'pointer',
-                                color: '#0f172a'
-                              }}
-                            >
-                              <span style={{ fontWeight: 600 }}>{product.name}</span>
-                              <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
-                                {getCategoryDisplayName(product.category)}
-                              </span>
-                            </button>
-                          ))
-                        ) : (
-                          <div style={{ padding: '0.7rem 0.8rem', color: '#64748b' }}>
-                            No matching products found.
-                          </div>
-                        )}
+            {showNavbarSearch && (
+              <div style={{ position: 'relative', marginLeft: '0.4rem' }}>
+                <input
+                  type="text"
+                  ref={navbarSearchInputRef}
+                  value={searchTerm}
+                  onChange={(e) => handleNavbarSearchChange(e.target.value)}
+                  placeholder="Search products"
+                  style={{
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    borderRadius: '999px',
+                    padding: '0.45rem 0.8rem',
+                    minWidth: '220px',
+                    color: '#0f172a',
+                    background: '#fff'
+                  }}
+                  autoFocus
+                />
+                {searchTerm.trim() && (
+                  <div style={{
+                    position: 'absolute',
+                    top: 'calc(100% + 0.35rem)',
+                    left: 0,
+                    right: 0,
+                    background: '#fff',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '12px',
+                    boxShadow: '0 8px 25px rgba(0, 0, 0, 0.12)',
+                    zIndex: 60,
+                    maxHeight: '280px',
+                    overflowY: 'auto'
+                  }}>
+                    {matchedSuggestions.length > 0 ? (
+                      matchedSuggestions.slice(0, 6).map(product => (
+                        <button
+                          key={product._id || product.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedProduct(product);
+                            setSelectedProductImageIndex(0);
+                            setShowNavbarSearch(false);
+                            setSearchTerm('');
+                          }}
+                          style={{
+                            width: '100%',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'flex-start',
+                            gap: '0.2rem',
+                            padding: '0.7rem 0.8rem',
+                            border: 'none',
+                            background: 'transparent',
+                            textAlign: 'left',
+                            cursor: 'pointer',
+                            color: '#0f172a'
+                          }}
+                        >
+                          <span style={{ fontWeight: 600 }}>{product.name}</span>
+                          <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                            {getCategoryDisplayName(product.category)}
+                          </span>
+                        </button>
+                      ))
+                    ) : (
+                      <div style={{ padding: '0.7rem 0.8rem', color: '#64748b' }}>
+                        No matching products found.
                       </div>
                     )}
                   </div>
                 )}
               </div>
-
-              {/* Wishlist Button */}
-              <button className="action-btn" title="Wishlist" aria-label="View wishlist" onClick={() => setShowWishlist(true)}>
-                <i className={waitlist.length > 0 ? "fa-solid fa-heart" : "fa-regular fa-heart"} aria-hidden="true" style={waitlist.length > 0 ? {color: 'var(--accent-yellow)'} : {}}></i>
-                <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>Wishlist</span>
-              </button>
-            </div>
-
-            {/* 6. Cart Button */}
-            <button className="action-btn cart-btn" title="Cart" aria-label={`View shopping cart with ${cart.length} items`} onClick={() => setShowCart(true)}>
-              <i className="fa-solid fa-cart-shopping" aria-hidden="true"></i>
-              <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>Cart</span>
-              {cart.length > 0 && <span className="cart-count">{cart.length}</span>}
-            </button>
-
-            {/* Admin Dashboard Button */}
-            {isAdmin && isViewingPublicProducts && (
-              <button className="action-btn" title="Admin Dashboard" aria-label="Open admin dashboard" onClick={handleOpenAdminDashboard}>
-                <i className="fa-solid fa-user-shield" aria-hidden="true"></i>
-                <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>Admin</span>
-              </button>
             )}
-
-            {/* Account Button */}
-            {isUserLoggedIn && !(isAdmin && isViewingPublicProducts) && (
-              <button className="action-btn" title="Account" aria-label="Open your account" onClick={handleOpenOrderDashboard}>
-                <i className="fa-solid fa-user" aria-hidden="true"></i>
-                <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>Account</span>
-              </button>
-            )}
-
           </div>
         </div>
       </header>
@@ -3916,7 +4039,6 @@ const resolvedCartItems = cart
               <i className="fa-solid fa-leaf stat-icon"></i>
               <div className="stat-text">
                 <h3>100%</h3>
-                <p>Eco Friendly</p>
               </div>
             </div>
           </div>
@@ -4212,43 +4334,7 @@ const resolvedCartItems = cart
       </main>
 
       {/* Footer */}
-      <footer id="footer" className="footer">
-        <div className="footer-container">
-          <div className="footer-details">
-            <a href="#" className="footer-logo">The Sri Tech</a>
-            <p>11/1, Gurusamipalayam, Rasipuram, Tamil Nadu 637403</p>
-            <p>
-              <a href="mailto:sritechofficial8@gmail.com" className="text-[#2874F0] hover:underline">
-                sritechofficial8@gmail.com
-              </a>
-            </p>
-            <p>+91 9043340278</p>
-            <div className="social-links">
-              <a href="https://www.instagram.com/thesritech?utm_source=qr&igsh=MWx6b2F5cGV5cXk4eA==" target="_blank" rel="noopener noreferrer" aria-label="Instagram"><i className="fa-brands fa-instagram" aria-hidden="true"></i></a>
-              <a href="https://www.youtube.com/@thesritech" target="_blank" rel="noopener noreferrer" aria-label="Youtube"><i className="fa-brands fa-youtube" aria-hidden="true"></i></a>
-            </div>
-          </div>
-
-          
-
-          <div className="footer-links footer-links--policies">
-            <h3>Policies</h3>
-            <a href="/privacy-policy.html">Privacy Policy</a>
-            <a href="/terms-and-conditions.html">Terms of Service</a>
-          </div>
-
-          <div className="footer-links quick-links">
-            <h3>Quick Links</h3>
-            <a href="#home" onClick={(e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>Home</a>
-            <a href="#product" onClick={(e) => { e.preventDefault(); const el = document.getElementById('product'); if(el) el.scrollIntoView({ behavior: 'smooth' }); }}>Products</a>
-            <a href="#" onClick={(e) => { e.preventDefault(); setShowComplaintModal(true); }}>Raise a Complaint</a>
-          </div>
-
-        </div>
-        <div className="footer-bottom">
-          <p>&copy; 2026 The Sri Tech. All rights reserved.</p>
-        </div>
-      </footer>
+      <Footer onRaiseComplaint={() => setShowComplaintModal(true)} />
     </div>
   );
 }

@@ -1,5 +1,6 @@
 const express = require('express');
 const { body } = require('express-validator');
+const { protectAdmin } = require('../middleware/auth');
 const couponController = require('../controllers/couponController');
 const validateRequest = require('../middleware/validateRequest');
 
@@ -7,6 +8,7 @@ const router = express.Router();
 
 router.get('/', couponController.getCoupons);
 router.post('/',
+  protectAdmin,
   [
     body('code').notEmpty().withMessage('Coupon code is required'),
     body('discountValue').isNumeric().withMessage('Discount value is required'),
@@ -15,7 +17,7 @@ router.post('/',
   validateRequest,
   couponController.createCoupon
 );
-router.patch('/:id', couponController.updateCoupon);
-router.delete('/:id', couponController.deleteCoupon);
+router.patch('/:id', protectAdmin, couponController.updateCoupon);
+router.delete('/:id', protectAdmin, couponController.deleteCoupon);
 
 module.exports = router;
