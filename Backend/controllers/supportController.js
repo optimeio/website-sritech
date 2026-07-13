@@ -16,6 +16,7 @@ exports.createSupportQuery = asyncHandler(async (req, res) => {
   const adminAddress = process.env.OWNER_EMAIL || process.env.SUPPORT_EMAIL;
   const adminUrl = process.env.ADMIN_URL || `${process.env.CLIENT_URL || 'https://thesritech.com'}/admin/support`;
 
+  // 1. Send automatic email notification to Admin
   if (adminAddress) {
     sendEmail(
       adminAddress,
@@ -25,7 +26,20 @@ exports.createSupportQuery = asyncHandler(async (req, res) => {
         template: 'supportSubmission',
         payload: { supportQueryId: saved._id }
       }
-    ).catch(err => console.error('Support submission email failed:', err.message));
+    ).catch(err => console.error('Support submission admin email failed:', err.message));
+  }
+
+  // 2. Send automatic confirmation receipt email to the Customer
+  if (saved.email) {
+    sendEmail(
+      saved.email,
+      `We received your complaint: ${saved.subject}`,
+      templates.supportAutoConfirmation({ supportQuery: saved }),
+      {
+        template: 'supportAutoConfirmation',
+        payload: { supportQueryId: saved._id }
+      }
+    ).catch(err => console.error('Support auto-confirmation customer email failed:', err.message));
   }
 
   res.status(201).json(saved);

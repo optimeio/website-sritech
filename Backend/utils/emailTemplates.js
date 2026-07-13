@@ -253,6 +253,19 @@ const templates = {
       <p>${response}</p>
     </div>
     <p class="muted">If you need further assistance, reply to this email anytime.</p>
+  `),
+
+  supportAutoConfirmation: ({ supportQuery }) => wrap(`We received your complaint — ${supportQuery.subject}`, 'Complaint Received', `
+    ${customerGreeting(supportQuery.customerName)}
+    <p class="muted">Thank you for contacting Sri Tech. We have successfully received your complaint and created a support ticket.</p>
+    <div class="section">
+      <table class="details-table">
+        <tr><th>Ticket ID</th><td>${supportQuery._id}</td></tr>
+        <tr><th>Subject</th><td>${supportQuery.subject}</td></tr>
+        <tr><th>Message</th><td>${supportQuery.message}</td></tr>
+      </table>
+    </div>
+    <p class="muted">Our customer support team is reviewing your ticket and will get back to you shortly. You do not need to reply to this email.</p>
   `)
 };
 

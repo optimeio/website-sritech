@@ -12,57 +12,10 @@ const API_URL = 'http://localhost:5000/api';
 const DEFAULT_BANNERS = [
   { _id: 'default-1', image: '/hero-image.png', caption: 'Premium Sustainable Engineering Solutions' },
   { _id: 'default-2', image: '/hero-banner.png', caption: 'Precision Agro, Food & Poultry Machineries' },
-  { _id: 'default-3', image: '/rocket-stove.png', caption: 'Eco-Friendly High Efficiency Rocket Stoves' }
+  { _id: 'default-3', image: '/rocket-stove.png', caption: 'Eco-Friendly High Efficiency Combustion Solutions' }
 ];
 
-const FALLBACK_PRODUCTS = [
-  {
-    _id: 'fallback-rocket-stove',
-    name: 'Rocket Stove',
-    price: '₹3,999',
-    category: 'Stoves',
-    description: 'High-efficiency rocket stove for cleaner, faster cooking.',
-    icon: 'fa-fire',
-    isNewArrival: true,
-    images: ['/rocket-stove.png']
-  },
-  {
-    _id: 'fallback-10-stove',
-    name: '10" Stove',
-    price: '₹4,499',
-    category: 'Stoves',
-    description: 'Compact stove for homes, canteens, and small kitchens.',
-    icon: 'fa-burn',
-    images: ['/hero-image.png']
-  },
-  {
-    _id: 'fallback-rocket-stove-pro',
-    name: 'Rocket Stove Pro',
-    price: '₹5,499',
-    category: 'Stoves',
-    description: 'Premium stove with enhanced heat retention and durability.',
-    icon: 'fa-fire-flame-simple',
-    images: ['/rocket-stove.png']
-  },
-  {
-    _id: 'fallback-stove-plate-kit',
-    name: 'Stove Cooking Plate Kit',
-    price: '₹1,299',
-    category: 'Stoves',
-    description: 'Convenient cooking plate attachment for household use.',
-    icon: 'fa-hot-tub-person',
-    images: ['/hero-image.png']
-  },
-  {
-    _id: 'fallback-home-kit',
-    name: 'Home Appliance Starter Kit',
-    price: '₹1,999',
-    category: 'Home Appliances',
-    description: 'Starter kit for sustainable household appliances.',
-    icon: 'fa-house',
-    images: ['/hero-banner.png']
-  }
-];
+const FALLBACK_PRODUCTS = [];
 
 function App() {
   // State
@@ -96,6 +49,27 @@ function App() {
   const [adminCredentials, setAdminCredentials] = useState({ username: '', password: '' });
   const [showCart, setShowCart] = useState(false);
   const [showWishlist, setShowWishlist] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [activeMobileStep, setActiveMobileStep] = useState(0);
+  const [activeBenefitIndex, setActiveBenefitIndex] = useState(0);
+  const [activeProductIndex, setActiveProductIndex] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setActiveBenefitIndex(prev => (prev + 1) % 4);
+    }, 4500);
+    return () => clearInterval(timer);
+  }, []);
+
+  const [activeStepIndex, setActiveStepIndex] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setActiveStepIndex(prev => (prev + 1) % 4);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
   const [offers, setOffers] = useState([]);
   const [offerData, setOfferData] = useState({
     title: 'Special Offer! 🎉',
@@ -104,7 +78,7 @@ function App() {
     poster: null
   });
   const [categories, setCategories] = useState([]);
-  const fallbackCategories = ['Stoves'];
+  const fallbackCategories = ['Products'];
 
   const normalizeCategorySlug = (value) => {
     if (!value) return '';
@@ -144,7 +118,7 @@ function App() {
     'test'
   ];
 
-  const allowedCategorySlugs = ['stoves'];
+  const allowedCategorySlugs = ['products'];
   const productCategorySlugs = Array.from(new Set(
     products
       .map(p => getCategorySlug(p.category))
@@ -1434,7 +1408,7 @@ function App() {
               {
                 product: 'test-product-001',
                 sku: 'SKU-T1',
-                name: 'Sri Tech Rocket Stove',
+                name: 'Sri Tech Combustion Unit',
                 quantity: 1,
                 price: 1250,
                 totalPrice: 1250
@@ -2261,6 +2235,7 @@ function App() {
   const handleCategoryChange = (cat) => {
     setSelectedCategory(getCategorySlug(cat));
     setSearchTerm(""); // Clear search when category changes
+    setActiveProductIndex(0); // Reset slideshow index
   };
 
   const handleAdminLoginSubmit = async (e) => {
@@ -2774,9 +2749,19 @@ const resolvedCartItems = cart
   const scrollToSection = (e, sectionId) => {
     e.preventDefault();
     setActiveSection(sectionId);
-    const element = document.getElementById(sectionId);
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth' });
+    if (location.pathname !== '/') {
+      navigate('/');
+      setTimeout(() => {
+        const element = document.getElementById(sectionId);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth' });
+        }
+      }, 100);
+    } else {
+      const element = document.getElementById(sectionId);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth' });
+      }
     }
   };
 
@@ -3434,7 +3419,7 @@ const resolvedCartItems = cart
           <div className="auth-left-pane">
             <div className="auth-left-content">
               <h2>Cook Smarter.<span>Save More.</span></h2>
-              <p className="auth-subhead">Join thousands of customers using fuel-efficient Rocket Stoves for sustainable cooking and a cleaner future.</p>
+              <p className="auth-subhead">Join thousands of customers using our fuel-efficient combustion systems for sustainable cooking and a cleaner future.</p>
               <ul className="auth-trust-list">
                 <li><i className="fa-solid fa-shield-halved"></i> Secure Login & Checkout</li>
                 <li><i className="fa-solid fa-truck-fast"></i> Lightning Fast Delivery Tracking</li>
@@ -3804,19 +3789,29 @@ const resolvedCartItems = cart
       {/* Header */}
       <header className="top-header">
         <div className="header-container">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <button 
+              className="mobile-menu-btn" 
+              onClick={() => setShowMobileMenu(!showMobileMenu)}
+              aria-label="Toggle Navigation Menu"
+              title="Menu"
+            >
+              <i className={showMobileMenu ? "fa-solid fa-xmark" : "fa-solid fa-bars"} aria-hidden="true"></i>
+            </button>
             <a href="#" className="logo" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
-            <img
-              src="/sri-tech-logo-final.png"
-              alt="SriTech Logo"
-              style={{
-                height: '130px',
-                width: 'auto',
-                objectFit: 'contain',
-                background: 'transparent',
-                filter: 'hue-rotate(12deg) saturate(1.08) drop-shadow(0 2px 4px rgba(0,0,0,0.12))'
-              }}
-            />
-          </a>
+              <img
+                src="/sri-tech-logo-final.png"
+                alt="SriTech Logo"
+                style={{
+                  height: '130px',
+                  width: 'auto',
+                  objectFit: 'contain',
+                  background: 'transparent',
+                  filter: 'hue-rotate(12deg) saturate(1.08) drop-shadow(0 2px 4px rgba(0,0,0,0.12))'
+                }}
+              />
+            </a>
+          </div>
 
           <nav className="header-nav">
             <a href="#home" className="action-btn" onClick={(e) => { scrollToSection(e, 'home'); }}>
@@ -3825,7 +3820,7 @@ const resolvedCartItems = cart
             <a href="#product" className="action-btn" onClick={(e) => { scrollToSection(e, 'product'); }}>
               Products
             </a>
-            <a href="#about" className="action-btn" onClick={(e) => { scrollToSection(e, 'about'); }}>
+            <a href="#how-it-works" className="action-btn" onClick={(e) => { scrollToSection(e, 'how-it-works'); }}>
               About
             </a>
             <a href="#footer" className="action-btn" onClick={(e) => { scrollToSection(e, 'footer'); }}>
@@ -3836,7 +3831,7 @@ const resolvedCartItems = cart
           <div className="header-actions">
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <button
-                className="action-btn"
+                className="action-btn header-search-btn"
                 title="Search products"
                 aria-label="Search products"
                 onClick={handleNavbarSearchToggle}
@@ -3845,12 +3840,12 @@ const resolvedCartItems = cart
               </button>
               <button className="action-btn cart-btn" title="Cart" aria-label={`View shopping cart with ${cart.length} items`} onClick={() => setShowCart(true)}>
                 <i className="fa-solid fa-cart-shopping" aria-hidden="true"></i>
-                <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>Cart</span>
+                <span className="btn-text" style={{ fontSize: '0.9rem', fontWeight: 600 }}>Cart</span>
                 {cart.length > 0 && <span className="cart-count">{cart.length}</span>}
               </button>
               <button className="action-btn" title="Wishlist" aria-label="Wishlist" onClick={() => setShowWishlist(true)}>
                 <i className={waitlist.length > 0 ? "fa-solid fa-heart" : "fa-regular fa-heart"} aria-hidden="true" style={waitlist.length > 0 ? { color: 'var(--accent-yellow)' } : {}}></i>
-                <span style={{ fontSize: '0.9rem', fontWeight: 600, marginLeft: '0.35rem' }}>Wishlist</span>
+                <span className="btn-text" style={{ fontSize: '0.9rem', fontWeight: 600, marginLeft: '0.35rem' }}>Wishlist</span>
               </button>
               <button
                 className="action-btn header-login-btn"
@@ -3863,12 +3858,13 @@ const resolvedCartItems = cart
                   setUserCredentials({ name: '', phone: '', address: '', email: '', password: '', confirmPassword: '' });
                 }}
               >
-                Login
+                <i className="fa-solid fa-user" aria-hidden="true"></i>
+                <span className="btn-text" style={{ fontSize: '0.9rem', fontWeight: 600, marginLeft: '0.35rem' }}>Login</span>
               </button>
             </div>
 
             {showNavbarSearch && (
-              <div style={{ position: 'relative', marginLeft: '0.4rem' }}>
+              <div className="navbar-search-container" style={{ position: 'relative', marginLeft: '0.4rem' }}>
                 <input
                   type="text"
                   ref={navbarSearchInputRef}
@@ -3941,6 +3937,22 @@ const resolvedCartItems = cart
             )}
           </div>
         </div>
+
+        {/* Mobile Navigation Dropdown Menu Panel */}
+        <div className={`mobile-nav-panel ${showMobileMenu ? 'active' : ''}`}>
+          <a href="#home" className="action-btn" onClick={(e) => { scrollToSection(e, 'home'); setShowMobileMenu(false); }}>
+            Home
+          </a>
+          <a href="#product" className="action-btn" onClick={(e) => { scrollToSection(e, 'product'); setShowMobileMenu(false); }}>
+            Products
+          </a>
+          <a href="#how-it-works" className="action-btn" onClick={(e) => { scrollToSection(e, 'how-it-works'); setShowMobileMenu(false); }}>
+            About
+          </a>
+          <a href="#footer" className="action-btn" onClick={(e) => { scrollToSection(e, 'footer'); setShowMobileMenu(false); }}>
+            Contact
+          </a>
+        </div>
       </header>
 
       <main>
@@ -3950,6 +3962,11 @@ const resolvedCartItems = cart
           <>
             {/* Premium Dark Parallax Hero Section */}
             <section id="home" className="premium-hero">
+              {/* Background Rain Forest Video */}
+              <video className="hero-video-bg" autoPlay muted loop playsInline>
+                <source src="/rain-forest-hd.mp4" type="video/mp4" />
+                <source src="/rain-forest.mp4" type="video/mp4" />
+              </video>
 
           <div className="premium-hero-content">
             <div className="hero-text-content">
@@ -3957,7 +3974,7 @@ const resolvedCartItems = cart
                 <span className="premium-badge-text">COOK SMART. SAVE FUEL. SAVE NATURE.</span>
               </div>
               <h1>Efficient Cooking.<br/><span className="text-highlight-green">Better Future.</span></h1>
-              <p className="hero-subtitle">Rocket stoves use less fuel, produce less smoke, and deliver higher efficiency for a sustainable tomorrow.</p>
+              <p className="hero-subtitle">Our systems use less fuel, produce less smoke, and deliver higher efficiency for a sustainable tomorrow.</p>
               
               <div className="hero-features-row">
                 <div className="feature-item-col">
@@ -3988,100 +4005,72 @@ const resolvedCartItems = cart
                     <span>Sustainable Living</span>
                   </div>
                 </div>
+              </div> {/* Close hero-features-row */}
+              <div className="hero-cta-group">
+                <a href="#product" className="primary-btn-green" onClick={(e) => scrollToSection(e, 'product')}>Explore Products <i className="fa-solid fa-arrow-right"></i></a>
+                <a href="#how-it-works" className="secondary-btn-outline" onClick={(e) => scrollToSection(e, 'how-it-works')}>Learn More</a>
               </div>
-            </div>
-
-            <div className="hero-cta-group hero-cta-center">
-              <a href="#product" className="primary-btn-green" onClick={(e) => scrollToSection(e, 'product')}>Explore Products <i className="fa-solid fa-arrow-right"></i></a>
-              <a href="#how-it-works" className="secondary-btn-outline" onClick={(e) => scrollToSection(e, 'how-it-works')}>Learn More</a>
             </div>
 
             <div className="hero-image-wrapper">
-              <div className="circular-badge">
-                <svg viewBox="0 0 100 100">
-                  <path id="curve" d="M 50 50 m -37 0 a 37 37 0 1 1 74 0 a 37 37 0 1 1 -74 0" fill="transparent" />
-                  <text><textPath href="#curve" startOffset="0">COOK FASTER • SAVE MORE • LIVE BETTER • </textPath></text>
-                </svg>
-                <i className="fa-solid fa-leaf center-icon" style={{color: '#1E7A3B'}}></i>
+              <div className="hero-product-card">
+                <img src="/rocket-stove-user.png" alt="Sri Tech Eco Combustion System with Flames" className="hero-product-image" />
               </div>
+            </div>
+          </div>
+
+          {/* Centered circular badge at the bottom of the landing page */}
+          <div className="hero-bottom-badge-wrap">
+            <div className="circular-badge">
+              <svg viewBox="0 0 100 100">
+                <path id="curve" d="M 50 50 m -37 0 a 37 37 0 1 1 74 0 a 37 37 0 1 1 -74 0" fill="transparent" />
+                <text><textPath href="#curve" startOffset="0">COOK FASTER • SAVE MORE • LIVE BETTER • </textPath></text>
+              </svg>
+              <i className="fa-solid fa-leaf center-icon" style={{color: '#1E7A3B'}}></i>
             </div>
           </div>
         </section>
 
-        {/* Floating Stats Bar */}
-        <div className="stats-bar-wrapper">
-          <div className="stats-bar-green">
-            <div className="stat-item-row">
-              <i className="fa-solid fa-piggy-bank stat-icon"></i>
-              <div className="stat-text">
-                <h3>80%</h3>
-                <p>Less Fuel Consumption</p>
-              </div>
-            </div>
-            <div className="stat-divider-light"></div>
-            <div className="stat-item-row">
-              <i className="fa-solid fa-cloud stat-icon"></i>
-              <div className="stat-text">
-                <h3>90%</h3>
-                <p>Less Smoke Emission</p>
-              </div>
-            </div>
-            <div className="stat-divider-light"></div>
-            <div className="stat-item-row">
-              <i className="fa-solid fa-fire stat-icon"></i>
-              <div className="stat-text">
-                <h3>2x</h3>
-                <p>More Efficiency</p>
-              </div>
-            </div>
-            <div className="stat-divider-light"></div>
-            <div className="stat-item-row">
-              <i className="fa-solid fa-leaf stat-icon"></i>
-              <div className="stat-text">
-                <h3>100%</h3>
-              </div>
-            </div>
-          </div>
-        </div>
+
 
         {/* How It Works Section */}
         <section id="how-it-works" className="how-it-works-section">
           <div className="hiw-container">
             <div className="section-header-dark">
               <h2>Master the Elements</h2>
-              <p>The science of perfect combustion inside every Sri Tech stove.</p>
+              <p>The science of perfect combustion inside every Sri Tech unit.</p>
             </div>
             
             <div className="hiw-grid">
               <div className="hiw-illustration">
                 <div className="cutaway-diagram">
-                  <img src="/rocket-stove.png" alt="Stove Cutaway Diagram" className="cutaway-img" onError={(e) => { e.target.src = "https://images.unsplash.com/photo-1517433670267-08bbd4be890f?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"; }} />
+                  <img src="/rocket-stove.png" alt="Cutaway Diagram" className="cutaway-img" onError={(e) => { e.target.src = "https://images.unsplash.com/photo-1517433670267-08bbd4be890f?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"; }} />
                   <div className="airflow-animated"></div>
                 </div>
               </div>
               <div className="hiw-steps">
-                <div className="step-card">
+                <div className={`step-card ${activeStepIndex === 0 ? 'active' : ''}`} onClick={() => setActiveStepIndex(0)}>
                   <div className="step-number">01</div>
                   <div className="step-info">
                     <h4>Feed Wood</h4>
                     <p>Load biomass or wood easily from the top or side intake port.</p>
                   </div>
                 </div>
-                <div className="step-card">
+                <div className={`step-card ${activeStepIndex === 1 ? 'active' : ''}`} onClick={() => setActiveStepIndex(1)}>
                   <div className="step-number">02</div>
                   <div className="step-info">
                     <h4>Airflow Ignites</h4>
                     <p>Oxygen is rapidly pulled through the bottom draft, creating a powerful draft.</p>
                   </div>
                 </div>
-                <div className="step-card">
+                <div className={`step-card ${activeStepIndex === 2 ? 'active' : ''}`} onClick={() => setActiveStepIndex(2)}>
                   <div className="step-number">03</div>
                   <div className="step-info">
                     <h4>Heat Rises</h4>
                     <p>The insulated combustion chamber forces fire up, burning excess smoke gases.</p>
                   </div>
                 </div>
-                <div className="step-card">
+                <div className={`step-card ${activeStepIndex === 3 ? 'active' : ''}`} onClick={() => setActiveStepIndex(3)}>
                   <div className="step-number">04</div>
                   <div className="step-info">
                     <h4>Efficient Cooking</h4>
@@ -4095,31 +4084,65 @@ const resolvedCartItems = cart
 
         {/* Why Choose Us Section */}
         <section id="why-choose-us" className="benefits-section">
+          {/* Animated Breeze Elements in Background */}
+          <div className="breeze-container">
+            <div className="breeze-leaf leaf-1"><i className="fa-solid fa-leaf"></i></div>
+            <div className="breeze-leaf leaf-2"><i className="fa-solid fa-wind"></i></div>
+            <div className="breeze-leaf leaf-3"><i className="fa-solid fa-leaf"></i></div>
+            <div className="breeze-leaf leaf-4"><i className="fa-solid fa-wind"></i></div>
+          </div>
+
           <div className="section-header-light">
             <h2>Better for You. Better for Nature.</h2>
             <p>Designed to outlast the harshest environments while protecting the planet.</p>
           </div>
           
-          <div className="benefits-grid">
-            <div className="benefit-card">
-              <div className="benefit-icon"><i className="fa-solid fa-heart-pulse"></i></div>
-              <h4>Healthier Cooking</h4>
-              <p>Significantly reduces toxic smoke inhalation compared to traditional fires.</p>
-            </div>
-            <div className="benefit-card">
-              <div className="benefit-icon"><i className="fa-solid fa-piggy-bank"></i></div>
-              <h4>Saves Money</h4>
-              <p>Uses up to 80% less fuel, paying for itself in a matter of months.</p>
-            </div>
-            <div className="benefit-card">
-              <div className="benefit-icon"><i className="fa-solid fa-leaf"></i></div>
-              <h4>Environment Friendly</h4>
-              <p>Lower carbon footprint and reduced deforestation through massive efficiency.</p>
-            </div>
-            <div className="benefit-card">
-              <div className="benefit-icon"><i className="fa-solid fa-hammer"></i></div>
-              <h4>Durable & Long Lasting</h4>
-              <p>Industrial-grade materials built for intense continuous heat.</p>
+          {/* Infinite Horizontal Scroll Track */}
+          <div className="benefits-marquee-container">
+            <div className="benefits-marquee-track">
+              {/* Set 1 */}
+              <div className="benefit-card">
+                <div className="benefit-icon"><i className="fa-solid fa-heart-pulse"></i></div>
+                <h4>Healthier Cooking</h4>
+                <p>Significantly reduces toxic smoke inhalation compared to traditional fires.</p>
+              </div>
+              <div className="benefit-card">
+                <div className="benefit-icon"><i className="fa-solid fa-piggy-bank"></i></div>
+                <h4>Saves Money</h4>
+                <p>Uses up to 80% less fuel, paying for itself in a matter of months.</p>
+              </div>
+              <div className="benefit-card">
+                <div className="benefit-icon"><i className="fa-solid fa-leaf"></i></div>
+                <h4>Environment Friendly</h4>
+                <p>Lower carbon footprint and reduced deforestation through massive efficiency.</p>
+              </div>
+              <div className="benefit-card">
+                <div className="benefit-icon"><i className="fa-solid fa-hammer"></i></div>
+                <h4>Durable & Long Lasting</h4>
+                <p>Industrial-grade materials built for intense continuous heat.</p>
+              </div>
+
+              {/* Set 2 (Duplicate for seamless infinite scrolling loop) */}
+              <div className="benefit-card">
+                <div className="benefit-icon"><i className="fa-solid fa-heart-pulse"></i></div>
+                <h4>Healthier Cooking</h4>
+                <p>Significantly reduces toxic smoke inhalation compared to traditional fires.</p>
+              </div>
+              <div className="benefit-card">
+                <div className="benefit-icon"><i className="fa-solid fa-piggy-bank"></i></div>
+                <h4>Saves Money</h4>
+                <p>Uses up to 80% less fuel, paying for itself in a matter of months.</p>
+              </div>
+              <div className="benefit-card">
+                <div className="benefit-icon"><i className="fa-solid fa-leaf"></i></div>
+                <h4>Environment Friendly</h4>
+                <p>Lower carbon footprint and reduced deforestation through massive efficiency.</p>
+              </div>
+              <div className="benefit-card">
+                <div className="benefit-icon"><i className="fa-solid fa-hammer"></i></div>
+                <h4>Durable & Long Lasting</h4>
+                <p>Industrial-grade materials built for intense continuous heat.</p>
+              </div>
             </div>
           </div>
         </section>
@@ -4127,151 +4150,140 @@ const resolvedCartItems = cart
         {/* Product Section */}
         <section id="product" className="products-section">
           <div className="section-header" style={{ justifyContent: 'center', textAlign: 'center', borderBottom: 'none', marginBottom: '2.5rem' }}>
-            <h2 style={{ 
-              fontFamily: "'Syne', 'Inter', sans-serif", 
-              letterSpacing: '2px', 
-              fontWeight: 800, 
-              fontSize: '3.6rem', 
-              textTransform: 'uppercase', 
-              background: 'linear-gradient(135deg, var(--accent-yellow) 0%, #4ade80 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              textAlign: 'center',
-              textShadow: '0 4px 20px rgba(74, 222, 128, 0.15)'
-            }}>
-              PRODUCTS
+            <h2 className="wavy-title">
+              <span>P</span><span>R</span><span>O</span><span>D</span><span>U</span><span>C</span><span>T</span><span>S</span>
             </h2>
           </div>
 
-          <div className="category-bar-wrapper" style={{ marginBottom: '2rem' }}>
-            <div className="category-bar-container">
-              {categoryItems.map(cat => {
-                const slug = getCategorySlug(cat);
-                const displayName = getCategoryDisplayName(cat);
-                let iconClass = 'fa-boxes-stacked';
-                if (slug.includes('stove')) iconClass = 'fa-fire';
-                else if (slug.includes('appliances')) iconClass = 'fa-home';
-                else if (slug.includes('welding')) iconClass = 'fa-bolt';
-                else if (slug.includes('engraining') || slug.includes('engraver')) iconClass = 'fa-gears';
-
-                const buttonKey = slug || displayName;
-                return (
-                  <button 
-                    key={buttonKey}
-                    className={`category-bar-item ${selectedCategory === slug ? 'active' : ''}`}
-                    onClick={() => {
-                      handleCategoryChange(slug);
-                      const el = document.getElementById('product');
-                      if (el) el.scrollIntoView({ behavior: 'smooth' });
-                    }}
-                  >
-                    <i className={`fa-solid ${iconClass}`}></i>
-                    <span>{displayName}</span>
-                  </button>
-                );
-              })}
+          <div className="products-filter-row">
+            <div className="category-pill-container">
+              <button 
+                className={`category-pill ${selectedCategory === '' ? 'active' : ''}`} 
+                onClick={() => handleCategoryChange('')}
+              >
+                ALL
+              </button>
+              {productCategories.map(cat => (
+                <button 
+                  key={cat.slug} 
+                  className={`category-pill ${selectedCategory === cat.slug ? 'active' : ''}`}
+                  onClick={() => handleCategoryChange(cat.slug)}
+                >
+                  {cat.name.toUpperCase()}
+                </button>
+              ))}
+            </div>
+            
+            <div className="products-search-wrapper">
+              <i className="fa-solid fa-magnifying-glass search-icon"></i>
+              <input 
+                type="text" 
+                placeholder="Search products..." 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="products-search-input"
+              />
             </div>
           </div>
 
           <div className="product-grid">
             {filteredProducts.length > 0 ? (
-              filteredProducts.map(product => (
-                <article key={product.id || product._id} className="product-card" style={{ animation: 'fadeIn 0.5s ease forwards' }}>
-                  <button 
-                    className={`like-btn ${waitlist.includes(product.id || product._id) ? 'active' : ''}`} 
-                    onClick={() => handleToggleWaitlist(product.id || product._id)}
-                    aria-label={waitlist.includes(product.id || product._id) ? "Remove from waitlist" : "Add to wishlist"}
-                  >
-                    <i className={`fa-${waitlist.includes(product.id || product._id) ? 'solid' : 'regular'} fa-heart`} aria-hidden="true"></i>
-                  </button>
+              filteredProducts.map(product => {
+                const charSum = (product._id || product.id || '').split('').reduce((sum, char) => sum + char.charCodeAt(0), 0);
+                const rating = (4.1 + (charSum % 8) / 10).toFixed(1);
+                const reviewsCount = 12 + (charSum % 340);
+                
+                const priceNum = parsePrice(product.price);
+                const activeOffer = getActiveOfferForProduct(product);
+                const activeCoupon = coupons.find(c => 
+                  c.isActive && 
+                  c.linkedProduct === (product._id || product.id) &&
+                  (!c.expiryDate || new Date(c.expiryDate) > new Date())
+                );
+                let discountedPrice = priceNum;
+                let discountText = '';
 
-                  <div className="product-img" onClick={() => { setSelectedProduct(product); setSelectedProductImageIndex(0); }} style={{ cursor: 'pointer' }}>
-                    {product.images && product.images.length > 0 ? (
-                      <img 
-                        src={product.images[0]} 
-                        alt={`${product.name} - ${product.category}`} 
-                        className="hover-zoom"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <i className={`fa-solid ${product.icon || 'fa-box'} placeholder-img`} aria-hidden="true"></i>
-                    )}
-                    {product.images && product.images.length > 1 && (
-                      <span className="image-badge" style={{ position: 'absolute', bottom: '10px', right: '10px', background: 'rgba(0,0,0,0.5)', color: 'white', padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem' }}>
-                        +{product.images.length - 1} photos
-                      </span>
-                    )}
-                  </div>
+                if (activeOffer) {
+                  if (activeOffer.discountType === 'fixed') {
+                    discountedPrice = Math.max(0, priceNum - (Number(activeOffer.discountValue) || 0));
+                    discountText = `₹${Number(activeOffer.discountValue) || 0} off`;
+                  } else if (activeOffer.discountType === 'percentage') {
+                    discountedPrice = Math.round(priceNum * (1 - (Number(activeOffer.discountValue) || 0) / 100));
+                    discountText = `${Number(activeOffer.discountValue) || 0}% off`;
+                  } else if (activeOffer.discountType === 'free-shipping') {
+                    discountText = 'Free shipping';
+                  }
+                } else if (activeCoupon) {
+                  const discountVal = parseFloat(activeCoupon.discountValue) || 0;
+                  if (activeCoupon.discountType === 'Fixed') {
+                    discountedPrice = Math.max(0, priceNum - discountVal);
+                    discountText = `₹${discountVal} off`;
+                  } else {
+                    discountedPrice = Math.round(priceNum * (1 - discountVal / 100));
+                    discountText = `${discountVal}% off`;
+                  }
+                }
+                const displayPrice = discountedPrice || priceNum;
 
-                  <div className="product-info">
-                    <h3 onClick={() => { setSelectedProduct(product); setSelectedProductImageIndex(0); }} style={{ cursor: 'pointer' }}>{product.name}</h3>
-                    
-                    {/* Rating badge */}
-                    {(() => {
-                      const charSum = (product._id || product.id || '').split('').reduce((sum, char) => sum + char.charCodeAt(0), 0);
-                      const rating = (4.1 + (charSum % 8) / 10).toFixed(1);
-                      const reviewsCount = 12 + (charSum % 340);
-                      return (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span className="rating-badge">{rating} <i className="fa-solid fa-star"></i></span>
-                          <span className="rating-count">({reviewsCount})</span>
-                        </div>
-                      );
-                    })()}
+                return (
+                  <article key={product.id || product._id} className="product-card">
+                    <button 
+                      className={`like-btn ${waitlist.includes(product.id || product._id) ? 'active' : ''}`} 
+                      onClick={() => handleToggleWaitlist(product.id || product._id)}
+                      aria-label="Wishlist"
+                    >
+                      <i className={`fa-${waitlist.includes(product.id || product._id) ? 'solid' : 'regular'} fa-heart`}></i>
+                    </button>
 
-                    {/* Price section */}
-                    {(() => {
-                      const priceNum = parsePrice(product.price);
-                      const activeOffer = getActiveOfferForProduct(product);
-                      const activeCoupon = coupons.find(c => 
-                        c.isActive && 
-                        c.linkedProduct === (product._id || product.id) &&
-                        (!c.expiryDate || new Date(c.expiryDate) > new Date())
-                      );
-                      let discountedPrice = priceNum;
-                      let discountText = '';
-
-                      if (activeOffer) {
-                        if (activeOffer.discountType === 'fixed') {
-                          discountedPrice = Math.max(0, priceNum - (Number(activeOffer.discountValue) || 0));
-                          discountText = `₹${Number(activeOffer.discountValue) || 0} off`;
-                        } else if (activeOffer.discountType === 'percentage') {
-                          discountedPrice = Math.round(priceNum * (1 - (Number(activeOffer.discountValue) || 0) / 100));
-                          discountText = `${Number(activeOffer.discountValue) || 0}% off`;
-                        } else if (activeOffer.discountType === 'free-shipping') {
-                          discountText = 'Free shipping';
-                        }
-                      } else if (activeCoupon) {
-                        const discountVal = parseFloat(activeCoupon.discountValue) || 0;
-                        if (activeCoupon.discountType === 'Fixed') {
-                          discountedPrice = Math.max(0, priceNum - discountVal);
-                          discountText = `₹${discountVal} off`;
-                        } else {
-                          discountedPrice = Math.round(priceNum * (1 - discountVal / 100));
-                          discountText = `${discountVal}% off`;
-                        }
-                      }
-                      
-                      const originalPrice = Math.round(priceNum * 1.35);
-                      const displayPrice = discountedPrice || priceNum;
-                      return (
-                        <div className="price-row">
-                          <span className="price">₹{displayPrice.toLocaleString('en-IN')}</span>
-                          <span className="original-price">₹{priceNum.toLocaleString('en-IN')}</span>
-                          <span className="discount" style={{ color: '#388e3c', fontWeight: 700 }}>{discountText || '20% off'}</span>
-                        </div>
-                      );
-                    })()}
-
-                    {/* Assured seal */}
-                    <div className="assured-badge-container">
-                      <span className="assured-tag">SriTech <span>Assured <i className="fa-solid fa-shield-halved" style={{ fontSize: '0.6rem' }}></i></span></span>
-                      <span className="free-delivery-tag">Free delivery</span>
+                    <div 
+                      className="product-img-wrapper product-shine-effect" 
+                      onClick={() => { setSelectedProduct(product); setSelectedProductImageIndex(0); }}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      {product.images && product.images.length > 0 ? (
+                        <img 
+                          src={product.images[0]} 
+                          alt={product.name} 
+                          className="hover-zoom"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <i className={`fa-solid ${product.icon || 'fa-box'} placeholder-img`}></i>
+                      )}
+                      {product.images && product.images.length > 1 && (
+                        <span className="image-badge">
+                          +{product.images.length - 1} photos
+                        </span>
+                      )}
                     </div>
 
-                  </div>
-                </article>
-              ))
+                    <div className="product-info">
+                      <h3 onClick={() => { setSelectedProduct(product); setSelectedProductImageIndex(0); }} style={{ cursor: 'pointer' }}>{product.name}</h3>
+                      
+                      <div className="rating-row-grid">
+                        <span className="rating-badge">{rating} <i className="fa-solid fa-star"></i></span>
+                        <span className="rating-count">({reviewsCount})</span>
+                      </div>
+
+                      <div className="price-row">
+                        <span className="price">₹{displayPrice.toLocaleString('en-IN')}</span>
+                        <span className="original-price">₹{priceNum.toLocaleString('en-IN')}</span>
+                        <span className="discount">{discountText || '20% off'}</span>
+                      </div>
+
+
+
+                      <button 
+                        className="primary-btn-green checkout-btn" 
+                        style={{ width: '100%', marginTop: '1rem', padding: '0.65rem 1rem', fontSize: '0.85rem' }}
+                        onClick={() => handleBuyNow(product)}
+                      >
+                        <i className="fa-solid fa-bag-shopping"></i> Buy Now
+                      </button>
+                    </div>
+                  </article>
+                );
+              })
             ) : (
               <div className="empty-state glass-card" style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '4rem' }}>
                 <i className="fa-solid fa-boxes-packing" style={{ fontSize: '3rem', color: 'var(--primary-color)', opacity: 0.2, marginBottom: '1.5rem', display: 'block' }}></i>
@@ -4334,7 +4346,11 @@ const resolvedCartItems = cart
       </main>
 
       {/* Footer */}
-      <Footer onRaiseComplaint={() => setShowComplaintModal(true)} />
+      <Footer 
+        complaintForm={complaintForm}
+        setComplaintForm={setComplaintForm}
+        handleComplaintSubmit={handleComplaintSubmit}
+      />
     </div>
   );
 }
