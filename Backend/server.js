@@ -96,6 +96,9 @@ const setupRoutes = () => {
   const refundRoutes = require('./routes/refundRoutes');
 
   console.log('🔌 Registering routes...');
+  app.get('/', (req, res) => {
+    res.json({ status: 'ok', message: 'SriTech Backend API is running' });
+  });
   app.use('/api/auth', authRoutes);
   app.use('/api/admin', adminRoutes);
   app.use('/api/users', userRoutes);
