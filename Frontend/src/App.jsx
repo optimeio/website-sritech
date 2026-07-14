@@ -7,7 +7,7 @@ import UserDashboard from './components/UserDashboard'
 import Footer from './components/Footer'
 import MyOrders from './pages/MyOrders.jsx'
 
-const API_URL = 'http://localhost:5000/api';
+const API_URL = import.meta.env.VITE_API_URL || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? '/api' : 'https://website-sritech.onrender.com/api');
 
 const DEFAULT_BANNERS = [
   { _id: 'default-1', image: '/hero-image.png', caption: 'Premium Sustainable Engineering Solutions' },
@@ -279,6 +279,18 @@ function App() {
 
   const GUEST_CART_KEY = 'sriTechGuestCart';
   const GUEST_WAITLIST_KEY = 'sriTechGuestWaitlist';
+
+  const trackGAEvent = (action, category, label, value) => {
+    if (window.gtag) {
+      window.gtag('event', action, {
+        event_category: category,
+        event_label: label,
+        value: value
+      });
+    } else {
+      console.log('[GA Mock Event]:', { action, category, label, value });
+    }
+  };
 
   const persistAuthSession = (token, user) => {
     if (token) {
@@ -584,10 +596,9 @@ function App() {
       }
     }
 
-    const isAdminArea = window.location.pathname.startsWith('/admin') || isAdmin;
     const adminHeaders = getAdminHeaders();
 
-    if (isAdminArea && adminHeaders.Authorization) {
+    if (isAdmin && adminHeaders.Authorization) {
       try {
         const returnRes = await fetch(`${API_URL}/returns?t=${t}`, { headers: adminHeaders });
         if (returnRes.ok) {
@@ -608,7 +619,7 @@ function App() {
     }
 
     // Fetch activity logs
-    if (isAdminArea && adminHeaders.Authorization) {
+    if (isAdmin && adminHeaders.Authorization) {
       try {
         const logRes = await fetch(`${API_URL}/logs?t=${t}`, { headers: adminHeaders });
         if (logRes.ok) {
@@ -620,7 +631,7 @@ function App() {
     }
 
     // Fetch visitor leads
-    if (isAdminArea && adminHeaders.Authorization) {
+    if (isAdmin && adminHeaders.Authorization) {
       try {
         const leadsRes = await fetch(`${API_URL}/leads?t=${t}`, { headers: adminHeaders });
         if (leadsRes.ok) {
@@ -632,7 +643,7 @@ function App() {
     }
 
     // Fetch registered users
-    if (isAdminArea && adminHeaders.Authorization) {
+    if (isAdmin && adminHeaders.Authorization) {
       try {
         const usersRes = await fetch(`${API_URL}/users?t=${t}`, { headers: adminHeaders });
         if (usersRes.ok) {
@@ -715,9 +726,13 @@ function App() {
       }
     };
 
-    restoreUserSession();
-    validateAdminSession();
-    fetchData();
+    const initializeApp = async () => {
+      await restoreUserSession();
+      await validateAdminSession();
+      await fetchData();
+    };
+
+    initializeApp();
   }, []);
 
   useEffect(() => {
@@ -738,9 +753,46 @@ function App() {
     }
   }, [location.pathname, isUserLoggedIn]);
 
+  // Synchronize URL path /product/:id with selectedProduct state
+  useEffect(() => {
+    if (!Array.isArray(products) || products.length === 0) return;
+
+    let targetProductId = null;
+    if (location.pathname.startsWith('/product/')) {
+      targetProductId = location.pathname.split('/product/')[1];
+    } else {
+      const params = new URLSearchParams(location.search);
+      targetProductId = params.get('product');
+    }
+
+    if (targetProductId) {
+      const found = products.find(p => String(p._id || p.id) === targetProductId || (p.slug && String(p.slug) === targetProductId));
+      if (found) {
+        if (!selectedProduct || (selectedProduct._id || selectedProduct.id) !== found._id) {
+          setSelectedProduct(found);
+        }
+      }
+    }
+  }, [location.pathname, location.search, products]);
+
+  // Sync selectedProduct state changes back to the URL
+  useEffect(() => {
+    if (selectedProduct) {
+      const targetPath = `/product/${selectedProduct._id || selectedProduct.id}`;
+      if (location.pathname !== targetPath) {
+        navigate(targetPath);
+      }
+    } else {
+      if (location.pathname.startsWith('/product/')) {
+        navigate('/');
+      }
+    }
+  }, [selectedProduct]);
+
   // Fetch reviews when product is selected
   useEffect(() => {
     if (selectedProduct) {
+      trackGAEvent('view_item', 'ecommerce', selectedProduct.name, Number(String(selectedProduct.price).replace(/[^0-9]/g, '')) || 0);
       setSelectedProductImageIndex(0);
       const fetchReviews = async () => {
         try {
@@ -808,7 +860,7 @@ function App() {
         const saved = await res.json();
         setHeroBanners(prev => [...prev, saved]);
         showToast('Hero banner uploaded successfully!', 'success');
-        const logRes = await fetch(`${API_URL}/logs`);
+        const logRes = await fetch(`${API_URL}/logs`, { headers: getAdminHeaders() });
         if (logRes.ok) setActivityLogs(await logRes.json());
         setNotifications(prev => [{ id: `banner-${saved._id || saved.id || Date.now()}`, title: 'New Banner', body: saved.caption || 'A new banner was added to the storefront.', time: new Date().toLocaleString(), unread: true }, ...(prev || [])]);
       } else {
@@ -830,7 +882,7 @@ function App() {
       if (res.ok) {
         setHeroBanners(prev => prev.filter(b => (b._id || b.id) !== bannerId));
         showToast('Hero banner deleted successfully!', 'success');
-        const logRes = await fetch(`${API_URL}/logs`);
+        const logRes = await fetch(`${API_URL}/logs`, { headers: getAdminHeaders() });
         if (logRes.ok) setActivityLogs(await logRes.json());
         setNotifications(prev => [{ id: `banner-delete-${bannerId}-${Date.now()}`, title: 'Banner Removed', body: 'A hero banner was removed from the storefront.', time: new Date().toLocaleString(), unread: true }, ...(prev || [])]);
       } else {
@@ -892,8 +944,8 @@ function App() {
         await refreshProducts();
         setSelectedProduct(prev => (prev && (prev._id || prev.id) === productId ? null : prev));
         showToast('Product deleted successfully!', 'success');
-        const logRes = await fetch(`${API_URL}/logs`);
-        setActivityLogs(await logRes.json());
+        const logRes = await fetch(`${API_URL}/logs`, { headers: getAdminHeaders() });
+        if (logRes.ok) setActivityLogs(await logRes.json());
       } else {
         const error = await res.json();
         showToast(error.message || 'Failed to delete product.', 'error');
@@ -918,8 +970,8 @@ function App() {
           prev && (prev._id || prev.id)?.toString() === productId?.toString() ? updated || prev : prev
         ));
         showToast('Product updated successfully!', 'success');
-        const logRes = await fetch(`${API_URL}/logs`);
-        setActivityLogs(await logRes.json());
+        const logRes = await fetch(`${API_URL}/logs`, { headers: getAdminHeaders() });
+        if (logRes.ok) setActivityLogs(await logRes.json());
         return true;
       }
 
@@ -1061,7 +1113,7 @@ function App() {
         const savedCategory = await res.json();
         setCategories(prev => [savedCategory, ...prev]);
         showToast('Category added successfully!', 'success');
-        const logRes = await fetch(`${API_URL}/logs`);
+        const logRes = await fetch(`${API_URL}/logs`, { headers: getAdminHeaders() });
         if (logRes.ok) setActivityLogs(await logRes.json());
       } else {
         const err = await res.json();
@@ -1085,7 +1137,7 @@ function App() {
         const updatedCategory = await res.json();
         setCategories(prev => prev.map(cat => (cat._id || cat.id) === categoryId ? updatedCategory : cat));
         showToast('Category updated successfully!', 'success');
-        const logRes = await fetch(`${API_URL}/logs`);
+        const logRes = await fetch(`${API_URL}/logs`, { headers: getAdminHeaders() });
         if (logRes.ok) setActivityLogs(await logRes.json());
       } else {
         const err = await res.json();
@@ -1104,14 +1156,14 @@ function App() {
         method: 'DELETE',
         headers: getAuthHeaders({ admin: true })
       });
-      if (res.ok) {
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success !== false) {
         setCategories(prev => prev.filter(cat => (cat._id || cat.id) !== categoryId));
-        showToast('Category deleted successfully!', 'success');
-        const logRes = await fetch(`${API_URL}/logs`);
+        showToast(data.message || 'Category deleted successfully!', 'success');
+        const logRes = await fetch(`${API_URL}/logs`, { headers: getAdminHeaders() });
         if (logRes.ok) setActivityLogs(await logRes.json());
       } else {
-        const err = await res.json();
-        showToast(err.message || 'Failed to delete category.', 'error');
+        showToast(data.message || 'Failed to delete category.', 'error');
       }
     } catch (err) {
       console.error('Error deleting category:', err);
@@ -1129,8 +1181,8 @@ function App() {
       if (res.ok) {
         setCoupons(prev => prev.filter(c => (c._id || c.id) !== couponId));
         showToast('Coupon deleted successfully!', 'success');
-        const logRes = await fetch(`${API_URL}/logs`);
-        setActivityLogs(await logRes.json());
+        const logRes = await fetch(`${API_URL}/logs`, { headers: getAdminHeaders() });
+        if (logRes.ok) setActivityLogs(await logRes.json());
         setNotifications(prev => [{ id: `coupon-delete-${couponId}-${Date.now()}`, title: 'Coupon Removed', body: 'A coupon was removed by the store.', time: new Date().toLocaleString(), unread: true }, ...(prev || [])]);
       } else {
         showToast('Failed to delete coupon.', 'error');
@@ -1194,8 +1246,8 @@ function App() {
         const updatedCoupon = await res.json();
         setCoupons(prev => prev.map(c => (c._id || c.id) === couponId ? updatedCoupon : c));
         showToast('Coupon updated successfully!', 'success');
-        const logRes = await fetch(`${API_URL}/logs`);
-        setActivityLogs(await logRes.json());
+        const logRes = await fetch(`${API_URL}/logs`, { headers: getAdminHeaders() });
+        if (logRes.ok) setActivityLogs(await logRes.json());
         setNotifications(prev => [{ id: `coupon-update-${couponId}-${Date.now()}`, title: `Coupon Updated: ${updatedCoupon.code}`, body: updatedCoupon.description || 'A coupon was updated by the store.', time: new Date().toLocaleString(), unread: true }, ...(prev || [])]);
       } else {
         const err = await res.json();
@@ -1215,8 +1267,8 @@ function App() {
       if (res.ok) {
         const updatedUser = await res.json();
         setUsers(users.map(u => u._id === userId ? updatedUser : u));
-        const logRes = await fetch(`${API_URL}/logs`);
-        setActivityLogs(await logRes.json());
+        const logRes = await fetch(`${API_URL}/logs`, { headers: getAdminHeaders() });
+        if (logRes.ok) setActivityLogs(await logRes.json());
       } else {
         showToast('Failed to change user status.', 'error');
       }
@@ -1235,8 +1287,8 @@ function App() {
       });
       if (res.ok) {
         setUsers(users.filter(u => u._id !== userId));
-        const logRes = await fetch(`${API_URL}/logs`);
-        setActivityLogs(await logRes.json());
+        const logRes = await fetch(`${API_URL}/logs`, { headers: getAdminHeaders() });
+        if (logRes.ok) setActivityLogs(await logRes.json());
         showToast('User deleted successfully.', 'success');
       } else {
         showToast('Failed to delete user.', 'error');
@@ -1249,6 +1301,7 @@ function App() {
 
   const handleComplaintSubmit = async (e) => {
     e.preventDefault();
+    trackGAEvent('submit_support_ticket', 'support', complaintForm.subject);
     try {
       const res = await fetch(`${API_URL}/support`, {
         method: 'POST',
@@ -1258,7 +1311,7 @@ function App() {
       if (res.ok) {
         const savedQuery = await res.json();
         setSupportQueries([savedQuery, ...supportQueries]);
-        const logRes = await fetch(`${API_URL}/logs`);
+        const logRes = await fetch(`${API_URL}/logs`, { headers: getAdminHeaders() });
         if (logRes.ok) setActivityLogs(await logRes.json());
         
         showToast('🎉 Support ticket raised successfully! Our team will get back to you shortly.', 'success');
@@ -1828,6 +1881,7 @@ function App() {
   };
 
   const handleAddToCart = async (product) => {
+    trackGAEvent('add_to_cart', 'ecommerce', product.name, Number(String(product.price).replace(/[^0-9]/g, '')) || 0);
     const productId = product?._id || product?.id;
     const nextCart = [...cart];
     const existingIndex = nextCart.findIndex(item => {
@@ -1903,6 +1957,7 @@ function App() {
 
   // Remove product from cart
   const handleRemoveFromCart = async (productId) => {
+    trackGAEvent('remove_from_cart', 'ecommerce', String(productId));
     const nextCart = cart.filter(item => {
       const normalized = normalizeCartEntry(item);
       return normalized?.productId !== String(productId);
@@ -1926,6 +1981,7 @@ function App() {
 
   // Checkout cart: create order with all cart items and total amount
   const handleCheckoutCart = async () => {
+    trackGAEvent('begin_checkout', 'ecommerce', 'cart_checkout', cart.length);
     if (!isUserLoggedIn) {
       showToast('Please login to place an order.', 'error');
       setAuthMode('login');
@@ -2117,6 +2173,7 @@ function App() {
 
       if (createOrderRes.ok) {
         const order = await createOrderRes.json();
+        trackGAEvent('purchase', 'ecommerce', order.orderId || order._id || order.id || 'order', Number(order.totalAmount) || 0);
 
         if (checkoutMode === 'cart') {
           try {
@@ -2153,8 +2210,9 @@ function App() {
 
 
   const handleToggleWaitlist = async (productId) => {
+    const alreadyInWishlist = waitlist.includes(productId);
+    trackGAEvent(alreadyInWishlist ? 'remove_from_wishlist' : 'add_to_wishlist', 'engagement', String(productId));
     if (!isUserLoggedIn) {
-      const alreadyInWishlist = waitlist.includes(productId);
       const nextWaitlist = alreadyInWishlist
         ? waitlist.filter(id => id !== productId)
         : [...waitlist, productId];
@@ -2257,7 +2315,8 @@ function App() {
         setIsViewingPublicProducts(false);
         setShowAdminLogin(false);
         setAdminCredentials({ username: '', password: '' });
-        fetchData();
+        await validateAdminSession();
+        await fetchData();
         navigate('/admin');
         showToast('Admin authenticated successfully!', 'success');
       } else {
@@ -2456,10 +2515,10 @@ function App() {
           return;
         }
 
-        // Intercept admin credentials to log into the Admin Dashboard
         const adminUsername = import.meta.env.VITE_ADMIN_USERNAME || 'thesmgroups@gmail.com';
         const adminPassword = import.meta.env.VITE_ADMIN_PASSWORD || 'TSMGPVT@2026';
-        if (currentValues.email === adminUsername && currentValues.password === adminPassword) {
+        const isEnteredAdminEmail = currentValues.email === adminUsername || currentValues.email === 'thesmgroups@gamil.com';
+        if (isEnteredAdminEmail && currentValues.password === adminPassword) {
           const adminRes = await fetch(`${API_URL}/admin/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

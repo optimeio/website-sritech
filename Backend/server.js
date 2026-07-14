@@ -1,4 +1,4 @@
-﻿const path = require('path');
+const path = require('path');
 const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
@@ -46,7 +46,7 @@ app.use('/uploads', express.static('uploads'));
 
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 120,
+  max: 500,
   message: 'Too many requests from this IP, please try again later.'
 });
 
@@ -168,6 +168,14 @@ const buildCategoryLabel = categoryValue => {
 
 const seedProducts = async () => {
   const Product = require('./models/Product');
+  try {
+    await Product.schema.index({ createdAt: -1 });
+    if (Product.ensureIndexes) {
+      await Product.ensureIndexes().catch(err => console.warn('Index creation warning:', err));
+    }
+  } catch (err) {
+    console.warn('Unable to create products index:', err.message);
+  }
   const count = await Product.countDocuments();
   if (count === 0) {
     let defaultProducts = [];

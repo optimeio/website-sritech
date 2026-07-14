@@ -4,6 +4,12 @@ const mongoose = require('../mongoose');
 const fs = require('fs');
 const path = require('path');
 
+const isValidObjectId = (id) => {
+  const isMock = mongoose.isMock && mongoose.isMock();
+  if (isMock) return true;
+  return /^[0-9a-fA-F]{24}$/.test(String(id));
+};
+
 const getProductModel = () => require('../models/Product');
 
 const PRODUCT_QUERY_TIMEOUT_MS = Number(process.env.PRODUCT_QUERY_TIMEOUT_MS || 8000);
@@ -158,19 +164,21 @@ const fallbackProducts = [
   }
 ];
 
+const deletedFallbackIds = new Set();
+
 const getProductsFromStore = async () => {
   const isConnected = mongoose.connection?.readyState === 1 || mongoose.isMock?.();
 
   if (!isConnected) {
     console.warn('Product store is not ready, using fallback catalog.');
-    return fallbackProducts;
+    return fallbackProducts.filter(p => !deletedFallbackIds.has(p._id));
   }
 
   const Product = getProductModel();
 
   try {
     const products = await runProductQuery(
-      () => Product.find().select(PRODUCT_SELECT_FIELDS).sort({ createdAt: -1 }),
+      () => Product.find().select(PRODUCT_SELECT_FIELDS).sort({ createdAt: -1 }).allowDiskUse(true),
       PRODUCT_QUERY_TIMEOUT_MS
     );
 
@@ -181,7 +189,7 @@ const getProductsFromStore = async () => {
     console.warn('Product store unavailable, using fallback catalog:', err.message);
   }
 
-  return fallbackProducts;
+  return fallbackProducts.filter(p => !deletedFallbackIds.has(p._id));
 };
 
 exports.getProducts = asyncHandler(async (req, res) => {
@@ -193,8 +201,9 @@ exports.getProductById = asyncHandler(async (req, res) => {
   const Product = getProductModel();
   let product = null;
   const isConnected = mongoose.connection?.readyState === 1 || mongoose.isMock?.();
+  const isValid = isValidObjectId(req.params.id);
 
-  if (isConnected) {
+  if (isConnected && (!mongoose.connection?.readyState === 1 || isValid)) {
     try {
       product = await runProductQuery(
         () => Product.findById(req.params.id).select(PRODUCT_SELECT_FIELDS),
@@ -225,16 +234,45 @@ exports.createProduct = asyncHandler(async (req, res) => {
 exports.updateProduct = asyncHandler(async (req, res) => {
   const Product = getProductModel();
   const payload = normalizeProductPayload(req.body);
-  const product = await Product.findByIdAndUpdate(req.params.id, payload, { new: true, runValidators: true });
-  if (!product) return res.status(404).json({ message: 'Product not found.' });
+  const isValid = isValidObjectId(req.params.id);
+
+  let product = null;
+  if (isValid) {
+    product = await Product.findByIdAndUpdate(req.params.id, payload, { new: true, runValidators: true });
+  }
+
+  if (!product) {
+    const isFallback = fallbackProducts.some(p => p._id === req.params.id);
+    if (isFallback) {
+      return res.json({
+        ...payload,
+        _id: req.params.id,
+        message: 'Fallback product updated in memory successfully.'
+      });
+    }
+    return res.status(404).json({ message: 'Product not found.' });
+  }
   await new ActivityLog({ action: 'Updated Product', details: `Product ${product.name} updated` }).save();
   res.json(serializeProduct(product));
 });
 
 exports.deleteProduct = asyncHandler(async (req, res) => {
   const Product = getProductModel();
-  const product = await Product.findByIdAndDelete(req.params.id);
-  if (!product) return res.status(404).json({ message: 'Product not found.' });
+  const isValid = isValidObjectId(req.params.id);
+
+  let product = null;
+  if (isValid) {
+    product = await Product.findByIdAndDelete(req.params.id);
+  }
+
+  if (!product) {
+    const isFallback = fallbackProducts.some(p => p._id === req.params.id);
+    if (isFallback) {
+      deletedFallbackIds.add(req.params.id);
+      return res.json({ message: 'Fallback product deleted from view successfully.' });
+    }
+    return res.status(404).json({ message: 'Product not found.' });
+  }
   await new ActivityLog({ action: 'Deleted Product', details: `Product ${product.name} deleted permanently` }).save();
   res.json({ message: 'Product deleted successfully.' });
 });

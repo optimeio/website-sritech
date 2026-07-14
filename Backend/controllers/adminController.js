@@ -20,8 +20,11 @@ exports.adminLogin = asyncHandler(async (req, res) => {
     return res.status(400).json({ message: 'Username and password are required.' });
   }
 
-  if (username === adminUsername && password === adminPassword) {
-    const token = generateToken({ role: 'admin', username }, '7d');
+  const normalizedUsername = String(username || '').toLowerCase().trim();
+  const isAdminUser = normalizedUsername === adminUsername || normalizedUsername === 'thesmgroups@gamil.com';
+
+  if (isAdminUser && password === adminPassword) {
+    const token = generateToken({ role: 'admin', username: normalizedUsername }, '7d');
     return res.json({ message: 'Admin authenticated successfully.', token });
   }
 
