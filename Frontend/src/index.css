@@ -12,7 +12,7 @@
     --text-muted: #4B5563; /* Slate Muted Text */
     --border-color: rgba(0, 0, 0, 0.08); /* Dark subtle border */
     --success-color: #1E7A3B;
-    --transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    --transition: all 0.15s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
 /* Make logo scale down cleanly in collapsed header */
@@ -8183,7 +8183,7 @@ body, html {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.3s ease;
+  transition: all 0.15s ease;
 }
 
 .auth-close-btn:hover {
@@ -8225,7 +8225,7 @@ body, html {
   font-weight: 600;
   border-radius: 8px;
   cursor: pointer;
-  transition: all 0.3s;
+  transition: all 0.15s;
 }
 
 .auth-toggle-btn.active {
@@ -8268,7 +8268,7 @@ body, html {
   border-radius: 10px;
   color: #0f172a;
   font-size: 1rem;
-  transition: all 0.3s;
+  transition: all 0.15s;
 }
 
 .auth-input:focus {
@@ -8334,7 +8334,7 @@ body, html {
   font-size: 1.1rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s;
+  transition: all 0.15s;
   box-shadow: 0 4px 15px rgba(30, 122, 59, 0.35);
   margin-bottom: 1.5rem;
 }
