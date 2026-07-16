@@ -8,21 +8,25 @@ const company = {
 };
 
 const globalStyles = `
-  body { margin: 0; font-family: 'Inter', sans-serif; background: #f8fafc; color: #0f172a; }
-  .wrapper { width: 100%; background: #f8fafc; padding: 20px 0; }
-  .container { width: 100%; max-width: 640px; margin: 0 auto; background: #ffffff; border-radius: 18px; overflow: hidden; border: 1px solid #e2e8f0; }
-  .header { background: #064e3b; color: #ffffff; text-align: center; padding: 28px 24px; }
-  .header img { max-height: 48px; margin-bottom: 12px; }
-  .header h1 { margin: 0; font-size: 24px; letter-spacing: 0.02em; }
-  .body { padding: 28px 24px; }
-  .section { margin-bottom: 24px; }
-  .section h2 { margin: 0 0 16px; font-size: 18px; color: #0f172a; }
-  .button { display: inline-block; background: #10b981; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 999px; font-weight: 600; }
-  .muted { color: #64748b; font-size: 14px; line-height: 1.7; }
-  .order-summary, .details-table { width: 100%; border-collapse: collapse; }
-  .order-summary td, .details-table td { padding: 10px 0; }
-  .details-table th, .details-table td { text-align: left; border-bottom: 1px solid #e2e8f0; padding: 10px 0; }
-  .footer { background: #f1f5f9; color: #475569; font-size: 13px; padding: 20px 24px; text-align: center; }
+  body { margin: 0; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8fafc; color: #0f172a; -webkit-font-smoothing: antialiased; }
+  .wrapper { width: 100%; background: #f8fafc; padding: 40px 0; }
+  .container { width: 100%; max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03); }
+  .header { background: #064e3b; color: #ffffff; text-align: center; padding: 32px 24px; }
+  .header img { max-height: 56px; margin-bottom: 14px; display: inline-block; }
+  .header h1 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.01em; }
+  .body { padding: 32px 32px 24px; text-align: justify; }
+  .body p { text-align: justify; line-height: 1.65; color: #334155; font-size: 15px; margin: 0 0 18px; }
+  .section { margin-bottom: 28px; }
+  .section h2 { margin: 0 0 16px; font-size: 14px; font-weight: 700; color: #0f172a; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; }
+  .button { display: inline-block; background: #1E7A3B; color: #ffffff !important; text-decoration: none; padding: 12px 28px; border-radius: 6px; font-weight: 600; font-size: 15px; text-align: center; box-shadow: 0 2px 4px rgba(30, 122, 59, 0.2); }
+  .muted { color: #64748b; font-size: 14px; line-height: 1.65; text-align: justify; margin: 16px 0; }
+  .order-summary, .details-table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+  .details-table th, .details-table td { text-align: left; padding: 12px 14px; border-bottom: 1px solid #f1f5f9; font-size: 14px; }
+  .details-table th { background: #f8fafc; font-weight: 600; color: #475569; width: 35%; }
+  .details-table td { color: #0f172a; }
+  .footer { background: #f8fafc; color: #64748b; font-size: 12px; padding: 24px; text-align: center; border-top: 1px solid #e2e8f0; line-height: 1.6; }
+  .footer p { margin: 0 0 8px; }
+  .footer a { color: #1E7A3B; text-decoration: none; font-weight: 500; }
 `;
 
 const wrap = (subject, title, bodyHtml) => `
