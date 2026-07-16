@@ -4376,6 +4376,103 @@ const resolvedCartItems = cart
           </div>
         </section>
 
+        {/* Meet Our Leadership Section */}
+        <section id="leadership" className="leadership-section-light">
+          <div className="leadership-container">
+            <div className="section-header-light">
+              <h2>Meet Our Leadership</h2>
+              <p>The visionaries guiding Sri Tech Engineering toward sustainable precision manufacturing.</p>
+            </div>
+            
+            <div className="leadership-grid">
+              {/* Leader 1: Sankarganesh R */}
+              <div className="leader-card glass-light-panel animate-on-scroll">
+                <div className="leader-header">
+                  <div className="leader-meta">
+                    <h3>Sankarganesh R</h3>
+                    <strong className="leader-role">CEO & Founder</strong>
+                    <span className="leader-edu">B.E (Mechanical Engineering), M.Tech (Energy Technology)</span>
+                  </div>
+                  <div className="leader-social">
+                    <a href="https://linkedin.com" target="_blank" rel="noopener noreferrer" className="linkedin-link" aria-label="LinkedIn Profile">
+                      <i className="fa-brands fa-linkedin"></i>
+                    </a>
+                  </div>
+                </div>
+
+                <div className="leader-roles-tags">
+                  {['Technical Lead', 'Industrial Consultant', 'Project Architect', 'Operations Head', 'CEO & Founder'].map((role, idx) => (
+                    <span key={idx} className="role-tag">{role}</span>
+                  ))}
+                </div>
+
+                <blockquote className="leader-vision">
+                  <i className="fa-solid fa-quote-left quotes-icon"></i>
+                  <p>"Engineering Precision for a Sustainable Industrial Future"</p>
+                </blockquote>
+
+                <div className="leader-body">
+                  <h4>Professional Bio</h4>
+                  <p>
+                    Sankarganesh R is a pioneering Mechanical Engineer and Industrialist with over a decade of expertise in precision manufacturing and strategic engineering. Holding an M.Tech in Energy Technology, he has spearheaded monumental projects for IOCL, SIDCO, and Indian Railways. As the visionary behind Sri Tech Engineering, he is at the forefront of EV design, industrial 3D printing, and reverse engineering, driving innovation across Tamil Nadu’s industrial corridor.
+                  </p>
+
+                  <h4>Core Focus & Achievements</h4>
+                  <ul className="leader-bullets">
+                    <li><i className="fa-solid fa-circle-check"></i> 15+ Years of Mastery in Precision Engineering & CAD/CAM</li>
+                    <li><i className="fa-solid fa-circle-check"></i> Successfully Delivered 500+ High-Impact Industrial Projects</li>
+                    <li><i className="fa-solid fa-circle-check"></i> Pioneer of Electric Vehicle (EV) Design & 3D Prototyping in Namakkal</li>
+                    <li><i className="fa-solid fa-circle-check"></i> Lead Engineer for Major IOCL, SIDCO, and National Railway Infrastructure</li>
+                    <li><i className="fa-solid fa-circle-check"></i> Lead Innovator of the First PEB Structure in SIDCO Industrial Estate</li>
+                  </ul>
+                </div>
+              </div>
+
+              {/* Leader 2: Ganga P */}
+              <div className="leader-card glass-light-panel animate-on-scroll">
+                <div className="leader-header">
+                  <div className="leader-meta">
+                    <h3>Ganga P</h3>
+                    <strong className="leader-role">Managing Director</strong>
+                    <span className="leader-edu">B.Com, M.Com (Corporate Governance)</span>
+                  </div>
+                  <div className="leader-social">
+                    <a href="https://linkedin.com" target="_blank" rel="noopener noreferrer" className="linkedin-link" aria-label="LinkedIn Profile">
+                      <i className="fa-brands fa-linkedin"></i>
+                    </a>
+                  </div>
+                </div>
+
+                <div className="leader-roles-tags">
+                  {['Managing Director', 'Strategic Planner', 'Financial Controller', 'Brand Custodian'].map((role, idx) => (
+                    <span key={idx} className="role-tag">{role}</span>
+                  ))}
+                </div>
+
+                <blockquote className="leader-vision">
+                  <i className="fa-solid fa-quote-left quotes-icon"></i>
+                  <p>"Driving Sustainable Innovation through Strategic Operational Excellence"</p>
+                </blockquote>
+
+                <div className="leader-body">
+                  <h4>Professional Bio</h4>
+                  <p>
+                    Ganga P is a strategic leader specializing in corporate governance and operational sustainability. As the Managing Director of SM Groups, she integrates commerce-driven insights with industrial strategy to ensure global quality standards. Her leadership focuses on brand development, ethical business operations, and fostering a culture of excellence that bridges the gap between traditional manufacturing and modern strategic management.
+                  </p>
+
+                  <h4>Core Focus & Achievements</h4>
+                  <ul className="leader-bullets">
+                    <li><i className="fa-solid fa-circle-check"></i> Expert in Strategic Brand Management & Corporate Identity</li>
+                    <li><i className="fa-solid fa-circle-check"></i> Architect of Sustainable Operational Frameworks for SM Groups</li>
+                    <li><i className="fa-solid fa-circle-check"></i> Specialist in Commerce-Driven Industrial Efficiency & Growth</li>
+                    <li><i className="fa-solid fa-circle-check"></i> Facilitator of Industry-Student Skill Bridge Programs</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* Why Choose Us Section */}
         <section id="why-choose-us" className="benefits-section">
           {/* Animated Breeze Elements in Background */}
