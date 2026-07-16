@@ -8631,3 +8631,423 @@ body, html {
     /* Make sure product titles and descriptions wrap */
     .product-info h3, .product-detail-info h2, .product-detail-info .description-text { word-break: break-word; }
 }
+
+/* --- Premium About Us Section Styles --- */
+.about-us-section {
+    background-color: #0f0a09 !important; /* Deep warm black to contrast with hero and products */
+    padding: 5rem 2rem !important;
+    position: relative;
+    overflow: hidden;
+}
+
+.about-container {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.about-grid {
+    display: grid;
+    grid-template-columns: 1.1fr 1fr;
+    gap: 2.5rem;
+    align-items: stretch;
+}
+
+.glass-panel {
+    background: rgba(255, 255, 255, 0.02) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-radius: 20px !important;
+    padding: 2rem !important;
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4), 
+                inset 0 1px 1px rgba(255, 255, 255, 0.05) !important;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-panel:hover {
+    transform: translateY(-5px);
+    border-color: rgba(255, 122, 0, 0.3) !important;
+    box-shadow: 0 20px 45px rgba(255, 122, 0, 0.08), 
+                inset 0 1px 1px rgba(255, 255, 255, 0.1) !important;
+}
+
+.about-card h3, .workflow-card h3 {
+    font-size: 1.5rem;
+    color: #ffffff;
+    margin-bottom: 1.25rem;
+    font-weight: 700;
+    position: relative;
+    padding-bottom: 0.5rem;
+}
+
+.about-card h3::after, .workflow-card h3::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 40px;
+    height: 3px;
+    background: linear-gradient(90deg, #ff7a00, #ffea00);
+    border-radius: 2px;
+}
+
+.about-card p {
+    color: #cbd5e1;
+    line-height: 1.6;
+    margin-bottom: 1.25rem;
+    font-size: 0.98rem;
+}
+
+.location-box {
+    display: flex;
+    align-items: center;
+    gap: 1.2rem;
+    background: rgba(255, 122, 0, 0.05);
+    border: 1px solid rgba(255, 122, 0, 0.15);
+    padding: 1.2rem;
+    border-radius: 14px;
+    margin-top: 1.5rem;
+}
+
+.location-box i {
+    font-size: 2rem;
+    color: #ff7a00;
+}
+
+.location-box strong {
+    display: block;
+    color: #ffffff;
+    font-size: 1rem;
+    margin-bottom: 0.25rem;
+}
+
+.location-box span {
+    color: #94a3b8;
+    font-size: 0.88rem;
+}
+
+/* Glowing Rocket Stove Banner */
+.rocket-stove-banner {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    margin: 2rem 0;
+    position: relative;
+    border: 1px dashed rgba(255, 122, 0, 0.4) !important;
+    background: radial-gradient(circle at 10% 20%, rgba(255, 122, 0, 0.08) 0%, transparent 60%) !important;
+}
+
+.rocket-stove-banner::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: 20px;
+    padding: 1px;
+    background: linear-gradient(135deg, rgba(255,122,0,0.5), transparent, rgba(255,80,0,0.3));
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+}
+
+.banner-icon-wrap {
+    width: 60px;
+    height: 60px;
+    background: rgba(255, 122, 0, 0.15);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 20px rgba(255, 122, 0, 0.2);
+}
+
+.banner-icon-wrap i {
+    font-size: 1.8rem;
+    color: #ff7a00;
+}
+
+.rocket-stove-banner h4 {
+    margin: 0 0 0.4rem 0;
+    color: #ffffff;
+    font-size: 1.15rem;
+    font-weight: 700;
+}
+
+.rocket-stove-banner p {
+    margin: 0;
+    color: #cbd5e1;
+    font-size: 0.95rem;
+}
+
+.animate-flicker {
+    animation: flameFlicker 1.5s ease-in-out infinite alternate;
+}
+
+@keyframes flameFlicker {
+    0% { transform: scale(0.9) rotate(-3deg); filter: drop-shadow(0 0 5px rgba(255,122,0,0.5)); }
+    100% { transform: scale(1.1) rotate(3deg); filter: drop-shadow(0 0 15px rgba(255,122,0,0.9)); }
+}
+
+.clients-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 1rem;
+}
+
+.client-badge {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #e2e8f0;
+    padding: 0.5rem 1rem;
+    border-radius: 99px;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.2s;
+}
+
+.client-badge:hover {
+    background: rgba(255, 122, 0, 0.1);
+    border-color: rgba(255, 122, 0, 0.3);
+    color: #ffffff;
+}
+
+/* Achievements grid */
+.achievements-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.25rem;
+    margin-bottom: 2rem;
+}
+
+.stat-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 1.5rem !important;
+}
+
+.stat-icon {
+    width: 50px;
+    height: 50px;
+    border-radius: 12px;
+    background: rgba(255, 122, 0, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 0.75rem;
+}
+
+.stat-icon i {
+    font-size: 1.4rem;
+    color: #ff7a00;
+}
+
+.stat-card strong {
+    font-size: 1.3rem;
+    color: #ffffff;
+    font-weight: 800;
+    margin-bottom: 0.25rem;
+}
+
+.stat-card span {
+    font-size: 0.82rem;
+    color: #94a3b8;
+    line-height: 1.3;
+}
+
+/* Workflow steps */
+.workflow-card {
+    margin-bottom: 2rem;
+}
+
+.workflow-steps-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 1.5rem;
+}
+
+.workflow-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    flex: 1;
+}
+
+.step-icon-circle {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.03);
+    border: 2px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 0.75rem;
+    transition: all 0.3s;
+}
+
+.workflow-step:hover .step-icon-circle {
+    background: #ff7a00;
+    border-color: #ff7a00;
+    box-shadow: 0 0 15px rgba(255, 122, 0, 0.4);
+    transform: scale(1.1);
+}
+
+.workflow-step:hover .step-icon-circle i {
+    color: #ffffff;
+}
+
+.step-icon-circle i {
+    font-size: 1.4rem;
+    color: #cbd5e1;
+    transition: all 0.3s;
+}
+
+.workflow-step strong {
+    color: #ffffff;
+    font-size: 0.95rem;
+    margin-bottom: 0.25rem;
+}
+
+.workflow-step span {
+    font-size: 0.78rem;
+    color: #94a3b8;
+    max-width: 120px;
+}
+
+.workflow-arrow {
+    font-size: 1.5rem;
+    color: rgba(255, 255, 255, 0.15);
+    margin-bottom: 2.2rem;
+    animation: flowPulse 2s infinite alternate;
+}
+
+@keyframes flowPulse {
+    0% { transform: translateX(-3px); color: rgba(255, 255, 255, 0.1); }
+    100% { transform: translateX(3px); color: #ff7a00; }
+}
+
+/* Combustion Tab widget inside About */
+.about-combustion-box {
+    margin-top: 1.25rem;
+}
+
+.combustion-steps-nav {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 1.25rem;
+}
+
+.combustion-tab-btn {
+    flex: 1;
+    min-width: 100px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: #cbd5e1;
+    padding: 0.5rem 0.75rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+}
+
+.combustion-tab-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+.combustion-tab-btn.active {
+    background: #ff7a00;
+    border-color: #ff7a00;
+    color: #ffffff;
+    box-shadow: 0 4px 12px rgba(255, 122, 0, 0.25);
+}
+
+.combustion-tab-content {
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    padding: 1.2rem;
+    border-radius: 12px;
+    min-height: 80px;
+    display: flex;
+    align-items: center;
+}
+
+.combustion-tab-content p {
+    margin: 0;
+    font-size: 0.95rem;
+    color: #e2e8f0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    line-height: 1.5;
+}
+
+.combustion-tab-content i {
+    font-size: 1.3rem;
+    color: #ff7a00;
+}
+
+/* Responsive Rules for About Us Section */
+@media (max-width: 992px) {
+    .about-grid {
+        grid-template-columns: 1fr;
+        gap: 2rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .about-us-section {
+        padding: 3.5rem 1rem !important;
+    }
+
+    .glass-panel {
+        padding: 1.5rem !important;
+    }
+
+    .workflow-steps-row {
+        flex-direction: column;
+        gap: 1.5rem;
+    }
+
+    .workflow-arrow {
+        transform: rotate(90deg) !important;
+        margin: 0;
+        animation: flowPulseVertical 1.5s infinite alternate;
+    }
+
+    @keyframes flowPulseVertical {
+        0% { transform: rotate(90deg) translateY(-3px); color: rgba(255, 255, 255, 0.1); }
+        100% { transform: rotate(90deg) translateY(3px); color: #ff7a00; }
+    }
+    
+    .combustion-tab-btn {
+        flex-basis: 45%;
+    }
+}
+
+@media (max-width: 480px) {
+    .achievements-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .combustion-tab-btn {
+        flex-basis: 100%;
+    }
+    
+    .rocket-stove-banner {
+        flex-direction: column;
+        text-align: center;
+        gap: 1rem;
+        padding: 1.5rem !important;
+    }
+}

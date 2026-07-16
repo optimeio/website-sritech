@@ -3937,7 +3937,7 @@ const resolvedCartItems = cart
             <a href="#product" className="action-btn" onClick={(e) => { scrollToSection(e, 'product'); }}>
               Products
             </a>
-            <a href="#how-it-works" className="action-btn" onClick={(e) => { scrollToSection(e, 'how-it-works'); }}>
+            <a href="#about" className="action-btn" onClick={(e) => { scrollToSection(e, 'about'); }}>
               About
             </a>
             <a href="#footer" className="action-btn" onClick={(e) => { scrollToSection(e, 'footer'); }}>
@@ -4063,7 +4063,7 @@ const resolvedCartItems = cart
           <a href="#product" className="action-btn" onClick={(e) => { scrollToSection(e, 'product'); setShowMobileMenu(false); }}>
             Products
           </a>
-          <a href="#how-it-works" className="action-btn" onClick={(e) => { scrollToSection(e, 'how-it-works'); setShowMobileMenu(false); }}>
+          <a href="#about" className="action-btn" onClick={(e) => { scrollToSection(e, 'about'); setShowMobileMenu(false); }}>
             About
           </a>
           <a href="#footer" className="action-btn" onClick={(e) => { scrollToSection(e, 'footer'); setShowMobileMenu(false); }}>
@@ -4174,7 +4174,7 @@ const resolvedCartItems = cart
               </div> {/* Close hero-features-row */}
               <div className="hero-cta-group">
                 <a href="#product" className="primary-btn-green" onClick={(e) => scrollToSection(e, 'product')}>Explore Products <i className="fa-solid fa-arrow-right"></i></a>
-                <a href="#how-it-works" className="secondary-btn-outline" onClick={(e) => scrollToSection(e, 'how-it-works')}>Learn More</a>
+                <a href="#about" className="secondary-btn-outline" onClick={(e) => scrollToSection(e, 'about')}>Learn More</a>
               </div>
             </div>
 
@@ -4199,48 +4199,127 @@ const resolvedCartItems = cart
 
 
 
-        {/* How It Works Section */}
-        <section id="how-it-works" className="how-it-works-section">
-          <div className="hiw-container">
+        {/* Massive Animated About Us Section */}
+        <section id="about" className="about-us-section">
+          <div className="about-container">
             <div className="section-header-dark">
-              <h2>Master the Elements</h2>
-              <p>The science of perfect combustion inside every Sri Tech unit.</p>
+              <h2>About Sri Tech Engineering</h2>
+              <p>Pioneering innovation, sustainability, and engineering excellence since 2020.</p>
             </div>
             
-            <div className="hiw-grid">
-              <div className="hiw-illustration">
-                <div className="cutaway-diagram">
-                  <img src="/rocket-stove.png" alt="Cutaway Diagram" className="cutaway-img" onError={(e) => { e.target.src = "https://images.unsplash.com/photo-1517433670267-08bbd4be890f?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"; }} />
-                  <div className="airflow-animated"></div>
+            <div className="about-grid">
+              {/* Left Column: Company Story & National Projects */}
+              <div className="about-story-col">
+                <div className="about-card glass-panel">
+                  <h3>Our Legacy & Specialization</h3>
+                  <p>
+                    Sri Tech Engineering (SM Group) is a precision manufacturing company founded in 2020. 
+                    We specialize in <strong>Agro, Food & Poultry Machineries</strong>, <strong>Material Fabrication</strong>, and <strong>Engineering Works</strong>.
+                  </p>
+                  <p>
+                    Led by <strong>Sankarganesh R (CEO)</strong> and <strong>Ganga (MD)</strong>, we focus on delivering excellence through innovation, sustainability, and quality. We bridge the gap between students and industry through technical skill development.
+                  </p>
+                  <div className="location-box">
+                    <i className="fa-solid fa-map-location-dot"></i>
+                    <div>
+                      <strong>Based in Namakkal, Tamil Nadu</strong>
+                      <span>2 Advanced Manufacturing Units: Athanoor & Vaiyappamalai</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rocket-stove-banner glass-panel glow-border-orange">
+                  <div className="banner-icon-wrap">
+                    <i className="fa-solid fa-fire-burner animate-flicker"></i>
+                  </div>
+                  <div>
+                    <h4>Eco-Friendly Rocket Stoves</h4>
+                    <p>We are proudly manufacturing high-efficiency rocket stoves and <strong>delivering all over India!</strong></p>
+                  </div>
+                </div>
+
+                <div className="about-card glass-panel">
+                  <h3>Prestigious Projects & Stature</h3>
+                  <p>We have successfully executed complex national-scale engineering projects for:</p>
+                  <div className="clients-list">
+                    <span className="client-badge"><i className="fa-solid fa-train"></i> Indian Railways</span>
+                    <span className="client-badge"><i className="fa-solid fa-droplet"></i> IOCL</span>
+                    <span className="client-badge"><i className="fa-solid fa-building"></i> SIDCO</span>
+                    <span className="client-badge"><i className="fa-solid fa-road"></i> Smart City Highways</span>
+                  </div>
                 </div>
               </div>
-              <div className="hiw-steps">
-                <div className={`step-card ${activeStepIndex === 0 ? 'active' : ''}`} onClick={() => setActiveStepIndex(0)}>
-                  <div className="step-number">01</div>
-                  <div className="step-info">
-                    <h4>Feed Wood</h4>
-                    <p>Load biomass or wood easily from the top or side intake port.</p>
+
+              {/* Right Column: Achievements & Interactive Workflow */}
+              <div className="about-achievements-col">
+                <div className="achievements-grid">
+                  <div className="stat-card glass-panel">
+                    <div className="stat-icon"><i className="fa-solid fa-award"></i></div>
+                    <strong>10+ Years</strong>
+                    <span>Precision Experience</span>
+                  </div>
+                  <div className="stat-card glass-panel">
+                    <div className="stat-icon"><i className="fa-solid fa-circle-check"></i></div>
+                    <strong>National</strong>
+                    <span>Projects Stature</span>
+                  </div>
+                  <div className="stat-card glass-panel">
+                    <div className="stat-icon"><i className="fa-solid fa-cubes"></i></div>
+                    <strong>First PEB</strong>
+                    <span>Structure at SIDCO Estate</span>
+                  </div>
+                  <div className="stat-card glass-panel">
+                    <div className="stat-icon"><i className="fa-solid fa-microchip"></i></div>
+                    <strong>Pioneer</strong>
+                    <span>EV Design & 3D Printing</span>
                   </div>
                 </div>
-                <div className={`step-card ${activeStepIndex === 1 ? 'active' : ''}`} onClick={() => setActiveStepIndex(1)}>
-                  <div className="step-number">02</div>
-                  <div className="step-info">
-                    <h4>Airflow Ignites</h4>
-                    <p>Oxygen is rapidly pulled through the bottom draft, creating a powerful draft.</p>
+
+                {/* Workflow section */}
+                <div className="workflow-card glass-panel">
+                  <h3>Our Precision Workflow</h3>
+                  <div className="workflow-steps-row">
+                    <div className="workflow-step">
+                      <div className="step-icon-circle"><i className="fa-solid fa-compass-drafting"></i></div>
+                      <strong>Design</strong>
+                      <span>CAD/CAM validated designs</span>
+                    </div>
+                    <div className="workflow-arrow"><i className="fa-solid fa-arrow-right-long"></i></div>
+                    <div className="workflow-step">
+                      <div className="step-icon-circle"><i className="fa-solid fa-industry"></i></div>
+                      <strong>Manufacture</strong>
+                      <span>2 precision units</span>
+                    </div>
+                    <div className="workflow-arrow"><i className="fa-solid fa-arrow-right-long"></i></div>
+                    <div className="workflow-step">
+                      <div className="step-icon-circle"><i className="fa-solid fa-truck-ramp-box"></i></div>
+                      <strong>Deliver</strong>
+                      <span>On-time, every time</span>
+                    </div>
                   </div>
                 </div>
-                <div className={`step-card ${activeStepIndex === 2 ? 'active' : ''}`} onClick={() => setActiveStepIndex(2)}>
-                  <div className="step-number">03</div>
-                  <div className="step-info">
-                    <h4>Heat Rises</h4>
-                    <p>The insulated combustion chamber forces fire up, burning excess smoke gases.</p>
-                  </div>
-                </div>
-                <div className={`step-card ${activeStepIndex === 3 ? 'active' : ''}`} onClick={() => setActiveStepIndex(3)}>
-                  <div className="step-number">04</div>
-                  <div className="step-info">
-                    <h4>Efficient Cooking</h4>
-                    <p>Concentrated high-velocity heat hits the cooking surface directly.</p>
+
+                {/* Combustion Science Interactive Sub-widget */}
+                <div className="workflow-card glass-panel">
+                  <h3>Combustion Science Inside Our Stoves</h3>
+                  <div className="about-combustion-box">
+                    <div className="combustion-steps-nav">
+                      {['Feed Wood', 'Airflow Ignites', 'Heat Rises', 'Clean Cooking'].map((tab, idx) => (
+                        <button 
+                          key={idx} 
+                          className={`combustion-tab-btn ${activeStepIndex === idx ? 'active' : ''}`}
+                          onClick={() => setActiveStepIndex(idx)}
+                        >
+                          {idx + 1}. {tab}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="combustion-tab-content">
+                      {activeStepIndex === 0 && <p><i className="fa-solid fa-wood-pile"></i> Load biomass or wood easily from the top or side intake port.</p>}
+                      {activeStepIndex === 1 && <p><i className="fa-solid fa-wind"></i> Oxygen is rapidly pulled through the bottom draft, creating a powerful draft.</p>}
+                      {activeStepIndex === 2 && <p><i className="fa-solid fa-arrow-up-long"></i> The insulated combustion chamber forces fire up, burning excess smoke gases.</p>}
+                      {activeStepIndex === 3 && <p><i className="fa-solid fa-fire"></i> Concentrated high-velocity heat hits the cooking surface directly for 80% thermal efficiency.</p>}
+                    </div>
                   </div>
                 </div>
               </div>
