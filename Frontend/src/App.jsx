@@ -4401,10 +4401,15 @@ const resolvedCartItems = cart
               {/* Leader 1: Sankarganesh R */}
               <div className="leader-card glass-light-panel glow-border-orange animate-on-scroll">
                 <div className="leader-header">
-                  <div className="leader-meta">
-                    <h3>Sankarganesh R</h3>
-                    <strong className="leader-role">CEO & Founder</strong>
-                    <span className="leader-edu">B.E (Mechanical Engineering), M.Tech (Energy Technology)</span>
+                  <div className="leader-profile-summary">
+                    <div className="leader-avatar-frame">
+                      <img src="/sankarganesh.png" alt="Sankarganesh R" className="leader-avatar" />
+                    </div>
+                    <div className="leader-meta">
+                      <h3>Sankarganesh R</h3>
+                      <strong className="leader-role">CEO & Founder</strong>
+                      <span className="leader-edu">B.E (Mechanical Engineering), M.Tech (Energy Technology)</span>
+                    </div>
                   </div>
                   <div className="leader-social">
                     <a href="https://linkedin.com" target="_blank" rel="noopener noreferrer" className="linkedin-link" aria-label="LinkedIn Profile">
@@ -4444,10 +4449,15 @@ const resolvedCartItems = cart
               {/* Leader 2: Ganga P */}
               <div className="leader-card glass-light-panel glow-border-orange animate-on-scroll">
                 <div className="leader-header">
-                  <div className="leader-meta">
-                    <h3>Ganga P</h3>
-                    <strong className="leader-role">Managing Director</strong>
-                    <span className="leader-edu">B.Com, M.Com (Corporate Governance)</span>
+                  <div className="leader-profile-summary">
+                    <div className="leader-avatar-frame">
+                      <img src="/ganga.png" alt="Ganga P" className="leader-avatar" />
+                    </div>
+                    <div className="leader-meta">
+                      <h3>Ganga P</h3>
+                      <strong className="leader-role">Managing Director</strong>
+                      <span className="leader-edu">B.Com, M.Com (Corporate Governance)</span>
+                    </div>
                   </div>
                   <div className="leader-social">
                     <a href="https://linkedin.com" target="_blank" rel="noopener noreferrer" className="linkedin-link" aria-label="LinkedIn Profile">
