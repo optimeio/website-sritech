@@ -4100,10 +4100,41 @@ const resolvedCartItems = cart
                 ))}
               </div>
 
+              {/* SVG Fractal Turbulence Fire Filter */}
+              <svg style={{ position: 'absolute', width: 0, height: 0, pointerEvents: 'none' }}>
+                <defs>
+                  <filter id="realistic-fire">
+                    <feTurbulence type="fractalNoise" baseFrequency="0.015 0.05" numOctaves="3" result="noise" />
+                    <feDisplacementMap in="SourceGraphic" in2="noise" scale="35" xChannelSelector="R" yChannelSelector="G" />
+                  </filter>
+                </defs>
+              </svg>
+
               <div className="combustion-flame-bar">
-                {Array.from({ length: 15 }).map((_, i) => (
-                  <div key={i} className="flame-element"></div>
-                ))}
+                {/* Layer 1: Background Red Flames */}
+                <div className="flame-layer flame-layer-red">
+                  {Array.from({ length: 18 }).map((_, i) => (
+                    <div key={`r-${i}`} className="flame-element flame-red"></div>
+                  ))}
+                </div>
+                {/* Layer 2: Middle Orange Flames */}
+                <div className="flame-layer flame-layer-orange">
+                  {Array.from({ length: 15 }).map((_, i) => (
+                    <div key={`o-${i}`} className="flame-element flame-orange"></div>
+                  ))}
+                </div>
+                {/* Layer 3: Foreground Golden Flames */}
+                <div className="flame-layer flame-layer-yellow">
+                  {Array.from({ length: 12 }).map((_, i) => (
+                    <div key={`y-${i}`} className="flame-element flame-yellow"></div>
+                  ))}
+                </div>
+                {/* Layer 4: White-Hot Core Combustion Flares */}
+                <div className="flame-layer flame-layer-white">
+                  {Array.from({ length: 8 }).map((_, i) => (
+                    <div key={`w-${i}`} className="flame-element flame-white"></div>
+                  ))}
+                </div>
               </div>
 
           <div className="premium-hero-content">
