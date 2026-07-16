@@ -21,9 +21,19 @@ exports.adminLogin = asyncHandler(async (req, res) => {
   }
 
   const normalizedUsername = String(username || '').toLowerCase().trim();
-  const isAdminUser = normalizedUsername === adminUsername || normalizedUsername === 'thesmgroups@gamil.com';
+  const isAdminUser = normalizedUsername === adminUsername.toLowerCase().trim() || normalizedUsername === 'thesmgroups@gamil.com';
+  const isPasswordMatch = password === adminPassword;
 
-  if (isAdminUser && password === adminPassword) {
+  console.log('[AdminLogin Debug]', {
+    receivedUsername: normalizedUsername,
+    expectedUsername: adminUsername,
+    usernameMatch: isAdminUser,
+    passwordMatch: isPasswordMatch,
+    receivedPassLen: password?.length,
+    expectedPassLen: adminPassword?.length
+  });
+
+  if (isAdminUser && isPasswordMatch) {
     const token = generateToken({ role: 'admin', username: normalizedUsername }, '7d');
     return res.json({ message: 'Admin authenticated successfully.', token });
   }
