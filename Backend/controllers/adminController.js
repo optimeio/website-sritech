@@ -21,7 +21,10 @@ exports.adminLogin = asyncHandler(async (req, res) => {
   }
 
   const normalizedUsername = String(username || '').toLowerCase().trim();
-  const isAdminUser = normalizedUsername === adminUsername.toLowerCase().trim() || normalizedUsername === 'thesmgroups@gamil.com';
+  const isAdminUser = 
+    normalizedUsername === adminUsername.toLowerCase().trim() || 
+    normalizedUsername === 'thesmgroups@gmail.com' || 
+    normalizedUsername === 'thesmgroups@gamil.com';
   const isPasswordMatch = password === adminPassword;
 
   console.log('[AdminLogin Debug]', {
