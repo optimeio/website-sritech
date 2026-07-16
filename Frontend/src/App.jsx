@@ -3920,7 +3920,7 @@ const resolvedCartItems = cart
                 src="/sri-tech-logo-final.png"
                 alt="SriTech Logo"
                 style={{
-                  height: '130px',
+                  height: '150px',
                   width: 'auto',
                   objectFit: 'contain',
                   background: 'transparent',
@@ -4482,6 +4482,34 @@ const resolvedCartItems = cart
                   </ul>
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* Realistic Combustion Flame Wall at bottom of Leadership */}
+          <div className="combustion-flame-bar">
+            {/* Layer 1: Background Red Flames */}
+            <div className="flame-layer flame-layer-red">
+              {Array.from({ length: 18 }).map((_, i) => (
+                <div key={`lr-${i}`} className="flame-element flame-red"></div>
+              ))}
+            </div>
+            {/* Layer 2: Middle Orange Flames */}
+            <div className="flame-layer flame-layer-orange">
+              {Array.from({ length: 15 }).map((_, i) => (
+                <div key={`lo-${i}`} className="flame-element flame-orange"></div>
+              ))}
+            </div>
+            {/* Layer 3: Foreground Golden Flames */}
+            <div className="flame-layer flame-layer-yellow">
+              {Array.from({ length: 12 }).map((_, i) => (
+                <div key={`ly-${i}`} className="flame-element flame-yellow"></div>
+              ))}
+            </div>
+            {/* Layer 4: White-Hot Core Combustion Flares */}
+            <div className="flame-layer flame-layer-white">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div key={`lw-${i}`} className="flame-element flame-white"></div>
+              ))}
             </div>
           </div>
         </section>
