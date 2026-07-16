@@ -16,7 +16,24 @@ const PRODUCT_QUERY_TIMEOUT_MS = Number(process.env.PRODUCT_QUERY_TIMEOUT_MS || 
 const PRODUCT_IMAGE_LIMIT = Number(process.env.PRODUCT_IMAGE_LIMIT || 2);
 const MAX_DESCRIPTION_LENGTH = Number(process.env.PRODUCT_DESCRIPTION_MAX_LENGTH || 400);
 const MAX_SPECIFICATIONS_LENGTH = Number(process.env.PRODUCT_SPECIFICATIONS_MAX_LENGTH || 600);
-const PRODUCT_SELECT_FIELDS = 'name price category description specifications stock icon isNewArrival images createdAt sku slug';
+const PRODUCT_SELECT_FIELDS = 'name price category description specifications stock icon isNewArrival images video createdAt sku slug';
+
+const uploadToCloudinary = async (base64Str, resourceType = 'auto') => {
+  if (!process.env.CLOUDINARY_CLOUD_NAME || typeof base64Str !== 'string' || !base64Str.startsWith('data:')) {
+    return base64Str;
+  }
+  try {
+    const cloudinaryObj = require('../config/cloudinary');
+    const uploadRes = await cloudinaryObj.uploader.upload(base64Str, {
+      resource_type: resourceType,
+      folder: 'sritech_products'
+    });
+    return uploadRes.secure_url;
+  } catch (err) {
+    console.error('[cloudinary] upload failed, keeping base64:', err.message);
+    return base64Str;
+  }
+};
 
 const isPlainObject = (value) => value && typeof value === 'object' && !Array.isArray(value);
 
@@ -51,6 +68,12 @@ const normalizeProductPayload = (payload = {}) => {
     normalized.images = [String(payload.images)];
   } else {
     normalized.images = [];
+  }
+
+  if (payload.video) {
+    normalized.video = String(payload.video);
+  } else {
+    normalized.video = '';
   }
   return normalized;
 };
@@ -87,6 +110,7 @@ const serializeProduct = (product) => {
     icon: plainProduct.icon || 'fa-box',
     isNewArrival: Boolean(plainProduct.isNewArrival),
     images,
+    video: plainProduct.video || '',
     createdAt: plainProduct.createdAt || new Date().toISOString()
   };
 
@@ -225,6 +249,16 @@ exports.getProductById = asyncHandler(async (req, res) => {
 exports.createProduct = asyncHandler(async (req, res) => {
   const Product = getProductModel();
   const payload = normalizeProductPayload(req.body);
+
+  if (Array.isArray(payload.images)) {
+    payload.images = await Promise.all(
+      payload.images.map(img => uploadToCloudinary(img, 'image'))
+    );
+  }
+  if (payload.video) {
+    payload.video = await uploadToCloudinary(payload.video, 'video');
+  }
+
   const product = new Product(payload);
   const saved = await product.save();
   await new ActivityLog({ action: 'Added Product', details: `Product: ${saved.name}` }).save();
@@ -235,6 +269,15 @@ exports.updateProduct = asyncHandler(async (req, res) => {
   const Product = getProductModel();
   const payload = normalizeProductPayload(req.body);
   const isValid = isValidObjectId(req.params.id);
+
+  if (Array.isArray(payload.images)) {
+    payload.images = await Promise.all(
+      payload.images.map(img => uploadToCloudinary(img, 'image'))
+    );
+  }
+  if (payload.video) {
+    payload.video = await uploadToCloudinary(payload.video, 'video');
+  }
 
   let product = null;
   if (isValid) {

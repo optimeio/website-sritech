@@ -2852,7 +2852,54 @@ const resolvedCartItems = cart
               {/* Left Column: Image Slider */}
               <div className="product-slider">
                 <div className="slider-main-image">
-                  {selectedProduct.images && selectedProduct.images.length > 0 ? (
+                  {selectedProduct.video && selectedProductImageIndex === (selectedProduct.images?.length || 0) ? (
+                    selectedProduct.video.includes('youtube.com') || selectedProduct.video.includes('youtu.be') ? (
+                      (() => {
+                        let embedId = '';
+                        if (selectedProduct.video.includes('youtube.com/watch?v=')) {
+                          embedId = selectedProduct.video.split('watch?v=')[1]?.split('&')[0];
+                        } else if (selectedProduct.video.includes('youtu.be/')) {
+                          embedId = selectedProduct.video.split('youtu.be/')[1]?.split('?')[0];
+                        } else if (selectedProduct.video.includes('youtube.com/embed/')) {
+                          embedId = selectedProduct.video.split('embed/')[1]?.split('?')[0];
+                        }
+                        return (
+                          <iframe 
+                            width="100%" 
+                            height="100%" 
+                            src={`https://www.youtube.com/embed/${embedId}?autoplay=1`} 
+                            title="Product Video" 
+                            frameBorder="0" 
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                            allowFullScreen
+                            style={{ borderRadius: '16px', minHeight: '320px', width: '100%', aspectRatio: '16/9' }}
+                          />
+                        );
+                      })()
+                    ) : selectedProduct.video.includes('vimeo.com') ? (
+                      (() => {
+                        const vimeoId = selectedProduct.video.split('vimeo.com/')[1]?.split('?')[0];
+                        return (
+                          <iframe 
+                            src={`https://player.vimeo.com/video/${vimeoId}?autoplay=1`} 
+                            width="100%" 
+                            height="100%" 
+                            frameBorder="0" 
+                            allow="autoplay; fullscreen; picture-in-picture" 
+                            allowFullScreen
+                            style={{ borderRadius: '16px', minHeight: '320px', width: '100%', aspectRatio: '16/9' }}
+                          />
+                        );
+                      })()
+                    ) : (
+                      <video 
+                        src={selectedProduct.video} 
+                        controls 
+                        autoPlay 
+                        style={{ width: '100%', height: '100%', maxHeight: '420px', objectFit: 'contain', borderRadius: '16px' }}
+                      />
+                    )
+                  ) : selectedProduct.images && selectedProduct.images.length > 0 ? (
                     <img loading="lazy" 
                       src={selectedProduct.images[selectedProductImageIndex]} 
                       alt={selectedProduct.name} 
@@ -2861,19 +2908,19 @@ const resolvedCartItems = cart
                     <i className={`fa-solid ${selectedProduct.icon || 'fa-box'} placeholder-img`} style={{ fontSize: '7rem' }} aria-hidden="true"></i>
                   )}
                   
-                  {selectedProduct.images && selectedProduct.images.length > 1 && (
+                  {((selectedProduct.images?.length || 0) + (selectedProduct.video ? 1 : 0)) > 1 && (
                     <>
                       <button 
                         className="slider-arrow prev" 
-                        onClick={() => setSelectedProductImageIndex(prev => (prev === 0 ? selectedProduct.images.length - 1 : prev - 1))}
-                        aria-label="Previous image"
+                        onClick={() => setSelectedProductImageIndex(prev => (prev === 0 ? ((selectedProduct.images?.length || 0) + (selectedProduct.video ? 1 : 0)) - 1 : prev - 1))}
+                        aria-label="Previous media"
                       >
                         <i className="fa-solid fa-chevron-left"></i>
                       </button>
                       <button 
                         className="slider-arrow next" 
-                        onClick={() => setSelectedProductImageIndex(prev => (prev === selectedProduct.images.length - 1 ? 0 : prev + 1))}
-                        aria-label="Next image"
+                        onClick={() => setSelectedProductImageIndex(prev => (prev === ((selectedProduct.images?.length || 0) + (selectedProduct.video ? 1 : 0)) - 1 ? 0 : prev + 1))}
+                        aria-label="Next media"
                       >
                         <i className="fa-solid fa-chevron-right"></i>
                       </button>
@@ -2882,9 +2929,9 @@ const resolvedCartItems = cart
                 </div>
 
                 {/* Thumbnails indicator */}
-                {selectedProduct.images && selectedProduct.images.length > 1 && (
+                {((selectedProduct.images?.length || 0) + (selectedProduct.video ? 1 : 0)) > 1 && (
                   <div className="slider-thumbnails">
-                    {selectedProduct.images.map((img, idx) => (
+                    {selectedProduct.images && selectedProduct.images.map((img, idx) => (
                       <button
                         key={idx}
                         className={`thumbnail-btn ${selectedProductImageIndex === idx ? 'active' : ''}`}
@@ -2893,6 +2940,17 @@ const resolvedCartItems = cart
                         <img loading="lazy" src={img} alt={`Thumbnail ${idx + 1}`} />
                       </button>
                     ))}
+                    {selectedProduct.video && (
+                      <button
+                        className={`thumbnail-btn video-thumb ${selectedProductImageIndex === selectedProduct.images.length ? 'active' : ''}`}
+                        onClick={() => setSelectedProductImageIndex(selectedProduct.images.length)}
+                        style={{ position: 'relative' }}
+                      >
+                        <div style={{ width: '100%', height: '100%', minHeight: '50px', display: 'grid', placeItems: 'center', background: '#1e293b', borderRadius: '8px' }}>
+                          <i className="fa-solid fa-play" style={{ color: '#fff', fontSize: '1.2rem' }}></i>
+                        </div>
+                      </button>
+                    )}
                   </div>
                 )}
               </div>

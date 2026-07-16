@@ -12,6 +12,7 @@ const productSchema = new mongoose.Schema({
   icon: { type: String, default: 'fa-box' },
   isNewArrival: { type: Boolean, default: false },
   images: [{ type: String }], // Array of base64 strings or URLs
+  video: { type: String, default: '' }, // Video URL or base64
   createdAt: { type: Date, default: Date.now }
 });
 

@@ -235,13 +235,14 @@ const AdminDashboard = ({
     category: categories[0]?.slug || categories[0]?.name || 'engraining-products', 
     icon: 'fa-box',
     isNewArrival: false,
-    images: [] 
+    images: [],
+    video: '' 
   });
 
   // --- Edit Product State ---
   const [editingProductId, setEditingProductId] = useState(null);
   const [editProduct, setEditProduct] = useState({
-    name: '', price: '', description: '', specifications: '', stock: 0, category: '', isNewArrival: false, images: []
+    name: '', price: '', description: '', specifications: '', stock: 0, category: '', isNewArrival: false, images: [], video: ''
   });
   const [replaceEditImages, setReplaceEditImages] = useState(false);
 
@@ -255,7 +256,8 @@ const AdminDashboard = ({
       stock: typeof p.stock === 'number' ? p.stock : 0,
       category: p.category || categories[0]?.slug || categories[0]?.name || '',
       isNewArrival: p.isNewArrival || false,
-      images: p.images || []
+      images: p.images || [],
+      video: p.video || ''
     });
     setReplaceEditImages(false);
     // Scroll to top of products section
@@ -264,7 +266,7 @@ const AdminDashboard = ({
 
   const cancelEditProduct = () => {
     setEditingProductId(null);
-    setEditProduct({ name: '', price: '', category: '', isNewArrival: false, images: [] });
+    setEditProduct({ name: '', price: '', category: '', isNewArrival: false, images: [], video: '' });
     setReplaceEditImages(false);
   };
 
@@ -318,6 +320,7 @@ const AdminDashboard = ({
 
     const payload = {
       ...editProduct,
+      video: String(editProduct.video || '').trim(),
       images: (Array.isArray(editProduct.images) ? editProduct.images : []).map((img) => {
         if (typeof img !== 'string' || !img) return img;
         if (img.startsWith('data:')) return img;
@@ -477,6 +480,7 @@ const AdminDashboard = ({
       stock: Number(newProduct.stock || 0),
       icon: String(newProduct.icon || 'fa-box').trim(),
       isNewArrival: Boolean(newProduct.isNewArrival),
+      video: String(newProduct.video || '').trim(),
       images: (Array.isArray(newProduct.images) ? newProduct.images : []).map((img) => {
         if (typeof img !== 'string' || !img) return img;
         if (img.startsWith('data:')) return img;
@@ -489,7 +493,7 @@ const AdminDashboard = ({
       const success = await onAddProduct(payload);
       if (success) {
         alert('Product added successfully!');
-        setNewProduct({ name: '', price: '', description: '', specifications: '', stock: 0, category: categories[0]?.slug || categories[0]?.name || 'stoves', icon: 'fa-box', isNewArrival: false, images: [] });
+        setNewProduct({ name: '', price: '', description: '', specifications: '', stock: 0, category: categories[0]?.slug || categories[0]?.name || 'stoves', icon: 'fa-box', isNewArrival: false, images: [], video: '' });
       } else {
         alert('Failed to add product. Please try again.');
       }
@@ -1071,6 +1075,67 @@ const AdminDashboard = ({
                       </div>
                     </div>
 
+                    <div className="admin-form-group" style={{ marginBottom: '1.5rem' }}>
+                      <div>Product Video (Upload File or Enter URL)</div>
+                      <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                        <input 
+                          type="text" 
+                          placeholder="Paste YouTube, Vimeo, or direct video URL here..." 
+                          value={editProduct.video && !editProduct.video.startsWith('data:') ? editProduct.video : ''}
+                          onChange={(e) => setEditProduct({...editProduct, video: e.target.value})}
+                          style={{ width: '100%' }}
+                        />
+                        
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                          <label htmlFor="editProductVideoUpload" className="admin-btn admin-btn-outline" style={{ cursor: 'pointer', padding: '0.5rem 1rem', fontSize: '0.85rem' }}>
+                            <i className="fa-solid fa-video" style={{ marginRight: '6px' }}></i>
+                            Upload Video File
+                            <input 
+                              id="editProductVideoUpload" 
+                              name="editProductVideoUpload" 
+                              type="file" 
+                              accept="video/*" 
+                              onChange={(e) => {
+                                const file = e.target.files[0];
+                                if (!file) return;
+                                if (file.size > 25 * 1024 * 1024) { // 25MB limit
+                                  alert('Video file size exceeds 25MB limit.');
+                                  return;
+                                }
+                                const reader = new FileReader();
+                                reader.onloadend = () => {
+                                  setEditProduct({...editProduct, video: reader.result});
+                                };
+                                reader.readAsDataURL(file);
+                              }} 
+                              style={{ display: 'none' }} 
+                            />
+                          </label>
+                          
+                          {editProduct.video && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                              <span style={{ fontSize: '0.85rem', color: '#10b981', fontWeight: 600 }}>
+                                {editProduct.video.startsWith('data:') ? '✓ Video File Loaded' : '✓ Video Link Set'}
+                              </span>
+                              <button 
+                                type="button" 
+                                onClick={() => setEditProduct({...editProduct, video: ''})}
+                                style={{ background: '#ef4444', color: 'white', border: 'none', borderRadius: '4px', padding: '2px 8px', cursor: 'pointer', fontSize: '0.75rem' }}
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                        
+                        {editProduct.video && editProduct.video.startsWith('data:') && (
+                          <div style={{ marginTop: '0.5rem', width: '100%', maxWidth: '280px' }}>
+                            <video src={editProduct.video} controls style={{ width: '100%', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.08)' }} />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
                     <button type="submit" className="admin-btn admin-btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '0.8rem' }}>
                       <i className="fa-solid fa-floppy-disk" style={{ marginRight: '6px' }}></i>
                       Save Changes
@@ -1197,6 +1262,67 @@ const AdminDashboard = ({
                           <span style={{ fontSize: '0.65rem', color: '#64748b', marginTop: '4px' }}>Add Image</span>
                           <input id="newProductImageUpload" name="newProductImageUpload" type="file" accept="image/*" multiple onChange={handleFileChange} style={{ display: 'none' }} />
                         </label>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="admin-form-group" style={{ marginBottom: '1.5rem' }}>
+                    <div>Product Video (Upload File or Enter URL)</div>
+                    <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                      <input 
+                        type="text" 
+                        placeholder="Paste YouTube, Vimeo, or direct video URL here..." 
+                        value={newProduct.video && !newProduct.video.startsWith('data:') ? newProduct.video : ''}
+                        onChange={(e) => setNewProduct({...newProduct, video: e.target.value})}
+                        style={{ width: '100%' }}
+                      />
+                      
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                        <label htmlFor="newProductVideoUpload" className="admin-btn admin-btn-outline" style={{ cursor: 'pointer', padding: '0.5rem 1rem', fontSize: '0.85rem' }}>
+                          <i className="fa-solid fa-video" style={{ marginRight: '6px' }}></i>
+                          Upload Video File
+                          <input 
+                            id="newProductVideoUpload" 
+                            name="newProductVideoUpload" 
+                            type="file" 
+                            accept="video/*" 
+                            onChange={(e) => {
+                              const file = e.target.files[0];
+                              if (!file) return;
+                              if (file.size > 25 * 1024 * 1024) { // 25MB limit
+                                alert('Video file size exceeds 25MB limit.');
+                                return;
+                              }
+                              const reader = new FileReader();
+                              reader.onloadend = () => {
+                                setNewProduct({...newProduct, video: reader.result});
+                              };
+                              reader.readAsDataURL(file);
+                            }} 
+                            style={{ display: 'none' }} 
+                          />
+                        </label>
+                        
+                        {newProduct.video && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <span style={{ fontSize: '0.85rem', color: '#10b981', fontWeight: 600 }}>
+                              {newProduct.video.startsWith('data:') ? '✓ Video File Loaded' : '✓ Video Link Set'}
+                            </span>
+                            <button 
+                              type="button" 
+                              onClick={() => setNewProduct({...newProduct, video: ''})}
+                              style={{ background: '#ef4444', color: 'white', border: 'none', borderRadius: '4px', padding: '2px 8px', cursor: 'pointer', fontSize: '0.75rem' }}
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {newProduct.video && newProduct.video.startsWith('data:') && (
+                        <div style={{ marginTop: '0.5rem', width: '100%', maxWidth: '280px' }}>
+                          <video src={newProduct.video} controls style={{ width: '100%', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.08)' }} />
+                        </div>
                       )}
                     </div>
                   </div>
