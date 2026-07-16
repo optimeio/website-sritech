@@ -4327,6 +4327,55 @@ const resolvedCartItems = cart
           </div>
         </section>
 
+        {/* How It Works Section */}
+        <section id="how-it-works" className="how-it-works-section">
+          <div className="hiw-container">
+            <div className="section-header-dark">
+              <h2>Master the Elements</h2>
+              <p>The science of perfect combustion inside every Sri Tech unit.</p>
+            </div>
+            
+            <div className="hiw-grid">
+              <div className="hiw-illustration">
+                <div className="cutaway-diagram">
+                  <img src="/rocket-stove.png" alt="Cutaway Diagram" className="cutaway-img" onError={(e) => { e.target.src = "https://images.unsplash.com/photo-1517433670267-08bbd4be890f?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"; }} />
+                  <div className="airflow-animated"></div>
+                </div>
+              </div>
+              <div className="hiw-steps">
+                <div className={`step-card ${activeStepIndex === 0 ? 'active' : ''}`} onClick={() => setActiveStepIndex(0)}>
+                  <div className="step-number">01</div>
+                  <div className="step-info">
+                    <h4>Feed Wood</h4>
+                    <p>Load biomass or wood easily from the top or side intake port.</p>
+                  </div>
+                </div>
+                <div className={`step-card ${activeStepIndex === 1 ? 'active' : ''}`} onClick={() => setActiveStepIndex(1)}>
+                  <div className="step-number">02</div>
+                  <div className="step-info">
+                    <h4>Airflow Ignites</h4>
+                    <p>Oxygen is rapidly pulled through the bottom draft, creating a powerful draft.</p>
+                  </div>
+                </div>
+                <div className={`step-card ${activeStepIndex === 2 ? 'active' : ''}`} onClick={() => setActiveStepIndex(2)}>
+                  <div className="step-number">03</div>
+                  <div className="step-info">
+                    <h4>Heat Rises</h4>
+                    <p>The insulated combustion chamber forces fire up, burning excess smoke gases.</p>
+                  </div>
+                </div>
+                <div className={`step-card ${activeStepIndex === 3 ? 'active' : ''}`} onClick={() => setActiveStepIndex(3)}>
+                  <div className="step-number">04</div>
+                  <div className="step-info">
+                    <h4>Efficient Cooking</h4>
+                    <p>Concentrated high-velocity heat hits the cooking surface directly.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* Why Choose Us Section */}
         <section id="why-choose-us" className="benefits-section">
           {/* Animated Breeze Elements in Background */}
