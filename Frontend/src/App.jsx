@@ -4085,12 +4085,33 @@ const resolvedCartItems = cart
                 <source src="/rain-forest.mp4" type="video/mp4" />
               </video>
 
+              {/* Glowing Combustion Fire FX Overlay */}
+              <div className="combustion-glow"></div>
+              
+              <div className="fiery-particles-container">
+                {Array.from({ length: 30 }).map((_, i) => (
+                  <span key={i} className="ember" style={{
+                    left: `${Math.random() * 100}%`,
+                    animationDelay: `${Math.random() * 5}s`,
+                    animationDuration: `${2 + Math.random() * 4}s`,
+                    width: `${2 + Math.random() * 6}px`,
+                    height: `${2 + Math.random() * 6}px`
+                  }}></span>
+                ))}
+              </div>
+
+              <div className="combustion-flame-bar">
+                {Array.from({ length: 15 }).map((_, i) => (
+                  <div key={i} className="flame-element"></div>
+                ))}
+              </div>
+
           <div className="premium-hero-content">
             <div className="hero-text-content">
               <div className="hero-badge-wrap">
                 <span className="premium-badge-text">COOK SMART. SAVE FUEL. SAVE NATURE.</span>
               </div>
-              <h1>Efficient Cooking.<br/><span className="text-highlight-green">Better Future.</span></h1>
+              <h1>Efficient Cooking.<br/><span className="text-highlight-orange">Fiery Efficiency.</span></h1>
               <p className="hero-subtitle">Our systems use less fuel, produce less smoke, and deliver higher efficiency for a sustainable tomorrow.</p>
               
               <div className="hero-features-row">

@@ -7554,7 +7554,7 @@ body, html {
 
 /* --- Rustic Nature Hero with Video Background & Fire Glow --- */
 .premium-hero {
-    background-color: #0a1a0a !important;
+    background-color: #110502 !important;
     background-image: none !important;
     position: relative !important;
     overflow: hidden !important;
@@ -7590,12 +7590,101 @@ body, html {
     inset: 0 !important;
     background: linear-gradient(
         to right,
-        rgba(10, 20, 10, 0.92) 0%,
-        rgba(10, 20, 10, 0.78) 35%,
-        rgba(10, 20, 10, 0.30) 65%,
-        rgba(10, 20, 10, 0.10) 100%
+        rgba(17, 5, 2, 0.94) 0%,
+        rgba(17, 5, 2, 0.82) 35%,
+        rgba(17, 5, 2, 0.40) 65%,
+        rgba(255, 122, 0, 0.08) 100%
     ) !important;
     z-index: 1 !important;
+}
+
+/* Fiery Animations & Particle Effects */
+.combustion-glow {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 80% 90%, rgba(255, 76, 0, 0.28) 0%, rgba(255, 122, 0, 0.1) 40%, transparent 70%);
+    z-index: 1;
+    pointer-events: none;
+    mix-blend-mode: screen;
+    animation: combustionPulse 4s ease-in-out infinite alternate;
+}
+
+@keyframes combustionPulse {
+    0% { opacity: 0.7; transform: scale(1); }
+    100% { opacity: 1.0; transform: scale(1.08); }
+}
+
+.fiery-particles-container {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1;
+    overflow: hidden;
+}
+
+.ember {
+    position: absolute;
+    bottom: -20px;
+    background: radial-gradient(circle, #ffa200 0%, #ff3c00 70%, transparent 100%);
+    border-radius: 50%;
+    box-shadow: 0 0 8px #ffa200, 0 0 16px #ff3c00;
+    opacity: 0;
+    animation: floatEmber linear infinite;
+}
+
+@keyframes floatEmber {
+    0% {
+        transform: translateY(0) translateX(0) scale(0.6);
+        opacity: 0;
+    }
+    10% {
+        opacity: 0.8;
+    }
+    90% {
+        opacity: 0.8;
+    }
+    100% {
+        transform: translateY(-110vh) translateX(50px) scale(0.3);
+        opacity: 0;
+    }
+}
+
+.combustion-flame-bar {
+    position: absolute;
+    bottom: -10px;
+    left: 0;
+    width: 100%;
+    height: 120px;
+    z-index: 1;
+    pointer-events: none;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    opacity: 0.65;
+    overflow: hidden;
+}
+
+.flame-element {
+    flex: 1;
+    height: 100px;
+    background: linear-gradient(to top, #ff2600, #ff7a00, #ffea00, transparent);
+    border-radius: 50% 50% 20% 20% / 60% 60% 40% 40%;
+    filter: blur(6px);
+    animation: waveFlame 1.8s ease-in-out infinite alternate;
+    transform-origin: bottom center;
+    margin: 0 -5px;
+}
+
+.flame-element:nth-child(even) {
+    animation-duration: 2.3s;
+    animation-delay: 0.4s;
+    height: 80px;
+    background: linear-gradient(to top, #ff3c00, #ffa200, #ffea00, transparent);
+}
+
+@keyframes waveFlame {
+    0% { transform: scaleY(0.75) skewX(-4deg); }
+    100% { transform: scaleY(1.15) skewX(4deg); }
 }
 
 /* Remove the CSS rain animation — the video itself has rain */
@@ -7685,7 +7774,7 @@ body, html {
 
 /* Override hero text for dark rustic background readability */
 .premium-hero .premium-badge-text {
-    color: #4ade80 !important;
+    color: #ff9f1a !important;
 }
 .premium-hero .hero-text-content h1 {
     color: #ffffff !important;
@@ -7693,8 +7782,12 @@ body, html {
     line-height: 1.15 !important;
     margin-bottom: 0.5rem !important;
 }
-.premium-hero .text-highlight-green {
-    color: #4ade80 !important;
+.premium-hero .text-highlight-orange {
+    background: linear-gradient(135deg, #ffa200, #ff5f00) !important;
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    font-weight: 800 !important;
+    display: inline-block !important;
 }
 .premium-hero .hero-subtitle {
     color: #d1d5db !important;
