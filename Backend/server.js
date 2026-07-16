@@ -30,7 +30,11 @@ app.use(cors({
       return callback(null, true);
     }
 
-    if (origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1') || origin === clientUrl) {
+    const isLocalhost = origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1');
+    const isSritechDomain = origin === 'https://website.sritechengg.in' || origin.endsWith('.sritechengg.in');
+    const isRenderDomain = origin.endsWith('.onrender.com');
+
+    if (isLocalhost || origin === clientUrl || isSritechDomain || isRenderDomain) {
       return callback(null, true);
     }
 

@@ -79,6 +79,33 @@ const createEmailLog = async ({ recipient, subject, template, payload }) => {
   }
 };
 
+const sendViaResendApi = async (to, subject, html, text) => {
+  const apiKey = process.env.EMAIL_PASS;
+  const toArray = Array.isArray(to) ? to : [to];
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      from: `${SENDER_NAME} <${SENDER_ADDRESS}>`,
+      to: toArray,
+      subject,
+      html,
+      text
+    })
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Resend API error: ${response.status} - ${errorText}`);
+  }
+
+  const data = await response.json();
+  return { messageId: data.id };
+};
+
 const sendEmail = async (to, subject, html, options = {}) => {
   const templateName = options.template || 'custom';
   const payload = options.payload || {};
@@ -102,16 +129,25 @@ const sendEmail = async (to, subject, html, options = {}) => {
     }
 
     try {
-      console.log('[emailService] connecting SMTP and sending email', { recipient, subject, user: process.env.EMAIL_USER });
-      const mailOptions = {
-        from: `${SENDER_NAME} <${SENDER_ADDRESS}>`,
-        to,
-        subject,
-        html,
-        text
-      };
-      const info = await transporter.sendMail(mailOptions);
-      console.log('[emailService] sendMail response', info);
+      let info;
+      const isResend = process.env.EMAIL_HOST === 'smtp.resend.com' && process.env.EMAIL_PASS?.startsWith('re_');
+
+      if (isResend && typeof fetch === 'function') {
+        console.log('[emailService] Sending via Resend REST API', { recipient, subject });
+        info = await sendViaResendApi(to, subject, html, text);
+      } else {
+        console.log('[emailService] connecting SMTP and sending email', { recipient, subject, user: process.env.EMAIL_USER });
+        const mailOptions = {
+          from: `${SENDER_NAME} <${SENDER_ADDRESS}>`,
+          to,
+          subject,
+          html,
+          text
+        };
+        info = await transporter.sendMail(mailOptions);
+      }
+
+      console.log('[emailService] email sent response', info);
 
       if (emailLog) {
         emailLog.status = 'sent';
