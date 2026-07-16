@@ -4079,11 +4079,8 @@ const resolvedCartItems = cart
           <>
             {/* Premium Dark Parallax Hero Section */}
             <section id="home" className="premium-hero">
-              {/* Background Rain Forest Video */}
-              <video className="hero-video-bg" autoPlay muted loop playsInline>
-                <source src="/rain-forest-hd.mp4" type="video/mp4" />
-                <source src="/rain-forest.mp4" type="video/mp4" />
-              </video>
+              {/* Premium Ambient Background Image */}
+              <div className="hero-image-bg"></div>
 
               {/* Glowing Combustion Fire FX Overlay */}
               <div className="combustion-glow"></div>

@@ -7567,20 +7567,24 @@ body, html {
     box-sizing: border-box !important;
 }
 
-/* Fullscreen background video */
-.hero-video-bg {
+/* Fullscreen background image with subtle parallax zoom */
+.hero-image-bg {
     position: absolute;
-    top: 50%;
-    left: 50%;
-    min-width: 108%; /* Slight zoom to prevent blur edges bleed */
-    min-height: 108%;
-    width: auto;
-    height: auto;
-    transform: translate(-50%, -50%) scale(1.08);
-    object-fit: cover;
+    inset: 0;
+    background-image: url('/hero-ambient-bg.png');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
     z-index: 0;
     pointer-events: none;
-    filter: blur(4px) brightness(0.75); /* Added blur and adjusted brightness */
+    transform: scale(1.02);
+    filter: brightness(0.68) contrast(1.05);
+    animation: slowKenBurns 20s ease-in-out infinite alternate;
+}
+
+@keyframes slowKenBurns {
+    0% { transform: scale(1.02) translate(0, 0); }
+    100% { transform: scale(1.08) translate(-10px, -5px); }
 }
 
 /* Dark rustic gradient overlay for text readability */
