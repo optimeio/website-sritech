@@ -9053,8 +9053,8 @@ body, html {
 }
 
 /* --- Premium Meet Our Leadership Section Styles --- */
-.leadership-section-dark {
-    background-color: #0c0605 !important; /* Deep carbon-charcoal warm background */
+.leadership-section-light-fiery {
+    background: linear-gradient(135deg, #fffdfa 0%, #fff1e0 100%) !important; /* Soft warm bright sunset gradient */
     padding: 5rem 2rem !important;
     position: relative;
     overflow: hidden;
@@ -9082,46 +9082,52 @@ body, html {
     padding: 2.5rem !important;
 }
 
+.glass-light-panel {
+    background: rgba(255, 255, 255, 0.88) !important;
+    border-radius: 24px !important;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
 .glow-border-orange {
-    border: 1px solid rgba(255, 122, 0, 0.2) !important;
-    background: rgba(255, 255, 255, 0.01) !important;
-    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5),
-                inset 0 1px 1px rgba(255, 255, 255, 0.03),
-                0 0 20px rgba(255, 122, 0, 0.04) !important;
+    border: 2px solid rgba(255, 111, 0, 0.25) !important;
+    box-shadow: 0 10px 30px rgba(255, 111, 0, 0.05),
+                inset 0 1px 1px rgba(255, 255, 255, 0.9) !important;
 }
 
 .glow-border-orange:hover {
-    border-color: rgba(255, 122, 0, 0.55) !important;
+    border-color: rgba(255, 111, 0, 0.8) !important;
     transform: translateY(-8px);
-    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.7),
-                inset 0 1px 1px rgba(255, 255, 255, 0.08),
-                0 0 35px rgba(255, 122, 0, 0.22) !important;
+    box-shadow: 0 20px 45px rgba(255, 111, 0, 0.16),
+                inset 0 1px 1px rgba(255, 255, 255, 0.95),
+                0 0 25px rgba(255, 111, 0, 0.12) !important;
 }
 
 .leader-header {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    border-bottom: 1px solid rgba(255, 111, 0, 0.15);
     padding-bottom: 1.25rem;
 }
 
 .leader-meta h3 {
     font-size: 1.8rem;
-    color: #ffffff;
+    color: #0f172a;
     margin: 0 0 0.4rem 0;
     font-weight: 800;
     transition: color 0.3s;
 }
 
 .leader-card:hover .leader-meta h3 {
-    color: #ff9f1a;
+    color: #e65100;
 }
 
 .leader-role {
     display: block;
     font-size: 1.05rem;
-    color: #ff7a00;
+    color: #d84315;
     font-weight: 700;
     margin-bottom: 0.25rem;
 }
@@ -9129,7 +9135,7 @@ body, html {
 .leader-edu {
     display: block;
     font-size: 0.88rem;
-    color: #cbd5e1;
+    color: #475569;
     font-weight: 500;
 }
 
@@ -9137,9 +9143,9 @@ body, html {
     width: 44px;
     height: 44px;
     border-radius: 50%;
-    background: rgba(255, 122, 0, 0.08);
-    border: 1px solid rgba(255, 122, 0, 0.15);
-    color: #ff7a00;
+    background: rgba(255, 111, 0, 0.06);
+    border: 1px solid rgba(255, 111, 0, 0.15);
+    color: #ff6f00;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -9163,9 +9169,9 @@ body, html {
 }
 
 .role-tag {
-    background: rgba(255, 122, 0, 0.04);
-    border: 1px solid rgba(255, 122, 0, 0.12);
-    color: #cbd5e1;
+    background: #fff3e0;
+    border: 1px solid #ffe0b2;
+    color: #e65100;
     padding: 0.4rem 0.8rem;
     border-radius: 99px;
     font-size: 0.85rem;
@@ -9174,15 +9180,15 @@ body, html {
 }
 
 .role-tag:hover {
-    background: #ff7a00;
-    border-color: #ff7a00;
+    background: #e65100;
+    border-color: #e65100;
     color: #ffffff;
-    box-shadow: 0 0 10px rgba(255, 122, 0, 0.3);
+    box-shadow: 0 0 10px rgba(230, 81, 0, 0.25);
 }
 
 .leader-vision {
-    background: linear-gradient(135deg, rgba(255, 122, 0, 0.1) 0%, rgba(255, 80, 0, 0.02) 100%);
-    border-left: 4px solid #ff7a00;
+    background: linear-gradient(135deg, #fffde7 0%, #fff9c4 100%);
+    border-left: 4px solid #ff8f00;
     padding: 1.25rem;
     border-radius: 0 16px 16px 0;
     margin: 0;
@@ -9194,7 +9200,7 @@ body, html {
     top: 8px;
     left: 10px;
     font-size: 2.2rem;
-    color: rgba(255, 122, 0, 0.12);
+    color: rgba(255, 111, 0, 0.08);
     pointer-events: none;
 }
 
@@ -9202,14 +9208,14 @@ body, html {
     margin: 0;
     font-size: 1.05rem;
     font-style: italic;
-    color: #f8fafc;
+    color: #1e293b;
     font-weight: 600;
     line-height: 1.4;
 }
 
 .leader-body h4 {
     font-size: 1.1rem;
-    color: #ffffff;
+    color: #0f172a;
     margin: 1.5rem 0 0.75rem 0;
     font-weight: 700;
     text-transform: uppercase;
@@ -9219,7 +9225,7 @@ body, html {
 }
 
 .leader-body p {
-    color: #94a3b8;
+    color: #334155;
     line-height: 1.65;
     font-size: 0.95rem;
     margin: 0;
@@ -9238,7 +9244,7 @@ body, html {
     display: flex;
     align-items: flex-start;
     gap: 0.75rem;
-    color: #cbd5e1;
+    color: #334155;
     font-size: 0.94rem;
     line-height: 1.4;
 }
@@ -9274,7 +9280,7 @@ body, html {
 }
 
 @media (max-width: 768px) {
-    .leadership-section-dark {
+    .leadership-section-light-fiery {
         padding: 3.5rem 1rem !important;
     }
 

@@ -4377,7 +4377,7 @@ const resolvedCartItems = cart
         </section>
 
         {/* Meet Our Leadership Section */}
-        <section id="leadership" className="leadership-section-dark">
+        <section id="leadership" className="leadership-section-light-fiery">
           {/* Floating embers inside leadership */}
           <div className="fiery-particles-container">
             {Array.from({ length: 15 }).map((_, i) => (
@@ -4392,14 +4392,14 @@ const resolvedCartItems = cart
           </div>
 
           <div className="leadership-container">
-            <div className="section-header-dark">
+            <div className="section-header-light">
               <h2>Meet Our Leadership</h2>
               <p>The visionaries guiding Sri Tech Engineering toward sustainable precision manufacturing.</p>
             </div>
             
             <div className="leadership-grid">
               {/* Leader 1: Sankarganesh R */}
-              <div className="leader-card glass-panel glow-border-orange animate-on-scroll">
+              <div className="leader-card glass-light-panel glow-border-orange animate-on-scroll">
                 <div className="leader-header">
                   <div className="leader-meta">
                     <h3>Sankarganesh R</h3>
@@ -4442,7 +4442,7 @@ const resolvedCartItems = cart
               </div>
 
               {/* Leader 2: Ganga P */}
-              <div className="leader-card glass-panel glow-border-orange animate-on-scroll">
+              <div className="leader-card glass-light-panel glow-border-orange animate-on-scroll">
                 <div className="leader-header">
                   <div className="leader-meta">
                     <h3>Ganga P</h3>
