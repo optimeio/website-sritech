@@ -276,7 +276,7 @@ body {
 
     /* keep logo visible and slightly smaller on narrow screens */
     .logo img {
-        max-height: 80px;
+        max-height: 140px;
     }
 }
 
@@ -3767,9 +3767,9 @@ footer.footer {
     }
 
     .logo img {
-        width: 220px;
+        width: 280px;
         height: auto;
-        max-height: 90px;
+        max-height: 120px;
     }
 
     .logo-main-text {
@@ -3963,9 +3963,9 @@ footer.footer {
 
 @media (max-width: 420px) {
     .logo img {
-        width: 180px;
+        width: 240px;
         height: auto;
-        max-height: 72px;
+        max-height: 100px;
     }
 
     .logo-main-text {
@@ -7056,10 +7056,10 @@ body, html {
     }
 
     .logo img {
-        height: 96px;
+        height: 140px;
         width: auto;
-        max-height: 96px;
-        max-width: 280px;
+        max-height: 140px;
+        max-width: 380px;
         box-shadow: none;
 }
 
@@ -7335,8 +7335,8 @@ body, html {
     }
 
     .logo img {
-        height: 54px;
-        max-width: 160px;
+        height: 90px;
+        max-width: 280px;
         width: auto;
     }
 
@@ -7496,9 +7496,9 @@ body, html {
     }
 
     .logo img {
-        width: 220px;
+        width: 280px;
         height: auto;
-        max-height: 90px;
+        max-height: 120px;
     }
 
     .logo-sub-text {
@@ -7958,8 +7958,8 @@ body, html {
         min-width: 0 !important;
     }
     .logo img {
-        height: 40px !important;
-        max-width: 110px !important;
+        height: 80px !important;
+        max-width: 260px !important;
         width: auto !important;
     }
     .mobile-menu-btn {
