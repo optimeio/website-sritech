@@ -4597,8 +4597,10 @@ const resolvedCartItems = cart
         <section id="product" className="products-section">
           <div className="section-header" style={{ justifyContent: 'center', textAlign: 'center', borderBottom: 'none', marginBottom: '2.5rem' }}>
             <h2 className="wavy-title">
-              {t('products.title').split('').map((char, idx) => (
-                <span key={idx}>{char}</span>
+              {Array.from(
+                new Intl.Segmenter('ta', { granularity: 'grapheme' }).segment(t('products.title'))
+              ).map((s, idx) => (
+                <span key={idx}>{s.segment}</span>
               ))}
             </h2>
           </div>
