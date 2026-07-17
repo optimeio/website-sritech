@@ -16,7 +16,7 @@ const PRODUCT_QUERY_TIMEOUT_MS = Number(process.env.PRODUCT_QUERY_TIMEOUT_MS || 
 const PRODUCT_IMAGE_LIMIT = Number(process.env.PRODUCT_IMAGE_LIMIT || 2);
 const MAX_DESCRIPTION_LENGTH = Number(process.env.PRODUCT_DESCRIPTION_MAX_LENGTH || 400);
 const MAX_SPECIFICATIONS_LENGTH = Number(process.env.PRODUCT_SPECIFICATIONS_MAX_LENGTH || 600);
-const PRODUCT_SELECT_FIELDS = 'name price category description specifications stock icon isNewArrival images video createdAt sku slug';
+const PRODUCT_SELECT_FIELDS = 'name price category description specifications howToUse stock icon isNewArrival images video createdAt sku slug';
 
 const uploadToCloudinary = async (base64Str, resourceType = 'auto') => {
   if (!process.env.CLOUDINARY_CLOUD_NAME || typeof base64Str !== 'string' || !base64Str.startsWith('data:')) {
@@ -106,6 +106,7 @@ const serializeProduct = (product) => {
     category: plainProduct.category,
     description,
     specifications,
+    howToUse: plainProduct.howToUse || '',
     stock: typeof plainProduct.stock === 'number' ? plainProduct.stock : Number(plainProduct.stock) || 0,
     icon: plainProduct.icon || 'fa-box',
     isNewArrival: Boolean(plainProduct.isNewArrival),

@@ -1,6 +1,8 @@
 import React from 'react';
+import { useLanguage } from '../LanguageContext';
 
 function Footer({ complaintForm, setComplaintForm, handleComplaintSubmit }) {
+  const { t } = useLanguage();
   return (
     <footer id="footer" className="footer">
       <div className="footer-grid">
@@ -26,61 +28,61 @@ function Footer({ complaintForm, setComplaintForm, handleComplaintSubmit }) {
         </div>
 
         <div>
-          <div className="col-title">Policies</div>
+          <div className="col-title">{t('footer.policies')}</div>
           <ul className="link-list">
-            <li><a href="/privacy-policy.html">Privacy Policy</a></li>
-            <li><a href="/terms-and-conditions.html">Terms of Service</a></li>
+            <li><a href="/privacy-policy.html">{t('footer.privacyPolicy')}</a></li>
+            <li><a href="/terms-and-conditions.html">{t('footer.termsOfService')}</a></li>
           </ul>
         </div>
 
         <div>
-          <div className="col-title">Quick Links</div>
+          <div className="col-title">{t('footer.quickLinks')}</div>
           <ul className="link-list">
-            <li><a href="#home" onClick={(e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>Home</a></li>
-            <li><a href="#how-it-works" onClick={(e) => { e.preventDefault(); const el = document.getElementById('how-it-works'); if (el) el.scrollIntoView({ behavior: 'smooth' }); }}>About</a></li>
-            <li><a href="#product" onClick={(e) => { e.preventDefault(); const el = document.getElementById('product'); if (el) el.scrollIntoView({ behavior: 'smooth' }); }}>Products</a></li>
-            <li><a href="#footer" onClick={(e) => { e.preventDefault(); const el = document.getElementById('footer'); if (el) el.scrollIntoView({ behavior: 'smooth' }); }}>Contact</a></li>
+            <li><a href="#home" onClick={(e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>{t('nav.home')}</a></li>
+            <li><a href="#how-it-works" onClick={(e) => { e.preventDefault(); const el = document.getElementById('how-it-works'); if (el) el.scrollIntoView({ behavior: 'smooth' }); }}>{t('nav.about')}</a></li>
+            <li><a href="#product" onClick={(e) => { e.preventDefault(); const el = document.getElementById('product'); if (el) el.scrollIntoView({ behavior: 'smooth' }); }}>{t('nav.products')}</a></li>
+            <li><a href="#footer" onClick={(e) => { e.preventDefault(); const el = document.getElementById('footer'); if (el) el.scrollIntoView({ behavior: 'smooth' }); }}>{t('nav.contact')}</a></li>
           </ul>
         </div>
 
         <div className="footer-form-col">
-          <div className="col-title">Raise a Complaint</div>
+          <div className="col-title">{t('footer.raiseComplaint')}</div>
           <form className="footer-complaint-form" onSubmit={handleComplaintSubmit}>
             <input 
               type="text" 
-              placeholder="Your Name" 
+              placeholder={t('footer.yourName')} 
               required 
               value={complaintForm?.customerName || ''}
               onChange={(e) => setComplaintForm({...complaintForm, customerName: e.target.value})}
             />
             <input 
               type="email" 
-              placeholder="Your Email" 
+              placeholder={t('footer.yourEmail')} 
               required 
               value={complaintForm?.email || ''}
               onChange={(e) => setComplaintForm({...complaintForm, email: e.target.value})}
             />
             <input 
               type="text" 
-              placeholder="Subject" 
+              placeholder={t('footer.subject')} 
               required 
               value={complaintForm?.subject || ''}
               onChange={(e) => setComplaintForm({...complaintForm, subject: e.target.value})}
             />
             <textarea 
-              placeholder="Type your complaint or feedback details..." 
+              placeholder={t('footer.messagePlaceholder')} 
               required 
               rows="3"
               value={complaintForm?.message || ''}
               onChange={(e) => setComplaintForm({...complaintForm, message: e.target.value})}
             ></textarea>
-            <button type="submit" className="footer-form-submit-btn">Submit Complaint</button>
+            <button type="submit" className="footer-form-submit-btn">{t('footer.submitComplaint')}</button>
           </form>
         </div>
       </div>
 
       <div className="bottom-bar">
-        <p>© 2026 The Sri Tech. All rights reserved.</p>
+        <p>{t('footer.copyright')}</p>
       </div>
     </footer>
   );

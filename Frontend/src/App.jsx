@@ -6,6 +6,8 @@ import AdminDashboard from './AdminDashboard'
 import UserDashboard from './components/UserDashboard'
 import Footer from './components/Footer'
 import MyOrders from './pages/MyOrders.jsx'
+import { useLanguage } from './LanguageContext'
+import LanguageSelectorPopup from './components/LanguageSelectorPopup'
 
 const API_URL = import.meta.env.VITE_API_URL || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? '/api' : 'https://website-sritech.onrender.com/api');
 
@@ -18,6 +20,7 @@ const DEFAULT_BANNERS = [
 const FALLBACK_PRODUCTS = [];
 
 function App() {
+  const { language, setLanguage, t } = useLanguage();
   // State
   const [activeSection, setActiveSection] = useState('home');
   const [selectedProduct, setSelectedProduct] = useState(null);
@@ -156,6 +159,7 @@ function App() {
   const location = useLocation();
   const isMyOrdersPage = location.pathname === '/my-orders';
   const [currentHeroIndex, setCurrentHeroIndex] = useState(0);
+  const [activeWorkflowStep, setActiveWorkflowStep] = useState(0);
   const displayBanners = heroBanners && heroBanners.length > 0 ? heroBanners : DEFAULT_BANNERS;
   const [complaintForm, setComplaintForm] = useState({
     customerName: '',
@@ -233,6 +237,13 @@ function App() {
     }, 4000);
     return () => clearInterval(interval);
   }, [displayBanners.length]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setActiveWorkflowStep((prev) => (prev + 1) % 3);
+    }, 3000);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     if (showNavbarSearch) {
@@ -2835,6 +2846,7 @@ const resolvedCartItems = cart
 
   return (
     <div className="app-wrapper">
+      <LanguageSelectorPopup />
       {/* Toast Notification */}
       {toastMessage && (
         <div className={`toast-popup ${toastMessage.type}`}>
@@ -3004,6 +3016,16 @@ const resolvedCartItems = cart
                 <p className="description-text">
                   {selectedProduct.description || `Experience top-tier quality and premium design with our ${selectedProduct.name}. Crafted carefully to blend cutting-edge performance with eco-friendly efficiency.`}
                 </p>
+                {selectedProduct.howToUse && (
+                  <div className="how-to-use-section" style={{ marginTop: '1.5rem', padding: '1rem', background: 'rgba(21, 128, 61, 0.05)', borderRadius: '8px', borderLeft: '4px solid #15803d', textAlign: 'left' }}>
+                    <h4 style={{ color: 'var(--text-main)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.1rem' }}>
+                      <i className="fa-solid fa-circle-info" style={{ color: '#15803d' }}></i> How to Use
+                    </h4>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', whiteSpace: 'pre-line', lineHeight: '1.6' }}>
+                      {selectedProduct.howToUse}
+                    </p>
+                  </div>
+                )}
                 <div className="actions-row">
                   <button className="buy-now-btn" onClick={() => { setSelectedProduct(null); handleBuyNow(selectedProduct); }}>Buy Now</button>
                   <button className="add-to-cart" onClick={() => handleAddToCart(selectedProduct)}>Add to Cart</button>
@@ -3920,7 +3942,7 @@ const resolvedCartItems = cart
                 src="/sri-tech-logo-final.png"
                 alt="SriTech Logo"
                 style={{
-                  height: '150px',
+                  height: '75px',
                   width: 'auto',
                   objectFit: 'contain',
                   background: 'transparent',
@@ -3932,17 +3954,29 @@ const resolvedCartItems = cart
 
           <nav className="header-nav">
             <a href="#home" className="action-btn" onClick={(e) => { scrollToSection(e, 'home'); }}>
-              Home
+              {t('nav.home')}
             </a>
             <a href="#product" className="action-btn" onClick={(e) => { scrollToSection(e, 'product'); }}>
-              Products
+              {t('nav.products')}
             </a>
             <a href="#about" className="action-btn" onClick={(e) => { scrollToSection(e, 'about'); }}>
-              About
+              {t('nav.about')}
             </a>
             <a href="#footer" className="action-btn" onClick={(e) => { scrollToSection(e, 'footer'); }}>
-              Contact
+              {t('nav.contact')}
             </a>
+            <div className="lang-dropdown-wrapper">
+              <select 
+                className="lang-dropdown action-btn" 
+                value={language} 
+                onChange={(e) => setLanguage(e.target.value)}
+                title="Change Language"
+              >
+                <option value="ta">தமிழ்</option>
+                <option value="en">English</option>
+                <option value="hi">हिंदी</option>
+              </select>
+            </div>
           </nav>
 
           <div className="header-actions">
@@ -3955,19 +3989,19 @@ const resolvedCartItems = cart
               >
                 <i className="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
               </button>
-              <button className="action-btn cart-btn" title="Cart" aria-label={`View shopping cart with ${cart.length} items`} onClick={() => setShowCart(true)}>
+              <button className="action-btn cart-btn" title={t('nav.cart')} aria-label={`View shopping cart with ${cart.length} items`} onClick={() => setShowCart(true)}>
                 <i className="fa-solid fa-cart-shopping" aria-hidden="true"></i>
-                <span className="btn-text" style={{ fontSize: '0.9rem', fontWeight: 600 }}>Cart</span>
+                <span className="btn-text" style={{ fontSize: '0.9rem', fontWeight: 600 }}>{t('nav.cart')}</span>
                 {cart.length > 0 && <span className="cart-count">{cart.length}</span>}
               </button>
-              <button className="action-btn" title="Wishlist" aria-label="Wishlist" onClick={() => setShowWishlist(true)}>
+              <button className="action-btn" title={t('nav.wishlist')} aria-label={t('nav.wishlist')} onClick={() => setShowWishlist(true)}>
                 <i className={waitlist.length > 0 ? "fa-solid fa-heart" : "fa-regular fa-heart"} aria-hidden="true" style={waitlist.length > 0 ? { color: 'var(--accent-yellow)' } : {}}></i>
-                <span className="btn-text" style={{ fontSize: '0.9rem', fontWeight: 600, marginLeft: '0.35rem' }}>Wishlist</span>
+                <span className="btn-text" style={{ fontSize: '0.9rem', fontWeight: 600, marginLeft: '0.35rem' }}>{t('nav.wishlist')}</span>
               </button>
               <button
                 className="action-btn header-login-btn"
-                title="Login"
-                aria-label="Login"
+                title={t('nav.login')}
+                aria-label={t('nav.login')}
                 onClick={() => {
                   setAuthMode('login');
                   setAuthErrorMessage(null);
@@ -3987,7 +4021,7 @@ const resolvedCartItems = cart
                   ref={navbarSearchInputRef}
                   value={searchTerm}
                   onChange={(e) => handleNavbarSearchChange(e.target.value)}
-                  placeholder="Search products"
+                  placeholder={t('nav.searchProducts')}
                   style={{
                     border: '1px solid rgba(255,255,255,0.2)',
                     borderRadius: '999px',
@@ -4086,15 +4120,6 @@ const resolvedCartItems = cart
               <div className="combustion-glow"></div>
               
               <div className="fiery-particles-container">
-                {Array.from({ length: 30 }).map((_, i) => (
-                  <span key={i} className="ember" style={{
-                    left: `${Math.random() * 100}%`,
-                    animationDelay: `${Math.random() * 5}s`,
-                    animationDuration: `${2 + Math.random() * 4}s`,
-                    width: `${2 + Math.random() * 6}px`,
-                    height: `${2 + Math.random() * 6}px`
-                  }}></span>
-                ))}
               </div>
 
               {/* SVG Fractal Turbulence Fire Filter */}
@@ -4107,80 +4132,53 @@ const resolvedCartItems = cart
                 </defs>
               </svg>
 
-              <div className="combustion-flame-bar">
-                {/* Layer 1: Background Red Flames */}
-                <div className="flame-layer flame-layer-red">
-                  {Array.from({ length: 18 }).map((_, i) => (
-                    <div key={`r-${i}`} className="flame-element flame-red"></div>
-                  ))}
-                </div>
-                {/* Layer 2: Middle Orange Flames */}
-                <div className="flame-layer flame-layer-orange">
-                  {Array.from({ length: 15 }).map((_, i) => (
-                    <div key={`o-${i}`} className="flame-element flame-orange"></div>
-                  ))}
-                </div>
-                {/* Layer 3: Foreground Golden Flames */}
-                <div className="flame-layer flame-layer-yellow">
-                  {Array.from({ length: 12 }).map((_, i) => (
-                    <div key={`y-${i}`} className="flame-element flame-yellow"></div>
-                  ))}
-                </div>
-                {/* Layer 4: White-Hot Core Combustion Flares */}
-                <div className="flame-layer flame-layer-white">
-                  {Array.from({ length: 8 }).map((_, i) => (
-                    <div key={`w-${i}`} className="flame-element flame-white"></div>
-                  ))}
-                </div>
-              </div>
-
           <div className="premium-hero-content">
             <div className="hero-text-content">
               <div className="hero-badge-wrap">
-                <span className="premium-badge-text">COOK SMART. SAVE FUEL. SAVE NATURE.</span>
+                <span className="premium-badge-text">{t('hero.badge')} <i className="fa-solid fa-leaf" style={{color: '#4CAF50', marginLeft: '5px'}}></i></span>
               </div>
-              <h1>Efficient Cooking.<br/><span className="text-highlight-orange">Fiery Efficiency.</span></h1>
-              <p className="hero-subtitle">Our systems use less fuel, produce less smoke, and deliver higher efficiency for a sustainable tomorrow.</p>
+              <h1>{t('hero.title')}<br/><span className="text-highlight-orange">{t('hero.titleHighlight')}</span></h1>
+              <p className="hero-subtitle" style={{ maxWidth: '450px' }}>{t('hero.subtitle')}</p>
               
               <div className="hero-features-row">
-                <div className="feature-item-col">
-                  <i className="fa-solid fa-fire-leaf"></i>
+                <div className="feature-item-col outline-feature">
+                  <div className="feature-icon-wrap"><i className="fa-solid fa-leaf"></i></div>
                   <div>
-                    <strong>Up to 80%</strong>
-                    <span>Less Fuel</span>
+                    <strong>{t('hero.featureUpTo80')}</strong>
+                    <span>{t('hero.featureLessFuel')}</span>
                   </div>
                 </div>
-                <div className="feature-item-col">
-                  <i className="fa-solid fa-cloud-slash"></i>
+                <div className="feature-item-col outline-feature">
+                  <div className="feature-icon-wrap"><i className="fa-solid fa-wind"></i></div>
                   <div>
-                    <strong>Low Smoke</strong>
-                    <span>Clean Cooking</span>
+                    <strong>{t('hero.featureLowSmoke')}</strong>
+                    <span>{t('hero.featureCleanCooking')}</span>
                   </div>
                 </div>
-                <div className="feature-item-col">
-                  <i className="fa-solid fa-bolt"></i>
+                <div className="feature-item-col outline-feature">
+                  <div className="feature-icon-wrap"><i className="fa-solid fa-bolt"></i></div>
                   <div>
-                    <strong>High Efficiency</strong>
-                    <span>Better Performance</span>
+                    <strong>{t('hero.featureHighEfficiency')}</strong>
+                    <span>{t('hero.featureBetterPerformance')}</span>
                   </div>
                 </div>
-                <div className="feature-item-col">
-                  <i className="fa-solid fa-tree"></i>
+                <div className="feature-item-col outline-feature">
+                  <div className="feature-icon-wrap"><i className="fa-solid fa-tree"></i></div>
                   <div>
-                    <strong>Eco Friendly</strong>
-                    <span>Sustainable Living</span>
+                    <strong>{t('hero.featureEcoFriendly')}</strong>
+                    <span>{t('hero.featureSustainableLiving')}</span>
                   </div>
                 </div>
               </div> {/* Close hero-features-row */}
               <div className="hero-cta-group">
-                <a href="#product" className="primary-btn-green" onClick={(e) => scrollToSection(e, 'product')}>Explore Products <i className="fa-solid fa-arrow-right"></i></a>
-                <a href="#about" className="secondary-btn-outline" onClick={(e) => scrollToSection(e, 'about')}>Learn More</a>
+                <a href="#product" className="primary-btn-gradient" onClick={(e) => scrollToSection(e, 'product')}>{t('hero.exploreProducts')} <i className="fa-solid fa-arrow-right"></i></a>
+                <a href="#about" className="secondary-btn-outline" onClick={(e) => scrollToSection(e, 'about')}><i className="fa-solid fa-play" style={{color: '#ff7a00', marginRight: '8px'}}></i> {t('hero.learnMore')}</a>
               </div>
             </div>
 
             <div className="hero-image-wrapper">
               <div className="hero-product-card">
-                <img src="/rocket-stove-user.png" alt="Sri Tech Eco Combustion System with Flames" className="hero-product-image" />
+                <img src="/hero-image.png" alt="Sri Tech Eco Combustion System with Flames" className="hero-product-image" />
               </div>
             </div>
           </div>
@@ -4190,7 +4188,7 @@ const resolvedCartItems = cart
             <div className="circular-badge">
               <svg viewBox="0 0 100 100">
                 <path id="curve" d="M 50 50 m -37 0 a 37 37 0 1 1 74 0 a 37 37 0 1 1 -74 0" fill="transparent" />
-                <text><textPath href="#curve" startOffset="0">COOK FASTER • SAVE MORE • LIVE BETTER • </textPath></text>
+                <text><textPath href="#curve" startOffset="0">{t('hero.circularBadge')} {t('hero.circularBadge')}</textPath></text>
               </svg>
               <i className="fa-solid fa-leaf center-icon" style={{color: '#1E7A3B'}}></i>
             </div>
@@ -4200,30 +4198,25 @@ const resolvedCartItems = cart
 
 
         {/* Massive Animated About Us Section */}
-        <section id="about" className="about-us-section">
+        <section id="about" className="about-us-section light-theme-about">
           <div className="about-container">
             <div className="section-header-dark">
-              <h2>About Sri Tech Engineering</h2>
-              <p>Pioneering innovation, sustainability, and engineering excellence since 2020.</p>
+              <h2>{t('about.sectionTitle')}</h2>
+              <p>{t('about.sectionSubtitle')}</p>
             </div>
             
             <div className="about-grid">
               {/* Left Column: Company Story & National Projects */}
               <div className="about-story-col">
                 <div className="about-card glass-panel">
-                  <h3>Our Legacy & Specialization</h3>
-                  <p>
-                    Sri Tech Engineering (SM Group) is a precision manufacturing company founded in 2020. 
-                    We specialize in <strong>Agro, Food & Poultry Machineries</strong>, <strong>Material Fabrication</strong>, and <strong>Engineering Works</strong>.
-                  </p>
-                  <p>
-                    Led by <strong>Sankarganesh R (CEO)</strong> and <strong>Ganga (MD)</strong>, we focus on delivering excellence through innovation, sustainability, and quality. We bridge the gap between students and industry through technical skill development.
-                  </p>
+                  <h3>{t('about.legacyTitle')}</h3>
+                  <p>{t('about.legacyP1')}</p>
+                  <p>{t('about.legacyP2')}</p>
                   <div className="location-box">
                     <i className="fa-solid fa-map-location-dot"></i>
                     <div>
-                      <strong>Based in Namakkal, Tamil Nadu</strong>
-                      <span>2 Advanced Manufacturing Units: Athanoor & Vaiyappamalai</span>
+                      <strong>{t('about.locationTitle')}</strong>
+                      <span>{t('about.locationDesc')}</span>
                     </div>
                   </div>
                 </div>
@@ -4233,19 +4226,19 @@ const resolvedCartItems = cart
                     <i className="fa-solid fa-fire-burner animate-flicker"></i>
                   </div>
                   <div>
-                    <h4>Eco-Friendly Rocket Stoves</h4>
-                    <p>We are proudly manufacturing high-efficiency rocket stoves and <strong>delivering all over India!</strong></p>
+                    <h4>{t('about.rocketStoveTitle')}</h4>
+                    <p>{t('about.rocketStoveDesc')}</p>
                   </div>
                 </div>
 
                 <div className="about-card glass-panel">
-                  <h3>Prestigious Projects & Stature</h3>
-                  <p>We have successfully executed complex national-scale engineering projects for:</p>
+                  <h3>{t('about.projectsTitle')}</h3>
+                  <p>{t('about.projectsDesc')}</p>
                   <div className="clients-list">
-                    <span className="client-badge"><i className="fa-solid fa-train"></i> Indian Railways</span>
-                    <span className="client-badge"><i className="fa-solid fa-droplet"></i> IOCL</span>
-                    <span className="client-badge"><i className="fa-solid fa-building"></i> SIDCO</span>
-                    <span className="client-badge"><i className="fa-solid fa-road"></i> Smart City Highways</span>
+                    <span className="client-badge"><i className="fa-solid fa-train"></i> {t('about.clientRailways')}</span>
+                    <span className="client-badge"><i className="fa-solid fa-droplet"></i> {t('about.clientIOCL')}</span>
+                    <span className="client-badge"><i className="fa-solid fa-building"></i> {t('about.clientSIDCO')}</span>
+                    <span className="client-badge"><i className="fa-solid fa-road"></i> {t('about.clientSmartCity')}</span>
                   </div>
                 </div>
               </div>
@@ -4255,56 +4248,33 @@ const resolvedCartItems = cart
                 <div className="achievements-grid">
                   <div className="stat-card glass-panel">
                     <div className="stat-icon"><i className="fa-solid fa-award"></i></div>
-                    <strong>10+ Years</strong>
-                    <span>Precision Experience</span>
+                    <strong>{t('about.stat10Years')}</strong>
+                    <span>{t('about.statPrecision')}</span>
                   </div>
                   <div className="stat-card glass-panel">
                     <div className="stat-icon"><i className="fa-solid fa-circle-check"></i></div>
-                    <strong>National</strong>
-                    <span>Projects Stature</span>
+                    <strong>{t('about.statNational')}</strong>
+                    <span>{t('about.statProjects')}</span>
                   </div>
                   <div className="stat-card glass-panel">
                     <div className="stat-icon"><i className="fa-solid fa-cubes"></i></div>
-                    <strong>First PEB</strong>
-                    <span>Structure at SIDCO Estate</span>
+                    <strong>{t('about.statFirstPEB')}</strong>
+                    <span>{t('about.statSIDCO')}</span>
                   </div>
                   <div className="stat-card glass-panel">
                     <div className="stat-icon"><i className="fa-solid fa-microchip"></i></div>
-                    <strong>Pioneer</strong>
-                    <span>EV Design & 3D Printing</span>
+                    <strong>{t('about.statPioneer')}</strong>
+                    <span>{t('about.statEVDesign')}</span>
                   </div>
                 </div>
 
-                {/* Workflow section */}
-                <div className="workflow-card glass-panel">
-                  <h3>Our Precision Workflow</h3>
-                  <div className="workflow-steps-row">
-                    <div className="workflow-step">
-                      <div className="step-icon-circle"><i className="fa-solid fa-compass-drafting"></i></div>
-                      <strong>Design</strong>
-                      <span>CAD/CAM validated designs</span>
-                    </div>
-                    <div className="workflow-arrow"><i className="fa-solid fa-arrow-right-long"></i></div>
-                    <div className="workflow-step">
-                      <div className="step-icon-circle"><i className="fa-solid fa-industry"></i></div>
-                      <strong>Manufacture</strong>
-                      <span>2 precision units</span>
-                    </div>
-                    <div className="workflow-arrow"><i className="fa-solid fa-arrow-right-long"></i></div>
-                    <div className="workflow-step">
-                      <div className="step-icon-circle"><i className="fa-solid fa-truck-ramp-box"></i></div>
-                      <strong>Deliver</strong>
-                      <span>On-time, every time</span>
-                    </div>
-                  </div>
-                </div>
 
                 {/* Combustion Science Interactive Sub-widget */}
                 <div className="workflow-card glass-panel">
-                  <h3>Combustion Science Inside Our Stoves</h3>
+                  <h3>{t('about.combustionTitle')}</h3>
                   <div className="about-combustion-box">
                     <div className="combustion-steps-nav">
-                      {['Feed Wood', 'Airflow Ignites', 'Heat Rises', 'Clean Cooking'].map((tab, idx) => (
+                      {t('about.combustionTabs').map((tab, idx) => (
                         <button 
                           key={idx} 
                           className={`combustion-tab-btn ${activeStepIndex === idx ? 'active' : ''}`}
@@ -4315,12 +4285,46 @@ const resolvedCartItems = cart
                       ))}
                     </div>
                     <div className="combustion-tab-content">
-                      {activeStepIndex === 0 && <p><i className="fa-solid fa-wood-pile"></i> Load biomass or wood easily from the top or side intake port.</p>}
-                      {activeStepIndex === 1 && <p><i className="fa-solid fa-wind"></i> Oxygen is rapidly pulled through the bottom draft, creating a powerful draft.</p>}
-                      {activeStepIndex === 2 && <p><i className="fa-solid fa-arrow-up-long"></i> The insulated combustion chamber forces fire up, burning excess smoke gases.</p>}
-                      {activeStepIndex === 3 && <p><i className="fa-solid fa-fire"></i> Concentrated high-velocity heat hits the cooking surface directly for 80% thermal efficiency.</p>}
+                      {activeStepIndex === 0 && <p><i className="fa-solid fa-wood-pile"></i> {t('about.combustionDescs.0')}</p>}
+                      {activeStepIndex === 1 && <p><i className="fa-solid fa-wind"></i> {t('about.combustionDescs.1')}</p>}
+                      {activeStepIndex === 2 && <p><i className="fa-solid fa-arrow-up-long"></i> {t('about.combustionDescs.2')}</p>}
+                      {activeStepIndex === 3 && <p><i className="fa-solid fa-fire"></i> {t('about.combustionDescs.3')}</p>}
                     </div>
                   </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Precision Workflow Section */}
+        <section id="workflow" className="how-it-works-section" style={{ backgroundColor: '#ffffff', padding: '5rem 2rem' }}>
+          <div className="hiw-container">
+            <div className="section-header-dark" style={{ textAlign: 'center', marginBottom: '3rem' }}>
+              <h2>{t('workflow.title')}</h2>
+              <p>{t('workflow.subtitle')}</p>
+            </div>
+            
+            <div className="hiw-steps" style={{ maxWidth: '800px', margin: '0 auto' }}>
+              <div className={`step-card ${activeWorkflowStep === 0 ? 'active' : ''}`} onClick={() => setActiveWorkflowStep(0)}>
+                <div className="step-number" style={{ fontSize: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '60px' }}><i className="fa-solid fa-compass-drafting"></i></div>
+                <div className="step-info">
+                  <h4>{t('workflow.step1Title')}</h4>
+                  <p>{t('workflow.step1Desc')}</p>
+                </div>
+              </div>
+              <div className={`step-card ${activeWorkflowStep === 1 ? 'active' : ''}`} onClick={() => setActiveWorkflowStep(1)}>
+                <div className="step-number" style={{ fontSize: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '60px' }}><i className="fa-solid fa-industry"></i></div>
+                <div className="step-info">
+                  <h4>{t('workflow.step2Title')}</h4>
+                  <p>{t('workflow.step2Desc')}</p>
+                </div>
+              </div>
+              <div className={`step-card ${activeWorkflowStep === 2 ? 'active' : ''}`} onClick={() => setActiveWorkflowStep(2)}>
+                <div className="step-number" style={{ fontSize: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '60px' }}><i className="fa-solid fa-truck-ramp-box"></i></div>
+                <div className="step-info">
+                  <h4>{t('workflow.step3Title')}</h4>
+                  <p>{t('workflow.step3Desc')}</p>
                 </div>
               </div>
             </div>
@@ -4331,14 +4335,14 @@ const resolvedCartItems = cart
         <section id="how-it-works" className="how-it-works-section">
           <div className="hiw-container">
             <div className="section-header-dark">
-              <h2>Master the Elements</h2>
-              <p>The science of perfect combustion inside every Sri Tech unit.</p>
+              <h2>{t('howItWorks.title')}</h2>
+              <p>{t('howItWorks.subtitle')}</p>
             </div>
             
             <div className="hiw-grid">
               <div className="hiw-illustration">
                 <div className="cutaway-diagram">
-                  <img src="/rocket-stove.png" alt="Cutaway Diagram" className="cutaway-img" onError={(e) => { e.target.src = "https://images.unsplash.com/photo-1517433670267-08bbd4be890f?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"; }} />
+                  <img src="/master-elements-stove.png" alt="Sri Tech High-Efficiency Rocket Stove roaring with flames in a rustic wooden workshop" className="cutaway-img" onError={(e) => { e.target.src = "https://images.unsplash.com/photo-1517433670267-08bbd4be890f?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"; }} />
                   <div className="airflow-animated"></div>
                 </div>
               </div>
@@ -4346,29 +4350,29 @@ const resolvedCartItems = cart
                 <div className={`step-card ${activeStepIndex === 0 ? 'active' : ''}`} onClick={() => setActiveStepIndex(0)}>
                   <div className="step-number">01</div>
                   <div className="step-info">
-                    <h4>Feed Wood</h4>
-                    <p>Load biomass or wood easily from the top or side intake port.</p>
+                    <h4>{t('howItWorks.step1Title')}</h4>
+                    <p>{t('howItWorks.step1Desc')}</p>
                   </div>
                 </div>
                 <div className={`step-card ${activeStepIndex === 1 ? 'active' : ''}`} onClick={() => setActiveStepIndex(1)}>
                   <div className="step-number">02</div>
                   <div className="step-info">
-                    <h4>Airflow Ignites</h4>
-                    <p>Oxygen is rapidly pulled through the bottom draft, creating a powerful draft.</p>
+                    <h4>{t('howItWorks.step2Title')}</h4>
+                    <p>{t('howItWorks.step2Desc')}</p>
                   </div>
                 </div>
                 <div className={`step-card ${activeStepIndex === 2 ? 'active' : ''}`} onClick={() => setActiveStepIndex(2)}>
                   <div className="step-number">03</div>
                   <div className="step-info">
-                    <h4>Heat Rises</h4>
-                    <p>The insulated combustion chamber forces fire up, burning excess smoke gases.</p>
+                    <h4>{t('howItWorks.step3Title')}</h4>
+                    <p>{t('howItWorks.step3Desc')}</p>
                   </div>
                 </div>
                 <div className={`step-card ${activeStepIndex === 3 ? 'active' : ''}`} onClick={() => setActiveStepIndex(3)}>
                   <div className="step-number">04</div>
                   <div className="step-info">
-                    <h4>Efficient Cooking</h4>
-                    <p>Concentrated high-velocity heat hits the cooking surface directly.</p>
+                    <h4>{t('howItWorks.step4Title')}</h4>
+                    <p>{t('howItWorks.step4Desc')}</p>
                   </div>
                 </div>
               </div>
@@ -4393,8 +4397,8 @@ const resolvedCartItems = cart
 
           <div className="leadership-container">
             <div className="section-header-light">
-              <h2>Meet Our Leadership</h2>
-              <p>The visionaries guiding Sri Tech Engineering toward sustainable precision manufacturing.</p>
+              <h2>{t('leadership.title')}</h2>
+              <p>{t('leadership.subtitle')}</p>
             </div>
             
             <div className="leadership-grid">
@@ -4535,8 +4539,8 @@ const resolvedCartItems = cart
           </div>
 
           <div className="section-header-light">
-            <h2>Better for You. Better for Nature.</h2>
-            <p>Designed to outlast the harshest environments while protecting the planet.</p>
+            <h2>{t('whyChooseUs.title')}</h2>
+            <p>{t('whyChooseUs.subtitle')}</p>
           </div>
           
           {/* Infinite Horizontal Scroll Track */}
@@ -4545,45 +4549,45 @@ const resolvedCartItems = cart
               {/* Set 1 */}
               <div className="benefit-card">
                 <div className="benefit-icon"><i className="fa-solid fa-heart-pulse"></i></div>
-                <h4>Healthier Cooking</h4>
-                <p>Significantly reduces toxic smoke inhalation compared to traditional fires.</p>
+                <h4>{t('whyChooseUs.healthierCooking')}</h4>
+                <p>{t('whyChooseUs.healthierCookingDesc')}</p>
               </div>
               <div className="benefit-card">
                 <div className="benefit-icon"><i className="fa-solid fa-piggy-bank"></i></div>
-                <h4>Saves Money</h4>
-                <p>Uses up to 80% less fuel, paying for itself in a matter of months.</p>
+                <h4>{t('whyChooseUs.savesMoney')}</h4>
+                <p>{t('whyChooseUs.savesMoneyDesc')}</p>
               </div>
               <div className="benefit-card">
                 <div className="benefit-icon"><i className="fa-solid fa-leaf"></i></div>
-                <h4>Environment Friendly</h4>
-                <p>Lower carbon footprint and reduced deforestation through massive efficiency.</p>
+                <h4>{t('whyChooseUs.envFriendly')}</h4>
+                <p>{t('whyChooseUs.envFriendlyDesc')}</p>
               </div>
               <div className="benefit-card">
                 <div className="benefit-icon"><i className="fa-solid fa-hammer"></i></div>
-                <h4>Durable & Long Lasting</h4>
-                <p>Industrial-grade materials built for intense continuous heat.</p>
+                <h4>{t('whyChooseUs.durable')}</h4>
+                <p>{t('whyChooseUs.durableDesc')}</p>
               </div>
 
               {/* Set 2 (Duplicate for seamless infinite scrolling loop) */}
               <div className="benefit-card">
                 <div className="benefit-icon"><i className="fa-solid fa-heart-pulse"></i></div>
-                <h4>Healthier Cooking</h4>
-                <p>Significantly reduces toxic smoke inhalation compared to traditional fires.</p>
+                <h4>{t('whyChooseUs.healthierCooking')}</h4>
+                <p>{t('whyChooseUs.healthierCookingDesc')}</p>
               </div>
               <div className="benefit-card">
                 <div className="benefit-icon"><i className="fa-solid fa-piggy-bank"></i></div>
-                <h4>Saves Money</h4>
-                <p>Uses up to 80% less fuel, paying for itself in a matter of months.</p>
+                <h4>{t('whyChooseUs.savesMoney')}</h4>
+                <p>{t('whyChooseUs.savesMoneyDesc')}</p>
               </div>
               <div className="benefit-card">
                 <div className="benefit-icon"><i className="fa-solid fa-leaf"></i></div>
-                <h4>Environment Friendly</h4>
-                <p>Lower carbon footprint and reduced deforestation through massive efficiency.</p>
+                <h4>{t('whyChooseUs.envFriendly')}</h4>
+                <p>{t('whyChooseUs.envFriendlyDesc')}</p>
               </div>
               <div className="benefit-card">
                 <div className="benefit-icon"><i className="fa-solid fa-hammer"></i></div>
-                <h4>Durable & Long Lasting</h4>
-                <p>Industrial-grade materials built for intense continuous heat.</p>
+                <h4>{t('whyChooseUs.durable')}</h4>
+                <p>{t('whyChooseUs.durableDesc')}</p>
               </div>
             </div>
           </div>
@@ -4593,7 +4597,9 @@ const resolvedCartItems = cart
         <section id="product" className="products-section">
           <div className="section-header" style={{ justifyContent: 'center', textAlign: 'center', borderBottom: 'none', marginBottom: '2.5rem' }}>
             <h2 className="wavy-title">
-              <span>P</span><span>R</span><span>O</span><span>D</span><span>U</span><span>C</span><span>T</span><span>S</span>
+              {t('products.title').split('').map((char, idx) => (
+                <span key={idx}>{char}</span>
+              ))}
             </h2>
           </div>
 
@@ -4603,7 +4609,7 @@ const resolvedCartItems = cart
                 className={`category-pill ${selectedCategory === '' ? 'active' : ''}`} 
                 onClick={() => handleCategoryChange('')}
               >
-                ALL
+                {t('products.all')}
               </button>
               {productCategories.map(cat => (
                 <button 
@@ -4620,7 +4626,7 @@ const resolvedCartItems = cart
               <i className="fa-solid fa-magnifying-glass search-icon"></i>
               <input 
                 type="text" 
-                placeholder="Search products..." 
+                placeholder={t('products.searchPlaceholder')} 
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="products-search-input"
@@ -4694,7 +4700,7 @@ const resolvedCartItems = cart
                       )}
                       {product.images && product.images.length > 1 && (
                         <span className="image-badge">
-                          +{product.images.length - 1} photos
+                          +{product.images.length - 1} {t('products.photos')}
                         </span>
                       )}
                     </div>
@@ -4720,7 +4726,7 @@ const resolvedCartItems = cart
                         style={{ width: '100%', marginTop: '1rem', padding: '0.65rem 1rem', fontSize: '0.85rem' }}
                         onClick={() => handleBuyNow(product)}
                       >
-                        <i className="fa-solid fa-bag-shopping"></i> Buy Now
+                        <i className="fa-solid fa-bag-shopping"></i> {t('products.buyNow')}
                       </button>
                     </div>
                   </article>
@@ -4729,8 +4735,8 @@ const resolvedCartItems = cart
             ) : (
               <div className="empty-state glass-card" style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '4rem' }}>
                 <i className="fa-solid fa-boxes-packing" style={{ fontSize: '3rem', color: 'var(--primary-color)', opacity: 0.2, marginBottom: '1.5rem', display: 'block' }}></i>
-                <h3 style={{ color: 'var(--primary-color)', marginBottom: '0.5rem' }}>Premium Products Coming Soon</h3>
-                <p style={{ color: 'var(--text-muted)' }}>Our team is currently updating our sustainable technology collection. Please check back shortly.</p>
+                <h3 style={{ color: 'var(--primary-color)', marginBottom: '0.5rem' }}>{t('products.comingSoonTitle')}</h3>
+                <p style={{ color: 'var(--text-muted)' }}>{t('products.comingSoonDesc')}</p>
               </div>
             )}
           </div>
@@ -4740,43 +4746,43 @@ const resolvedCartItems = cart
           {/* Testimonials Section */}
           <section className="testimonials-section">
           <div className="section-header-dark">
-            <h2>Trusted by Professionals</h2>
-            <p>See what our early adopters are saying about the Sri Tech difference.</p>
+            <h2>{t('testimonials.title')}</h2>
+            <p>{t('testimonials.subtitle')}</p>
           </div>
           
           <div className="testimonials-grid">
             <div className="testimonial-card glass-panel">
               <div className="stars"><i className="fa-solid fa-star"></i><i className="fa-solid fa-star"></i><i className="fa-solid fa-star"></i><i className="fa-solid fa-star"></i><i className="fa-solid fa-star"></i></div>
-              <p className="review-text">"The heat output is incredible. We use 80% less wood than our traditional open fire setup. Truly a game changer for our catering business."</p>
+              <p className="review-text">{t('testimonials.review1')}</p>
               <div className="reviewer">
-                <div className="reviewer-avatar">RA</div>
+                <div className="reviewer-avatar">{t('testimonials.reviewer1Initials')}</div>
                 <div>
-                  <h4>Rajesh A.</h4>
-                  <p>Commercial Caterer</p>
+                  <h4>{t('testimonials.reviewer1Name')}</h4>
+                  <p>{t('testimonials.reviewer1Role')}</p>
                 </div>
               </div>
             </div>
             
             <div className="testimonial-card glass-panel">
               <div className="stars"><i className="fa-solid fa-star"></i><i className="fa-solid fa-star"></i><i className="fa-solid fa-star"></i><i className="fa-solid fa-star"></i><i className="fa-solid fa-star"></i></div>
-              <p className="review-text">"Zero smoke once it gets going. It's built like a tank and the stainless steel finish looks premium in our outdoor kitchen."</p>
+              <p className="review-text">{t('testimonials.review2')}</p>
               <div className="reviewer">
-                <div className="reviewer-avatar">SM</div>
+                <div className="reviewer-avatar">{t('testimonials.reviewer2Initials')}</div>
                 <div>
-                  <h4>Sarah M.</h4>
-                  <p>Eco-Resort Owner</p>
+                  <h4>{t('testimonials.reviewer2Name')}</h4>
+                  <p>{t('testimonials.reviewer2Role')}</p>
                 </div>
               </div>
             </div>
 
             <div className="testimonial-card glass-panel">
               <div className="stars"><i className="fa-solid fa-star"></i><i className="fa-solid fa-star"></i><i className="fa-solid fa-star"></i><i className="fa-solid fa-star"></i><i className="fa-solid fa-star-half-stroke"></i></div>
-              <p className="review-text">"I was skeptical about the fuel savings, but the airflow design is pure genius. Boiling water takes a fraction of the time now."</p>
+              <p className="review-text">{t('testimonials.review3')}</p>
               <div className="reviewer">
-                <div className="reviewer-avatar">KV</div>
+                <div className="reviewer-avatar">{t('testimonials.reviewer3Initials')}</div>
                 <div>
-                  <h4>Karthik V.</h4>
-                  <p>Homestead Enthusiast</p>
+                  <h4>{t('testimonials.reviewer3Name')}</h4>
+                  {t('testimonials.reviewer3Role') && <p>{t('testimonials.reviewer3Role')}</p>}
                 </div>
               </div>
             </div>

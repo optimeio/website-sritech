@@ -231,6 +231,7 @@ const AdminDashboard = ({
     price: '', 
     description: '',
     specifications: '',
+    howToUse: '',
     stock: 0,
     category: categories[0]?.slug || categories[0]?.name || 'engraining-products', 
     icon: 'fa-box',
@@ -242,7 +243,7 @@ const AdminDashboard = ({
   // --- Edit Product State ---
   const [editingProductId, setEditingProductId] = useState(null);
   const [editProduct, setEditProduct] = useState({
-    name: '', price: '', description: '', specifications: '', stock: 0, category: '', isNewArrival: false, images: [], video: ''
+    name: '', price: '', description: '', specifications: '', howToUse: '', stock: 0, category: '', isNewArrival: false, images: [], video: ''
   });
   const [replaceEditImages, setReplaceEditImages] = useState(false);
 
@@ -253,6 +254,7 @@ const AdminDashboard = ({
       price: p.price ? p.price.toString().replace(/[₹,]/g, '') : '',
       description: p.description || '',
       specifications: p.specifications || '',
+      howToUse: p.howToUse || '',
       stock: typeof p.stock === 'number' ? p.stock : 0,
       category: p.category || categories[0]?.slug || categories[0]?.name || '',
       isNewArrival: p.isNewArrival || false,
@@ -493,7 +495,7 @@ const AdminDashboard = ({
       const success = await onAddProduct(payload);
       if (success) {
         alert('Product added successfully!');
-        setNewProduct({ name: '', price: '', description: '', specifications: '', stock: 0, category: categories[0]?.slug || categories[0]?.name || 'stoves', icon: 'fa-box', isNewArrival: false, images: [], video: '' });
+        setNewProduct({ name: '', price: '', description: '', specifications: '', howToUse: '', stock: 0, category: categories[0]?.slug || categories[0]?.name || 'stoves', icon: 'fa-box', isNewArrival: false, images: [], video: '' });
       } else {
         alert('Failed to add product. Please try again.');
       }
@@ -996,6 +998,16 @@ const AdminDashboard = ({
                         />
                       </div>
                       <div className="admin-form-group">
+                        <label htmlFor="editProductHowToUse">How to Use</label>
+                        <textarea
+                          id="editProductHowToUse"
+                          placeholder="Instructions on how to use the product"
+                          value={editProduct.howToUse}
+                          onChange={(e) => setEditProduct({ ...editProduct, howToUse: e.target.value })}
+                          style={{ minHeight: '100px' }}
+                        />
+                      </div>
+                      <div className="admin-form-group">
                         <label htmlFor="editProductStock">Stock</label>
                         <input
                           id="editProductStock"
@@ -1193,6 +1205,16 @@ const AdminDashboard = ({
                         placeholder="Product specifications"
                         value={newProduct.specifications}
                         onChange={(e) => setNewProduct({...newProduct, specifications: e.target.value})}
+                        style={{ minHeight: '100px' }}
+                      />
+                    </div>
+                    <div className="admin-form-group">
+                      <label htmlFor="newProductHowToUse">How to Use</label>
+                      <textarea
+                        id="newProductHowToUse"
+                        placeholder="Instructions on how to use the product"
+                        value={newProduct.howToUse}
+                        onChange={(e) => setNewProduct({...newProduct, howToUse: e.target.value})}
                         style={{ minHeight: '100px' }}
                       />
                     </div>

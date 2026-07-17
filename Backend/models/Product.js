@@ -8,6 +8,7 @@ const productSchema = new mongoose.Schema({
   category: { type: String, required: true },
   description: { type: String, default: '' },
   specifications: { type: String, default: '' },
+  howToUse: { type: String, default: '' },
   stock: { type: Number, default: 0 },
   icon: { type: String, default: 'fa-box' },
   isNewArrival: { type: Boolean, default: false },
