@@ -125,12 +125,27 @@ const setupRoutes = () => {
 };
 
 const setupErrorHandling = () => {
-  // 404 middleware - must be after all routes
-  app.use((req, res, next) => {
-    const error = new Error('Endpoint not found');
+  // 404 middleware for API routes - must be after all routes
+  app.use('/api', (req, res, next) => {
+    const error = new Error('API Endpoint not found');
     error.statusCode = 404;
     next(error);
   });
+
+  // Serve frontend in production for non-API routes
+  if (process.env.NODE_ENV === 'production') {
+    app.use(express.static(path.join(__dirname, '../Frontend/dist')));
+    app.get('*', (req, res) => {
+      res.sendFile(path.resolve(__dirname, '../Frontend/dist', 'index.html'));
+    });
+  } else {
+    // 404 fallback for non-API routes in dev mode
+    app.use((req, res, next) => {
+      const error = new Error('Endpoint not found');
+      error.statusCode = 404;
+      next(error);
+    });
+  }
 
   // Global error handler
   app.use(errorHandler);

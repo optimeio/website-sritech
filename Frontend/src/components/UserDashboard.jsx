@@ -356,19 +356,40 @@ function UserDashboard({
             <div className="user-dashboard-grid">
               <div className="user-dashboard-card user-dashboard-stats-grid">
                 {[
-                  { label: 'Total Orders', value: stats.totalOrders, icon: 'fa-box', accent: 'linear-gradient(135deg, #6d28d9, #4f46e5)' },
-                  { label: 'Pending Orders', value: stats.pendingOrders, icon: 'fa-clock', accent: 'linear-gradient(135deg, #f59e0b, #fb923c)' },
-                  { label: 'Delivered Orders', value: stats.deliveredOrders, icon: 'fa-circle-check', accent: 'linear-gradient(135deg, #16a34a, #34d399)' },
-                  { label: 'Wishlist Items', value: stats.wishlistItems, icon: 'fa-heart', accent: 'linear-gradient(135deg, #ec4899, #f43f5e)' },
-                  { label: 'Cart', value: stats.cartItemsCount, icon: 'fa-cart-shopping', accent: 'linear-gradient(135deg, #0f766e, #14b8a6)' }
+                  { label: 'Total Orders', value: stats.totalOrders, icon: 'fa-box', accent: 'linear-gradient(135deg, #6d28d9, #4f46e5)', tabKey: 'orders' },
+                  { label: 'Pending Orders', value: stats.pendingOrders, icon: 'fa-clock', accent: 'linear-gradient(135deg, #f59e0b, #fb923c)', tabKey: 'orders' },
+                  { label: 'Delivered Orders', value: stats.deliveredOrders, icon: 'fa-circle-check', accent: 'linear-gradient(135deg, #16a34a, #34d399)', tabKey: 'orders' },
+                  { label: 'Wishlist Items', value: stats.wishlistItems, icon: 'fa-heart', accent: 'linear-gradient(135deg, #ec4899, #f43f5e)', tabKey: 'wishlist' },
+                  { label: 'Cart', value: stats.cartItemsCount, icon: 'fa-cart-shopping', accent: 'linear-gradient(135deg, #0f766e, #14b8a6)', tabKey: 'cart' }
                 ].map(stat => (
-                  <div key={stat.label} className="user-dashboard-stat-card" style={{ background: stat.accent }}>
+                  <button 
+                    key={stat.label} 
+                    type="button"
+                    className="user-dashboard-stat-card" 
+                    style={{ 
+                      background: stat.accent,
+                      border: 'none',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      fontFamily: 'inherit',
+                      width: '100%',
+                      padding: '1rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.8rem',
+                      color: 'white',
+                      borderRadius: '18px',
+                      minHeight: '96px'
+                    }}
+                    onClick={() => setActiveTab(stat.tabKey)}
+                    aria-label={`View ${stat.label}`}
+                  >
                     <i className={`fa-solid ${stat.icon}`} />
                     <div>
                       <p>{stat.label}</p>
                       <strong>{stat.value}</strong>
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
 
