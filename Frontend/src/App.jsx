@@ -380,6 +380,16 @@ function App() {
     localStorage.removeItem('sriTechUser');
   };
 
+  const handleAuthError = (res) => {
+    if (res && res.status === 401) {
+      clearAuthSession();
+      setActiveUser(null);
+      setIsUserLoggedIn(false);
+      return true;
+    }
+    return false;
+  };
+
   const loadGuestCart = () => {
     try {
       const saved = localStorage.getItem(GUEST_CART_KEY);
@@ -418,12 +428,18 @@ function App() {
 
   // Sync cart & waitlist from DB when user logs in
   useEffect(() => {
+    const sanitizeCart = (items) => items.filter(item => {
+      const id = typeof item === 'object' ? (item.productId || item.product?._id || item.product?.id || item._id || item.id) : item;
+      return /^[0-9a-fA-F]{24}$/.test(String(id));
+    });
+    const sanitizeWaitlist = (items) => items.filter(id => /^[0-9a-fA-F]{24}$/.test(String(id)));
+
     if (activeUser) {
-      setCart(activeUser.cart || []);
-      setWaitlist(activeUser.waitlist || []);
+      setCart(sanitizeCart(activeUser.cart || []));
+      setWaitlist(sanitizeWaitlist(activeUser.waitlist || []));
     } else {
-      setCart(loadGuestCart());
-      setWaitlist(loadGuestWaitlist());
+      setCart(sanitizeCart(loadGuestCart()));
+      setWaitlist(sanitizeWaitlist(loadGuestWaitlist()));
     }
   }, [activeUser]);
 
@@ -573,15 +589,19 @@ function App() {
 
     // Fetch logged-in user orders
     if (activeUser) {
-      try {
-        const userOrderRes = await fetch(`${API_URL}/orders/me?t=${t}`, {
-          headers: getUserHeaders()
-        });
-        if (userOrderRes.ok) {
-          setUserOrders(await userOrderRes.json());
+      const headers = getUserHeaders();
+      if (headers.Authorization) {
+        try {
+          const userOrderRes = await fetch(`${API_URL}/orders/me?t=${t}`, { headers });
+          if (handleAuthError(userOrderRes)) return;
+          if (userOrderRes.ok) {
+            setUserOrders(await userOrderRes.json());
+          }
+        } catch (err) {
+          console.error("Error fetching user orders:", err);
         }
-      } catch (err) {
-        console.error("Error fetching user orders:", err);
+      } else {
+        handleAuthError({ status: 401 });
       }
     }
 
@@ -805,9 +825,10 @@ function App() {
     if (selectedProduct) {
       trackGAEvent('view_item', 'ecommerce', selectedProduct.name, Number(String(selectedProduct.price).replace(/[^0-9]/g, '')) || 0);
       setSelectedProductImageIndex(0);
+      const productId = selectedProduct._id || selectedProduct.id;
       const fetchReviews = async () => {
         try {
-          const res = await fetch(`${API_URL}/products/${selectedProduct._id || selectedProduct.id}/reviews?t=${Date.now()}`);
+          const res = await fetch(`${API_URL}/products/${productId}/reviews?t=${Date.now()}`);
           if (res.ok) {
             setSelectedProductReviews(await res.json());
           }
@@ -834,8 +855,9 @@ function App() {
       showToast("Please login to leave a review.", 'error');
       return;
     }
+    const productId = selectedProduct._id || selectedProduct.id;
     try {
-      const res = await fetch(`${API_URL}/products/${selectedProduct._id || selectedProduct.id}/reviews`, {
+      const res = await fetch(`${API_URL}/products/${productId}/reviews`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1434,11 +1456,15 @@ function App() {
 
   const fetchUserOrders = async () => {
     if (!activeUser) return;
+    const headers = getUserHeaders();
+    if (!headers.Authorization) {
+      handleAuthError({ status: 401 });
+      return;
+    }
     setOrderDashboardLoading(true);
     try {
-      const res = await fetch(`${API_URL}/orders/me?t=${Date.now()}`, {
-        headers: getUserHeaders()
-      });
+      const res = await fetch(`${API_URL}/orders/me?t=${Date.now()}`, { headers });
+      if (handleAuthError(res)) return;
       if (res.ok) {
         const fetchedOrders = await res.json();
         if (!fetchedOrders.length && import.meta.env.DEV) {
@@ -1924,7 +1950,7 @@ function App() {
         headers: getAuthHeaders({ contentType: true }),
         body: JSON.stringify({ productId })
       });
-
+      if (handleAuthError(res)) return;
       if (res.ok) {
         const updatedCart = await res.json().catch(() => null);
         if (Array.isArray(updatedCart)) {
@@ -1976,10 +2002,11 @@ function App() {
 
     if (isUserLoggedIn) {
       try {
-        await fetch(`${API_URL}/users/${activeUser._id}/cart/${productId}`, {
+        const res = await fetch(`${API_URL}/users/${activeUser._id}/cart/${productId}`, {
           method: 'DELETE',
           headers: getUserHeaders()
         });
+        if (handleAuthError(res)) return;
       } catch (err) {
         console.error("Error removing from cart on backend:", err);
       }
@@ -2078,7 +2105,7 @@ function App() {
       const options = {
         key: razorpayKey,
         amount: razorpayOrder.amount,
-        currency: 'INR',
+        currency: razorpayOrder.currency || 'INR',
         name: 'SriTech',
         description: 'Product Purchase',
         order_id: razorpayOrder.id,
@@ -2087,9 +2114,9 @@ function App() {
           await handleVerifyPayment(response);
         },
         prefill: {
-          name: activeUser?.name || '',
-          email: activeUser?.email || '',
-          contact: activeUser?.phone || ''
+          name: checkoutName,
+          email: activeUser?.email || userCredentials?.email || 'customer@sritechengg.in',
+          contact: checkoutPhone
         },
         theme: {
           color: '#1E7A3B'
@@ -2242,6 +2269,7 @@ function App() {
         headers,
         body: JSON.stringify({ productId })
       });
+      if (handleAuthError(res)) return;
 
       let payload = null;
       try {
@@ -2268,7 +2296,7 @@ function App() {
           : [...waitlist, productId];
         setWaitlist(nextWaitlist);
         saveGuestWaitlist(nextWaitlist);
-        showToast(payload?.message || 'Wishlist updated locally. Please refresh if needed.', 'success');
+        showToast(payload?.message || 'Failed to sync wishlist with server.', 'error');
       }
     } catch (err) {
       console.error('Wishlist error:', err);
@@ -2778,6 +2806,8 @@ const resolvedCartItems = cart
     })
     .filter(Boolean);
 
+const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p.id)?.toString()));
+
   const cartTotal = resolvedCartItems.reduce((sum, item) => sum + (getProductFinalPrice(item) * (Number(item.quantity) || 1)), 0);
   const checkoutItemsForDisplay = checkoutItems.length > 0 ? checkoutItems : resolvedCartItems;
   const checkoutTotal = checkoutItemsForDisplay.reduce((sum, item) => sum + (getProductFinalPrice(item) * (Number(item.quantity) || 1)), 0);
@@ -3215,7 +3245,7 @@ const resolvedCartItems = cart
              <button className="close-modal" onClick={() => setShowCheckout(false)} aria-label="Close" disabled={isProcessingPayment}>
                &times;
              </button>
-             <h2 style={{ fontSize: '1.8rem', color: '#ffffff', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+             <h2 style={{ fontSize: '1.8rem', color: 'var(--text-main)', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                <i className="fa-solid fa-credit-card"></i> Order Checkout
              </h2>
 
@@ -3359,9 +3389,9 @@ const resolvedCartItems = cart
                   </h2>
                   <p className="modal-subtitle">Items you saved for later are waiting here.</p>
                 </div>
-                <div className="modal-pill wishlist-pill">{waitlist.length} saved</div>
+                <div className="modal-pill wishlist-pill">{resolvedWaitlistItems.length} saved</div>
               </div>
-              {waitlist.length === 0 ? (
+              {resolvedWaitlistItems.length === 0 ? (
                 <div className="modal-empty-state wishlist-empty">
                   <i className="fa-regular fa-heart"></i>
                   <p>Your wishlist is empty.</p>
@@ -3369,7 +3399,7 @@ const resolvedCartItems = cart
                 </div>
               ) : (
                 <ul className="modal-item-list">
-                  {products.filter(p => waitlist.includes(p._id || p.id)).map((item, idx) => (
+                  {resolvedWaitlistItems.map((item, idx) => (
                     <li key={idx} className="modal-item-card">
                       <div className="modal-item-img">
                         {item.images && item.images.length > 0 ? (
@@ -3989,13 +4019,13 @@ const resolvedCartItems = cart
               >
                 <i className="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
               </button>
-              <button className="action-btn cart-btn" title={t('nav.cart')} aria-label={`View shopping cart with ${cart.length} items`} onClick={() => setShowCart(true)}>
+              <button className="action-btn cart-btn" title={t('nav.cart')} aria-label={`View shopping cart with ${resolvedCartItems.length} items`} onClick={() => setShowCart(true)}>
                 <i className="fa-solid fa-cart-shopping" aria-hidden="true"></i>
                 <span className="btn-text" style={{ fontSize: '0.9rem', fontWeight: 600 }}>{t('nav.cart')}</span>
-                {cart.length > 0 && <span className="cart-count">{cart.length}</span>}
+                {resolvedCartItems.length > 0 && <span className="cart-count">{resolvedCartItems.length}</span>}
               </button>
               <button className="action-btn" title={t('nav.wishlist')} aria-label={t('nav.wishlist')} onClick={() => setShowWishlist(true)}>
-                <i className={waitlist.length > 0 ? "fa-solid fa-heart" : "fa-regular fa-heart"} aria-hidden="true" style={waitlist.length > 0 ? { color: 'var(--accent-yellow)' } : {}}></i>
+                <i className={resolvedWaitlistItems.length > 0 ? "fa-solid fa-heart" : "fa-regular fa-heart"} aria-hidden="true" style={resolvedWaitlistItems.length > 0 ? { color: 'var(--accent-yellow)' } : {}}></i>
                 <span className="btn-text" style={{ fontSize: '0.9rem', fontWeight: 600, marginLeft: '0.35rem' }}>{t('nav.wishlist')}</span>
               </button>
               <button
@@ -4342,7 +4372,7 @@ const resolvedCartItems = cart
             <div className="hiw-grid">
               <div className="hiw-illustration">
                 <div className="cutaway-diagram">
-                  <img src="/master-elements-stove.png" alt="Sri Tech High-Efficiency Rocket Stove roaring with flames in a rustic wooden workshop" className="cutaway-img" onError={(e) => { e.target.src = "https://images.unsplash.com/photo-1517433670267-08bbd4be890f?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"; }} />
+                  <img src="/master-elements-stove.jpg" alt="Sri Tech High-Efficiency Rocket Stove roaring with flames in a rustic wooden workshop" className="cutaway-img" onError={(e) => { e.target.src = "https://images.unsplash.com/photo-1517433670267-08bbd4be890f?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"; }} />
                   <div className="airflow-animated"></div>
                 </div>
               </div>

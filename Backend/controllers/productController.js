@@ -123,7 +123,7 @@ const serializeProduct = (product) => {
 
 const fallbackProducts = [
   {
-    _id: 'fallback-rocket-stove',
+    _id: '600000000000000000000001',
     name: 'Rocket Stove',
     price: '₹3,999',
     category: 'Stoves',
@@ -133,7 +133,7 @@ const fallbackProducts = [
     createdAt: new Date().toISOString()
   },
   {
-    _id: 'fallback-10-stove',
+    _id: '600000000000000000000002',
     name: '10" Stove',
     price: '₹4,499',
     category: 'Stoves',
@@ -142,7 +142,7 @@ const fallbackProducts = [
     createdAt: new Date().toISOString()
   },
   {
-    _id: 'fallback-rocket-stove-pro',
+    _id: '600000000000000000000003',
     name: 'Rocket Stove Pro',
     price: '₹5,499',
     category: 'Stoves',
@@ -151,7 +151,7 @@ const fallbackProducts = [
     createdAt: new Date().toISOString()
   },
   {
-    _id: 'fallback-stove-plate-kit',
+    _id: '600000000000000000000004',
     name: 'Stove Cooking Plate Kit',
     price: '₹1,299',
     category: 'Stoves',
@@ -160,7 +160,7 @@ const fallbackProducts = [
     createdAt: new Date().toISOString()
   },
   {
-    _id: 'fallback-home-kit',
+    _id: '600000000000000000000005',
     name: 'Home Appliance Starter Kit',
     price: '₹1,999',
     category: 'Home Appliances',
@@ -169,7 +169,7 @@ const fallbackProducts = [
     createdAt: new Date().toISOString()
   },
   {
-    _id: 'fallback-engraining',
+    _id: '600000000000000000000006',
     name: 'Engraining Premium Pack',
     price: '₹2,999',
     category: 'Engraining Products',
@@ -178,7 +178,7 @@ const fallbackProducts = [
     createdAt: new Date().toISOString()
   },
   {
-    _id: 'fallback-welding',
+    _id: '600000000000000000000007',
     name: 'SriTech Welding Torch',
     price: '₹2,499',
     category: 'Welding Products',

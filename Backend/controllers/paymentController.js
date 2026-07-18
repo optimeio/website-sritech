@@ -40,6 +40,12 @@ exports.createPaymentOrder = asyncHandler(async (req, res) => {
 
   try {
     const order = await razorpay.orders.create(options);
+    console.log("RAZORPAY ORDER CREATED:", {
+      id: order.id,
+      amount: order.amount,
+      currency: order.currency,
+      receipt: order.receipt
+    });
     return res.status(201).json(order);
   } catch (err) {
     if (mockPaymentsEnabled) {
