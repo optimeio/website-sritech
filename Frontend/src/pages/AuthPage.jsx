@@ -45,7 +45,7 @@ const AuthPage = () => {
       setMessage('Email verified successfully. Redirecting...');
       setMessageType('success');
       setTimeout(() => {
-        window.location.href = '/';
+        window.location.href = '/?verified=true';
       }, 800);
     } catch (err) {
       console.error(err);
@@ -136,7 +136,7 @@ const AuthPage = () => {
         setMessage('Login successful. Redirecting...');
         setMessageType('success');
         setTimeout(() => {
-          window.location.href = '/';
+          window.location.href = '/?loggedin=true';
         }, 800);
       } else {
         const res = await fetch(`${API_URL}/auth/signup`, {

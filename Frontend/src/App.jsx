@@ -2887,6 +2887,17 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
     setShowNavbarSearch(true);
   };
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('verified') === 'true') {
+      showToast('Email verified successfully!', 'success');
+      window.history.replaceState({}, '', window.location.pathname);
+    } else if (params.get('loggedin') === 'true') {
+      showToast('Login successful!', 'success');
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
+
   return (
     (isAdmin && !isViewingPublicProducts) ? (
       <AdminDashboard 
@@ -3911,7 +3922,9 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
 
                 {/* Submit Button */}
                 <button type="submit" className="auth-submit-btn" disabled={authSubmitting}>
-                  {authSubmitting ? (authMode === 'login' ? 'Signing In...' : 'Creating Account...') : (authMode === 'login' ? 'Sign In' : 'Create Account')}
+                  {authSubmitting
+                    ? (authMode === 'login' ? 'Signing In...' : authMode === 'verify' ? 'Verifying...' : 'Creating Account...')
+                    : (authMode === 'login' ? 'Sign In' : authMode === 'verify' ? 'Verify Email' : 'Create Account')}
                 </button>
                 
               </form>
