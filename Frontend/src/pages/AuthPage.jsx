@@ -37,9 +37,16 @@ const AuthPage = () => {
         throw new Error(data.error || data.message || 'OTP verification failed.');
       }
 
+      if (data.token) {
+        localStorage.setItem('sriTechToken', data.token);
+        window.dispatchEvent(new Event('auth-change'));
+      }
+
       setMessage('Email verified successfully. Redirecting...');
       setMessageType('success');
-      setTimeout(() => navigate('/'), 800);
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 800);
     } catch (err) {
       console.error(err);
       setMessage(err.message || 'OTP verification failed.');
@@ -115,16 +122,23 @@ const AuthPage = () => {
             password: userCredentials.password
           })
         });
+        const data = await res.json();
 
         if (!res.ok) {
-          const errorData = await res.json();
-          throw new Error(errorData.message || 'Login failed.');
+          throw new Error(data.message || 'Login failed.');
+        }
+        
+        if (data.token) {
+          localStorage.setItem('sriTechToken', data.token);
+          window.dispatchEvent(new Event('auth-change'));
         }
 
         setMessage('Login successful. Redirecting...');
         setMessageType('success');
-        setTimeout(() => navigate('/'), 800);
-        } else {
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 800);
+      } else {
         const res = await fetch(`${API_URL}/auth/signup`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
