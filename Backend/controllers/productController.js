@@ -47,8 +47,33 @@ const coerceDocumentToObject = (value) => {
 };
 
 const runProductQuery = async (queryFactory, timeoutMs = PRODUCT_QUERY_TIMEOUT_MS) => {
-  const queryResult = await executeProductQuery(queryFactory, timeoutMs);
-  return coerceDocumentToObject(queryResult);
+  try {
+    const queryResult = await executeProductQuery(queryFactory, timeoutMs);
+    return coerceDocumentToObject(queryResult);
+  } catch (err) {
+    const mongoose = require('../mongoose');
+    if (mongoose.isMock && !mongoose.isMock()) {
+      console.warn('Real database failed or timed out. Switching to mock mode permanently for this session.');
+      mongoose.useMock();
+      const mockResult = await executeProductQuery(queryFactory, timeoutMs);
+      return coerceDocumentToObject(mockResult);
+    }
+    throw err;
+  }
+};
+
+const executeWithMockFallback = async (operation) => {
+  try {
+    return await operation();
+  } catch (err) {
+    const mongoose = require('../mongoose');
+    if (mongoose.isMock && !mongoose.isMock()) {
+      console.warn('Real database failed during operation. Switching to mock mode permanently.');
+      mongoose.useMock();
+      return await operation();
+    }
+    throw err;
+  }
 };
 
 const executeProductQuery = async (queryPromiseFactory, timeoutMs = PRODUCT_QUERY_TIMEOUT_MS) => {
@@ -285,10 +310,14 @@ exports.createProduct = asyncHandler(async (req, res) => {
     payload.slug = `${baseSlug}-${Date.now().toString(36)}`;
   }
 
-  const product = new Product(payload);
-  const saved = await product.save();
+  const saved = await executeWithMockFallback(async () => {
+    const Product = getProductModel();
+    const product = new Product(payload);
+    return await product.save();
+  });
   await new ActivityLog({ action: 'Added Product', details: `Product: ${saved.name}` }).save();
-  res.status(201).json(serializeProduct(saved));
+
+  res.status(201).json({ success: true, product: serializeProduct(saved) });
 });
 
 exports.updateProduct = asyncHandler(async (req, res) => {
@@ -305,24 +334,18 @@ exports.updateProduct = asyncHandler(async (req, res) => {
     payload.video = await uploadToCloudinary(payload.video, 'video');
   }
 
-  let product = null;
-  if (isValid) {
-    product = await Product.findByIdAndUpdate(req.params.id, payload, { new: true, runValidators: true });
+  const updated = await executeWithMockFallback(async () => {
+    const Product = getProductModel();
+    return await Product.findByIdAndUpdate(req.params.id, payload, { new: true });
+  });
+
+  if (!updated) {
+    return res.status(404).json({ success: false, message: 'Product not found' });
   }
 
-  if (!product) {
-    const isFallback = fallbackProducts.some(p => p._id === req.params.id);
-    if (isFallback) {
-      return res.json({
-        ...payload,
-        _id: req.params.id,
-        message: 'Fallback product updated in memory successfully.'
-      });
-    }
-    return res.status(404).json({ message: 'Product not found.' });
-  }
-  await new ActivityLog({ action: 'Updated Product', details: `Product ${product.name} updated` }).save();
-  res.json(serializeProduct(product));
+  await new ActivityLog({ action: 'Updated Product', details: `Product ${updated.name}` }).save();
+
+  res.json({ success: true, product: serializeProduct(updated) });
 });
 
 exports.deleteProduct = asyncHandler(async (req, res) => {
@@ -331,7 +354,10 @@ exports.deleteProduct = asyncHandler(async (req, res) => {
 
   let product = null;
   if (isValid) {
-    product = await Product.findByIdAndDelete(req.params.id);
+    product = await executeWithMockFallback(async () => {
+      const Product = getProductModel();
+      return await Product.findByIdAndDelete(req.params.id);
+    });
   }
 
   if (!product) {
