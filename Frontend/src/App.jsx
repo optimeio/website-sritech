@@ -4084,7 +4084,7 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
             <img
               src="/sri-tech-logo-final.png"
               alt="SriTech Logo"
-              style={{ width: '170px', height: 'auto', maxHeight: '48px', objectFit: 'contain' }}
+              style={{ width: '240px', height: 'auto', maxHeight: '65px', objectFit: 'contain' }}
             />
           </a>
 
@@ -4214,7 +4214,7 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
               <img
                 src="/sri-tech-logo-final.png"
                 alt="SriTech Logo"
-                style={{ width: '130px', height: 'auto' }}
+                style={{ width: '180px', height: 'auto' }}
               />
             </a>
             <button className="mobile-drawer-close-btn" onClick={() => setShowMobileMenu(false)} aria-label="Close menu">
