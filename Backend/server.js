@@ -7,6 +7,21 @@ const helmet = require('helmet');
 const swaggerUi = require('swagger-ui-express');
 const swaggerJsdoc = require('swagger-jsdoc');
 const dotenv = require('dotenv');
+const fs = require('fs');
+
+// Safety check: Delete oversized db.json to prevent OOM crashes on Render
+try {
+  const dbPath = path.join(__dirname, 'db.json');
+  if (fs.existsSync(dbPath)) {
+    const stats = fs.statSync(dbPath);
+    if (stats.size > 5 * 1024 * 1024) { // 5MB limit
+      console.warn(`⚠️ Warning: db.json is too large (${Math.round(stats.size/1024/1024)}MB). Deleting to prevent OOM crash.`);
+      fs.unlinkSync(dbPath);
+    }
+  }
+} catch (e) {
+  console.error('Error checking db.json size:', e);
+}
 
 dotenv.config({ path: path.resolve(__dirname, '.env') });
 
