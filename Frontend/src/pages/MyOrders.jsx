@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import './MyOrders.css';
 
-const API_URL = import.meta.env.VITE_API_URL || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? '/api' : 'https://website-sritech.onrender.com/api');
+const API_URL = import.meta.env.VITE_API_URL || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? '/api' : 'https://website-sritech-refk.onrender.com/api');
 const BACKEND_URL = API_URL.replace(/\/api\/?$/, '');
 
 const getInvoiceUrl = (order) => {

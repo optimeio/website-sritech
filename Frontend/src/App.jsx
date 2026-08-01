@@ -9,7 +9,7 @@ import MyOrders from './pages/MyOrders.jsx'
 import { useLanguage } from './LanguageContext'
 import LanguageSelectorPopup from './components/LanguageSelectorPopup'
 
-const API_URL = import.meta.env.VITE_API_URL || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? '/api' : 'https://website-sritech.onrender.com/api');
+const API_URL = import.meta.env.VITE_API_URL || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? '/api' : 'https://website-sritech-refk.onrender.com/api');
 
 const DEFAULT_BANNERS = [
   { _id: 'default-1', image: '/hero-image.png', caption: 'Premium Sustainable Engineering Solutions' },
