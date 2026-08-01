@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import './index.css'
 import { createPortal } from 'react-dom'
@@ -195,6 +195,7 @@ function App() {
   const [paymentOrder, setPaymentOrder] = useState(null);
   const [checkoutItems, setCheckoutItems] = useState([]);
   const [checkoutMode, setCheckoutMode] = useState('cart');
+  const [selectedCourierOption, setSelectedCourierOption] = useState(null);
   const [razorpayLoaded, setRazorpayLoaded] = useState(false);
 
   const ORDER_STATUS_OPTIONS = ['All', 'Payment Successful', 'Order Confirmed', 'Processing', 'Packed', 'Shipped', 'In Transit', 'Out For Delivery', 'Delivered', 'Cancelled', 'Return Requested', 'Return Approved', 'Return Rejected', 'Returned', 'Refund Initiated', 'Refund Completed'];
@@ -515,18 +516,16 @@ function App() {
       }
 
       const prodData = await prodRes.json();
-      if (!Array.isArray(prodData) || prodData.length === 0) {
-        const fallbackProducts = FALLBACK_PRODUCTS;
-        setProducts(fallbackProducts);
-        return fallbackProducts;
+      if (!Array.isArray(prodData)) {
+        throw new Error('Invalid product data received');
       }
 
       setProducts(prodData);
       return prodData;
     } catch (err) {
       console.error('Error refreshing products:', err);
-      setProducts(FALLBACK_PRODUCTS);
-      return FALLBACK_PRODUCTS;
+      setProducts(prev => (prev && prev.length > 0) ? prev : FALLBACK_PRODUCTS);
+      return [];
     }
   };
 
@@ -600,8 +599,6 @@ function App() {
         } catch (err) {
           console.error("Error fetching user orders:", err);
         }
-      } else {
-        handleAuthError({ status: 401 });
       }
     }
 
@@ -764,6 +761,12 @@ function App() {
     };
 
     initializeApp();
+
+    const pollInterval = setInterval(() => {
+      refreshProducts();
+    }, 5000);
+
+    return () => clearInterval(pollInterval);
   }, []);
 
   useEffect(() => {
@@ -784,20 +787,32 @@ function App() {
     }
   }, [location.pathname, isUserLoggedIn]);
 
-  // Synchronize URL path /product/:id with selectedProduct state
+  // Helper function to build clean product URL slug
+  const getProductSlug = (p) => {
+    if (!p) return '';
+    if (p.slug) return p.slug;
+    const nameSlug = String(p.name || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    return nameSlug || String(p._id || p.id || '');
+  };
+
+  // Synchronize URL path /product/:slug with selectedProduct state
   useEffect(() => {
     if (!Array.isArray(products) || products.length === 0) return;
 
-    let targetProductId = null;
+    let targetProductKey = null;
     if (location.pathname.startsWith('/product/')) {
-      targetProductId = location.pathname.split('/product/')[1];
+      targetProductKey = decodeURIComponent(location.pathname.split('/product/')[1]);
     } else {
       const params = new URLSearchParams(location.search);
-      targetProductId = params.get('product');
+      targetProductKey = params.get('product');
     }
 
-    if (targetProductId) {
-      const found = products.find(p => String(p._id || p.id) === targetProductId || (p.slug && String(p.slug) === targetProductId));
+    if (targetProductKey) {
+      const found = products.find(p => 
+        String(p._id || p.id) === targetProductKey || 
+        (p.slug && String(p.slug) === targetProductKey) ||
+        getProductSlug(p) === targetProductKey
+      );
       if (found) {
         if (!selectedProduct || (selectedProduct._id || selectedProduct.id) !== found._id) {
           setSelectedProduct(found);
@@ -806,10 +821,11 @@ function App() {
     }
   }, [location.pathname, location.search, products]);
 
-  // Sync selectedProduct state changes back to the URL
+  // Sync selectedProduct state changes back to readable product-name URL
   useEffect(() => {
     if (selectedProduct) {
-      const targetPath = `/product/${selectedProduct._id || selectedProduct.id}`;
+      const productSlug = getProductSlug(selectedProduct);
+      const targetPath = `/product/${productSlug}`;
       if (location.pathname !== targetPath) {
         navigate(targetPath);
       }
@@ -968,24 +984,31 @@ function App() {
 
   const deleteProduct = async (productId) => {
     if (!window.confirm("Are you sure you want to permanently delete this product?")) return;
+    
+    // Optimistic UI update
+    setProducts(prev => prev.filter(p => (p._id || p.id) !== productId));
+    setSelectedProduct(prev => (prev && (prev._id || prev.id) === productId ? null : prev));
+    
     try {
       const res = await fetch(`${API_URL}/products/${productId}`, {
         method: 'DELETE',
         headers: getAdminHeaders()
       });
       if (res.ok) {
-        await refreshProducts();
-        setSelectedProduct(prev => (prev && (prev._id || prev.id) === productId ? null : prev));
         showToast('Product deleted successfully!', 'success');
+        refreshProducts(); // Do not await
         const logRes = await fetch(`${API_URL}/logs`, { headers: getAdminHeaders() });
         if (logRes.ok) setActivityLogs(await logRes.json());
       } else {
-        const error = await res.json();
+        const error = await res.json().catch(() => ({}));
         showToast(error.message || 'Failed to delete product.', 'error');
+        // Revert on failure
+        refreshProducts();
       }
     } catch (err) {
-      console.error("Error deleting product:", err);
-      showToast('Error deleting product. Please try again.', 'error');
+      console.error('Delete product error:', err);
+      showToast('Error deleting product', 'error');
+      refreshProducts();
     }
   };
 
@@ -1978,7 +2001,12 @@ function App() {
       if (normalized.productId === String(productId)) {
         const updatedQuantity = (Number(normalized.quantity) || 1) + delta;
         if (updatedQuantity > 0) {
-          acc.push({ ...item, quantity: updatedQuantity });
+          // Rebuild the entry as a proper object to avoid spreading a plain string
+          if (typeof item === 'string') {
+            acc.push({ productId: item, quantity: updatedQuantity });
+          } else {
+            acc.push({ ...item, quantity: updatedQuantity });
+          }
         }
         return acc;
       }
@@ -2068,7 +2096,7 @@ function App() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          amount: totalForCheckout,
+          amount: checkoutGrandTotal,
           currency: 'INR',
           receipt: `order_${Date.now()}`
         })
@@ -2084,14 +2112,16 @@ function App() {
       const razorpayOrder = await orderRes.json();
       setPaymentOrder(razorpayOrder);
 
-      // Step 2: Get Razorpay key from backend or use hardcoded
-      const keyRes = await fetch(`${API_URL}/payments/get-key`).catch(() => null);
-      const razorpayKey = keyRes ? (await keyRes.json()).key : import.meta.env.VITE_RAZORPAY_KEY_ID;
-
-      if (!razorpayKey) {
-        showToast('Razorpay key not configured. Please contact support.', 'error');
-        setIsProcessingPayment(false);
-        return;
+      // Step 2: Get Razorpay key from backend or fallback to configured live key
+      let razorpayKey = 'rzp_live_TGQsNWOi8CWHds';
+      try {
+        const keyRes = await fetch(`${API_URL}/payments/get-key`);
+        if (keyRes.ok) {
+          const keyData = await keyRes.json();
+          if (keyData?.key) razorpayKey = keyData.key;
+        }
+      } catch (e) {
+        console.warn('Backend key fetch failed, using configured key:', e);
       }
 
       const razorpayReady = await loadRazorpayScript();
@@ -2110,7 +2140,6 @@ function App() {
         description: 'Product Purchase',
         order_id: razorpayOrder.id,
         handler: async (response) => {
-          console.log(response);
           await handleVerifyPayment(response);
         },
         prefill: {
@@ -2194,7 +2223,10 @@ function App() {
         },
         items: orderItems,
         subtotal: totalForCheckout,
-        grandTotal: totalForCheckout,
+        shippingCost: shippingFee,
+        tax: gstAmount,
+        discount: discountAmount,
+        grandTotal: checkoutGrandTotal,
         paymentMethod: 'Razorpay',
         paymentId: paymentResponse.razorpay_payment_id,
         paymentStatus: 'Completed',
@@ -2319,13 +2351,9 @@ function App() {
       return;
     }
 
-    const confirmOrder = window.confirm(`Confirm purchase for ${product.name} at ₹${getProductFinalPrice(product)}?`);
-    if (!confirmOrder) return;
-
     setCheckoutMode('buy-now');
     setCheckoutItems([product]);
     setShowCheckout(true);
-    showToast('Secure checkout is ready. Complete payment to place your order.', 'success');
   };
 
 
@@ -2500,8 +2528,7 @@ function App() {
 
           showToast('Account created. Please sign in.', 'success');
         } else {
-          const errorData = await res.json().catch(() => ({}));
-          const message = errorData?.error || errorData?.message || 'Signup failed';
+          const message = data?.error || data?.message || 'Signup failed';
           showToast(message, 'error');
           if (/account already created|already registered|please sign in/i.test(message)) {
             setAuthMode('login');
@@ -2584,12 +2611,19 @@ function App() {
           return;
         }
 
-        const res = await fetch(`${API_URL}/auth/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: normalizedEmail, password: currentValues.password })
-        });
-        if (res.ok) {
+        let res;
+        try {
+          res = await fetch(`${API_URL}/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: normalizedEmail, password: currentValues.password })
+          });
+        } catch (fetchErr) {
+          // Silent catch to prevent browser net noise
+          console.warn('Network issue during login:', fetchErr);
+        }
+
+        if (res && res.ok) {
           const data = await res.json();
           const user = data.user || data;
           const token = data.token;
@@ -2603,7 +2637,7 @@ function App() {
             setTimeout(() => openUserDashboard('Overview'), 0);
           }
         } else {
-          const error = await res.json().catch(() => ({}));
+          const error = res ? await res.json().catch(() => ({})) : {};
           const msg = error?.message || 'Invalid email or password';
           setAuthErrorMessage(msg);
           const lowerMsg = msg.toLowerCase();
@@ -2681,56 +2715,8 @@ function App() {
     }, 0);
   };
 
-  if (isAdmin && !isViewingPublicProducts) {
-    return (
-      <AdminDashboard 
-        onLogout={() => {
-          clearAdminSession();
-          setIsAdmin(false);
-          setIsViewingPublicProducts(false);
-          setShowAdminLogin(false);
-          navigate('/');
-        }} 
-        products={products} 
-        onAddProduct={addProduct} 
-        onDeleteProduct={deleteProduct}
-        onUpdateProduct={updateProduct}
-
-        offers={offers}
-        offerData={offerData}
-        onUpdateOffer={updateOffer}
-        onDeleteOffer={deleteOffer}
-        onToggleOffer={toggleOffer}
-        onDuplicateOffer={duplicateOffer}
-        categories={categories}
-        onAddCategory={addCategory}
-        onAddCoupon={addCoupon}
-        onDeleteCoupon={deleteCoupon}
-        onUpdateCoupon={updateCoupon}
-        onUpdateCategory={updateCategory}
-        onDeleteCategory={deleteCategory}
-        orders={orders}
-        coupons={coupons}
-        supportQueries={supportQueries}
-        returnRequests={returnRequests}
-        refundRequests={refundRequests}
-        activityLogs={activityLogs}
-        leads={leads}
-        users={users}
-        onToggleBlockUser={handleToggleBlockUser}
-        onDeleteUser={handleDeleteUser}
-        onRefresh={handleRefresh}
-        isRefreshing={isRefreshing}
-        onUpdateOrder={updateOrder}
-        onViewPublicProducts={handleViewPublicProducts}
-        heroBanners={heroBanners}
-        onAddHeroBanner={addHeroBanner}
-        onDeleteHeroBanner={deleteHeroBanner}
-        onRespondToSupport={respondToSupport}
-      />
-
-    );
-  }
+  // Admin dashboard rendering moved to the main return block to avoid
+  // conditional hook execution (useMemo below must always run).
 
 
   const parsePrice = (priceStr) => {
@@ -2811,10 +2797,37 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
   const cartTotal = resolvedCartItems.reduce((sum, item) => sum + (getProductFinalPrice(item) * (Number(item.quantity) || 1)), 0);
   const checkoutItemsForDisplay = checkoutItems.length > 0 ? checkoutItems : resolvedCartItems;
   const checkoutTotal = checkoutItemsForDisplay.reduce((sum, item) => sum + (getProductFinalPrice(item) * (Number(item.quantity) || 1)), 0);
-  const discountPercent = 20;
-  const discountAmount = Math.round(checkoutTotal * discountPercent / 100);
-  const shippingFee = 500;
-  const gstAmount = Math.round((checkoutTotal - discountAmount + shippingFee) * 0.18);
+  const discountPercent = checkoutItemsForDisplay.reduce((maxDisc, item) => Math.max(maxDisc, Number(item.discountPercent) || 0), 0);
+  const discountAmount = discountPercent > 0 ? Math.round(checkoutTotal * discountPercent / 100) : 0;
+
+  const availableCourierOptions = useMemo(() => {
+    const optsMap = new Map();
+    checkoutItemsForDisplay.forEach(item => {
+      const opts = Array.isArray(item.courierOptions) && item.courierOptions.length > 0
+        ? item.courierOptions
+        : [
+            { name: 'rathimeena parcel service', price: 100 },
+            { name: 'ST Couriers', price: 150 }
+          ];
+      opts.forEach(o => {
+        if (o && o.name) {
+          optsMap.set(o.name, Number(o.price) || 0);
+        }
+      });
+    });
+    if (optsMap.size === 0) {
+      optsMap.set('rathimeena parcel service', 100);
+      optsMap.set('ST Couriers', 150);
+    }
+    return Array.from(optsMap.entries()).map(([name, price]) => ({ name, price }));
+  }, [checkoutItemsForDisplay]);
+
+  const activeCourier = selectedCourierOption || availableCourierOptions[0] || { name: 'rathimeena parcel service', price: 100 };
+  const shippingFee = Number(activeCourier.price) || 0;
+  
+  // Dynamic GST calculation based on admin configuration per product (0% if none specified)
+  const gstRate = checkoutItemsForDisplay.reduce((maxGst, item) => Math.max(maxGst, Number(item.gstPercent) || 0), 0);
+  const gstAmount = gstRate > 0 ? Math.round((checkoutTotal - discountAmount + shippingFee) * (gstRate / 100)) : 0;
   const checkoutGrandTotal = Math.max(0, checkoutTotal - discountAmount + shippingFee + gstAmount);
 
   const displayedProducts = Array.isArray(products) && products.length > 0 ? products : FALLBACK_PRODUCTS;
@@ -2875,6 +2888,53 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
   };
 
   return (
+    (isAdmin && !isViewingPublicProducts) ? (
+      <AdminDashboard 
+        onLogout={() => {
+          clearAdminSession();
+          setIsAdmin(false);
+          setIsViewingPublicProducts(false);
+          setShowAdminLogin(false);
+          navigate('/');
+        }} 
+        products={products} 
+        onAddProduct={addProduct} 
+        onDeleteProduct={deleteProduct}
+        onUpdateProduct={updateProduct}
+
+        offers={offers}
+        offerData={offerData}
+        onUpdateOffer={updateOffer}
+        onDeleteOffer={deleteOffer}
+        onToggleOffer={toggleOffer}
+        onDuplicateOffer={duplicateOffer}
+        categories={categories}
+        onAddCategory={addCategory}
+        onAddCoupon={addCoupon}
+        onDeleteCoupon={deleteCoupon}
+        onUpdateCoupon={updateCoupon}
+        onUpdateCategory={updateCategory}
+        onDeleteCategory={deleteCategory}
+        orders={orders}
+        coupons={coupons}
+        supportQueries={supportQueries}
+        returnRequests={returnRequests}
+        refundRequests={refundRequests}
+        activityLogs={activityLogs}
+        leads={leads}
+        users={users}
+        onToggleBlockUser={handleToggleBlockUser}
+        onDeleteUser={handleDeleteUser}
+        onRefresh={handleRefresh}
+        isRefreshing={isRefreshing}
+        onUpdateOrder={updateOrder}
+        onViewPublicProducts={handleViewPublicProducts}
+        heroBanners={heroBanners}
+        onAddHeroBanner={addHeroBanner}
+        onDeleteHeroBanner={deleteHeroBanner}
+        onRespondToSupport={respondToSupport}
+      />
+    ) : (
     <div className="app-wrapper">
       <LanguageSelectorPopup />
       {/* Toast Notification */}
@@ -3296,27 +3356,73 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
                      )}
                      <div className="checkout-summary-order-item-text">
                        <span className="checkout-summary-order-item-name">{item.name}</span>
-                       <span className="checkout-summary-order-item-details">{Number(item.quantity) || 1} qty • {discountPercent}% discount</span>
+                        <span className="checkout-summary-order-item-details">{Number(item.quantity) || 1} qty • {discountPercent}% discount</span>
                      </div>
                    </div>
                  ))}
                </div>
-               <div className="checkout-summary-row">
-                 <span>Subtotal</span>
+                <div className="checkout-shipping-method-section" style={{ background: '#ffffff', padding: '0.85rem 1rem', borderRadius: '12px', border: '1px solid #e2e8f0', marginBottom: '0.75rem' }}>
+                  <span style={{ fontSize: '0.85rem', fontWeight: '700', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.6rem' }}>
+                    <i className="fa-solid fa-truck-fast" style={{ color: '#ff7a00' }} />
+                    Select Shipping Method
+                  </span>
+                  <div style={{ display: 'grid', gap: '0.5rem' }}>
+                    {availableCourierOptions.map((courier, idx) => {
+                      const isSelected = activeCourier.name === courier.name;
+                      return (
+                        <label
+                          key={idx}
+                          onClick={() => setSelectedCourierOption(courier)}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '0.6rem 0.85rem',
+                            borderRadius: '8px',
+                            border: isSelected ? '2px solid #ff7a00' : '1px solid #cbd5e1',
+                            background: isSelected ? '#fff7ed' : '#ffffff',
+                            cursor: 'pointer',
+                            fontSize: '0.9rem',
+                            fontWeight: isSelected ? '600' : '400',
+                            color: '#0f172a'
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                            <input
+                              type="radio"
+                              name="courierOption"
+                              checked={isSelected}
+                              onChange={() => setSelectedCourierOption(courier)}
+                              style={{ accentColor: '#ff7a00', cursor: 'pointer' }}
+                            />
+                            <span>{courier.name}</span>
+                          </div>
+                          <strong>₹{courier.price}</strong>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div className="checkout-summary-row">
+                  <span>Subtotal</span>
                  <strong>₹{checkoutTotal.toLocaleString('en-IN')}</strong>
                </div>
-               <div className="checkout-summary-row">
-                 <span>Discount ({discountPercent}%)</span>
-                 <strong>-₹{discountAmount.toLocaleString('en-IN')}</strong>
-               </div>
+               {discountAmount > 0 && (
+                 <div className="checkout-summary-row">
+                   <span>Discount ({discountPercent}%)</span>
+                   <strong>-₹{discountAmount.toLocaleString('en-IN')}</strong>
+                 </div>
+               )}
                <div className="checkout-summary-row">
                  <span>Shipping</span>
-                 <strong>₹{shippingFee.toLocaleString('en-IN')}</strong>
+                 <strong>{shippingFee === 0 ? 'FREE' : `₹${shippingFee.toLocaleString('en-IN')}`}</strong>
                </div>
-               <div className="checkout-summary-row">
-                 <span>GST (18%)</span>
-                 <strong>₹{gstAmount.toLocaleString('en-IN')}</strong>
-               </div>
+               {gstAmount > 0 && (
+                 <div className="checkout-summary-row">
+                   <span>GST ({gstRate}%)</span>
+                   <strong>₹{gstAmount.toLocaleString('en-IN')}</strong>
+                 </div>
+               )}
                <div className="checkout-summary-divider" />
                <div className="checkout-summary-row total-row">
                  <span>Total</span>
@@ -3468,6 +3574,11 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
             onLogout={handleLogout}
             getProductFinalPrice={getProductFinalPrice}
             totalCartAmount={cartTotal}
+            onViewProduct={(product) => {
+              setSelectedProduct(product);
+              setSelectedProductImageIndex(0);
+              setCustomerDashboardOpen(false);
+            }}
           />
         )}
 
@@ -3958,36 +4069,39 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
       {/* Header */}
       <header className="top-header">
         <div className="header-container">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <button 
-              className="mobile-menu-btn" 
-              onClick={() => setShowMobileMenu(!showMobileMenu)}
-              aria-label="Toggle Navigation Menu"
-              title="Menu"
-            >
-              <i className={showMobileMenu ? "fa-solid fa-xmark" : "fa-solid fa-bars"} aria-hidden="true"></i>
-            </button>
-            <a href="#" className="logo" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
-              <img
-                src="/sri-tech-logo-final.png"
-                alt="SriTech Logo"
-                style={{
-                  height: '75px',
-                  width: 'auto',
-                  objectFit: 'contain',
-                  background: 'transparent',
-                  filter: 'hue-rotate(12deg) saturate(1.08) drop-shadow(0 2px 4px rgba(0,0,0,0.12))'
-                }}
-              />
-            </a>
-          </div>
+          {/* Mobile Menu Button */}
+          <button 
+            className="mobile-menu-btn" 
+            onClick={() => setShowMobileMenu(!showMobileMenu)}
+            aria-label="Toggle Navigation Menu"
+            title="Menu"
+          >
+            <i className={showMobileMenu ? "fa-solid fa-xmark" : "fa-solid fa-bars"} aria-hidden="true"></i>
+          </button>
 
+          {/* Left Logo */}
+          <a href="#" className="logo" onClick={(e) => { e.preventDefault(); scrollToSection(e, 'home'); }} style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
+            <img
+              src="/sri-tech-logo-final.png"
+              alt="SriTech Logo"
+              style={{ width: '170px', height: 'auto', maxHeight: '48px', objectFit: 'contain' }}
+            />
+          </a>
+
+          {/* Desktop Navigation Links */}
           <nav className="header-nav">
             <a href="#home" className="action-btn" onClick={(e) => { scrollToSection(e, 'home'); }}>
               {t('nav.home')}
             </a>
             <a href="#product" className="action-btn" onClick={(e) => { scrollToSection(e, 'product'); }}>
               {t('nav.products')}
+            </a>
+            <a href="#category" className="action-btn" onClick={(e) => { 
+              e.preventDefault();
+              const catElem = document.getElementById('categories') || document.getElementById('category');
+              if (catElem) catElem.scrollIntoView({ behavior: 'smooth' });
+            }}>
+              Categories
             </a>
             <a href="#about" className="action-btn" onClick={(e) => { scrollToSection(e, 'about'); }}>
               {t('nav.about')}
@@ -4001,138 +4115,237 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
                 value={language} 
                 onChange={(e) => setLanguage(e.target.value)}
                 title="Change Language"
+                style={{ paddingRight: '1.25rem' }}
               >
-                <option value="ta">தமிழ்</option>
                 <option value="en">English</option>
+                <option value="ta">தமிழ்</option>
                 <option value="hi">हिंदी</option>
               </select>
             </div>
           </nav>
 
-          <div className="header-actions">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <button
-                className="action-btn header-search-btn"
-                title="Search products"
-                aria-label="Search products"
-                onClick={handleNavbarSearchToggle}
-              >
-                <i className="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
-              </button>
-              <button className="action-btn cart-btn" title={t('nav.cart')} aria-label={`View shopping cart with ${resolvedCartItems.length} items`} onClick={() => setShowCart(true)}>
-                <i className="fa-solid fa-cart-shopping" aria-hidden="true"></i>
-                <span className="btn-text" style={{ fontSize: '0.9rem', fontWeight: 600 }}>{t('nav.cart')}</span>
-                {resolvedCartItems.length > 0 && <span className="cart-count">{resolvedCartItems.length}</span>}
-              </button>
-              <button className="action-btn" title={t('nav.wishlist')} aria-label={t('nav.wishlist')} onClick={() => setShowWishlist(true)}>
-                <i className={resolvedWaitlistItems.length > 0 ? "fa-solid fa-heart" : "fa-regular fa-heart"} aria-hidden="true" style={resolvedWaitlistItems.length > 0 ? { color: 'var(--accent-yellow)' } : {}}></i>
-                <span className="btn-text" style={{ fontSize: '0.9rem', fontWeight: 600, marginLeft: '0.35rem' }}>{t('nav.wishlist')}</span>
-              </button>
-              <button
-                className="action-btn header-login-btn"
-                title={t('nav.login')}
-                aria-label={t('nav.login')}
-                onClick={() => {
-                  setAuthMode('login');
-                  setAuthErrorMessage(null);
-                  setShowAuthModal(true);
-                  setUserCredentials({ name: '', phone: '', address: '', email: '', password: '', confirmPassword: '' });
-                }}
-              >
-                <i className="fa-solid fa-user" aria-hidden="true"></i>
-                <span className="btn-text" style={{ fontSize: '0.9rem', fontWeight: 600, marginLeft: '0.35rem' }}>Login</span>
-              </button>
-            </div>
-
-            {showNavbarSearch && (
-              <div className="navbar-search-container" style={{ position: 'relative', marginLeft: '0.4rem' }}>
-                <input
-                  type="text"
-                  ref={navbarSearchInputRef}
-                  value={searchTerm}
-                  onChange={(e) => handleNavbarSearchChange(e.target.value)}
-                  placeholder={t('nav.searchProducts')}
-                  style={{
-                    border: '1px solid rgba(255,255,255,0.2)',
-                    borderRadius: '999px',
-                    padding: '0.45rem 0.8rem',
-                    minWidth: '220px',
-                    color: '#0f172a',
-                    background: '#fff'
-                  }}
-                  autoFocus
-                />
-                {searchTerm.trim() && (
-                  <div style={{
-                    position: 'absolute',
-                    top: 'calc(100% + 0.35rem)',
-                    left: 0,
-                    right: 0,
-                    background: '#fff',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '12px',
-                    boxShadow: '0 8px 25px rgba(0, 0, 0, 0.12)',
-                    zIndex: 60,
-                    maxHeight: '280px',
-                    overflowY: 'auto'
-                  }}>
-                    {matchedSuggestions.length > 0 ? (
-                      matchedSuggestions.slice(0, 6).map(product => (
-                        <button
-                          key={product._id || product.id}
-                          type="button"
-                          onClick={() => {
-                            setSelectedProduct(product);
-                            setSelectedProductImageIndex(0);
-                            setShowNavbarSearch(false);
-                            setSearchTerm('');
-                          }}
-                          style={{
-                            width: '100%',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'flex-start',
-                            gap: '0.2rem',
-                            padding: '0.7rem 0.8rem',
-                            border: 'none',
-                            background: 'transparent',
-                            textAlign: 'left',
-                            cursor: 'pointer',
-                            color: '#0f172a'
-                          }}
-                        >
-                          <span style={{ fontWeight: 600 }}>{product.name}</span>
-                          <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
-                            {getCategoryDisplayName(product.category)}
-                          </span>
-                        </button>
-                      ))
-                    ) : (
-                      <div style={{ padding: '0.7rem 0.8rem', color: '#64748b' }}>
-                        No matching products found.
-                      </div>
-                    )}
-                  </div>
+          {/* Centered Search Bar */}
+          <div className="header-search-bar-wrap">
+            <i className="fa-solid fa-magnifying-glass search-icon" aria-hidden="true"></i>
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => handleNavbarSearchChange(e.target.value)}
+              placeholder="Search products..."
+              className="navbar-search-input-field"
+            />
+            {searchTerm.trim() && (
+              <div className="search-suggestions-dropdown">
+                {matchedSuggestions.length > 0 ? (
+                  matchedSuggestions.slice(0, 6).map(product => (
+                    <button
+                      key={product._id || product.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedProduct(product);
+                        setSelectedProductImageIndex(0);
+                        setSearchTerm('');
+                      }}
+                    >
+                      <span className="name">{product.name}</span>
+                      <span className="cat">{getCategoryDisplayName(product.category)}</span>
+                    </button>
+                  ))
+                ) : (
+                  <div className="no-results">No products found.</div>
                 )}
               </div>
             )}
           </div>
+
+          {/* Right Actions */}
+          <div className="header-actions">
+            {/* Wishlist Button */}
+            <button className="action-btn wishlist-btn-premium" title={t('nav.wishlist')} aria-label={t('nav.wishlist')} onClick={() => {
+              if (isUserLoggedIn) {
+                openUserDashboard('wishlist');
+              } else {
+                setShowWishlist(true);
+              }
+            }}>
+              <i className={resolvedWaitlistItems.length > 0 ? "fa-solid fa-heart" : "fa-regular fa-heart"} aria-hidden="true" style={resolvedWaitlistItems.length > 0 ? { color: 'var(--accent-yellow)' } : {}}></i>
+            </button>
+
+            {/* Cart Button */}
+            <button className="action-btn cart-btn-premium" title={t('nav.cart')} aria-label={`View shopping cart with ${resolvedCartItems.length} items`} onClick={() => {
+              if (isUserLoggedIn) {
+                openUserDashboard('cart');
+              } else {
+                setShowCart(true);
+              }
+            }}>
+              <i className="fa-solid fa-cart-shopping" aria-hidden="true"></i>
+              {resolvedCartItems.length > 0 && <span className="cart-badge-count">{resolvedCartItems.length}</span>}
+            </button>
+
+            {/* Login / Account Button */}
+            <button
+              className="action-btn login-btn-premium"
+              title={isUserLoggedIn ? t('nav.account', 'Account') : t('nav.login')}
+              aria-label={isUserLoggedIn ? t('nav.account', 'Account') : t('nav.login')}
+              onClick={() => {
+                if (isUserLoggedIn) {
+                  handleOpenOrderDashboard({ forceOpen: true });
+                } else {
+                  setAuthMode('login');
+                  setAuthErrorMessage(null);
+                  setShowAuthModal(true);
+                  setUserCredentials({ name: '', phone: '', address: '', email: '', password: '', confirmPassword: '' });
+                }
+              }}
+            >
+              <i className="fa-solid fa-user" aria-hidden="true"></i>
+              <span className="btn-text">
+                {isUserLoggedIn ? (activeUser?.name?.split(' ')[0] || 'Account') : 'Login'}
+              </span>
+            </button>
+          </div>
         </div>
 
-        {/* Mobile Navigation Dropdown Menu Panel */}
+        {/* Mobile Navigation Dropdown Menu Drawer */}
         <div className={`mobile-nav-panel ${showMobileMenu ? 'active' : ''}`}>
-          <a href="#home" className="action-btn" onClick={(e) => { scrollToSection(e, 'home'); setShowMobileMenu(false); }}>
-            Home
-          </a>
-          <a href="#product" className="action-btn" onClick={(e) => { scrollToSection(e, 'product'); setShowMobileMenu(false); }}>
-            Products
-          </a>
-          <a href="#about" className="action-btn" onClick={(e) => { scrollToSection(e, 'about'); setShowMobileMenu(false); }}>
-            About
-          </a>
-          <a href="#footer" className="action-btn" onClick={(e) => { scrollToSection(e, 'footer'); setShowMobileMenu(false); }}>
-            Contact
-          </a>
+          <div className="mobile-nav-header">
+            <a href="#" className="logo" onClick={(e) => { e.preventDefault(); scrollToSection(e, 'home'); setShowMobileMenu(false); }}>
+              <img
+                src="/sri-tech-logo-final.png"
+                alt="SriTech Logo"
+                style={{ width: '130px', height: 'auto' }}
+              />
+            </a>
+            <button className="mobile-drawer-close-btn" onClick={() => setShowMobileMenu(false)} aria-label="Close menu">
+              <i className="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+
+          <div className="mobile-nav-body">
+            <div className="mobile-nav-links-list">
+              <a href="#home" className="mobile-nav-link-item active" onClick={(e) => { scrollToSection(e, 'home'); setShowMobileMenu(false); }}>
+                <i className="fa-solid fa-house"></i>
+                <span>Home</span>
+              </a>
+              <a href="#product" className="mobile-nav-link-item" onClick={(e) => { scrollToSection(e, 'product'); setShowMobileMenu(false); }}>
+                <i className="fa-solid fa-cubes"></i>
+                <span>Products</span>
+                <i className="fa-solid fa-chevron-right arrow-icon"></i>
+              </a>
+              <a href="#category" className="mobile-nav-link-item" onClick={(e) => { 
+                e.preventDefault();
+                setShowMobileMenu(false);
+                const catElem = document.getElementById('categories') || document.getElementById('category');
+                if (catElem) catElem.scrollIntoView({ behavior: 'smooth' });
+              }}>
+                <i className="fa-solid fa-layer-group"></i>
+                <span>Categories</span>
+                <i className="fa-solid fa-chevron-right arrow-icon"></i>
+              </a>
+              <a href="#about" className="mobile-nav-link-item" onClick={(e) => { scrollToSection(e, 'about'); setShowMobileMenu(false); }}>
+                <i className="fa-solid fa-address-card"></i>
+                <span>About Us</span>
+              </a>
+              <a href="#footer" className="mobile-nav-link-item" onClick={(e) => { scrollToSection(e, 'footer'); setShowMobileMenu(false); }}>
+                <i className="fa-solid fa-pen-to-square"></i>
+                <span>Contact Us</span>
+              </a>
+            </div>
+
+            <div className="mobile-nav-divider"></div>
+
+            <div className="mobile-nav-secondary-actions">
+              <button className="mobile-action-item" onClick={() => { setShowMobileMenu(false); if (isUserLoggedIn) openUserDashboard('wishlist'); else setShowWishlist(true); }}>
+                <i className="fa-regular fa-heart"></i>
+                <span>Wishlist</span>
+              </button>
+              <button className="mobile-action-item" onClick={() => { setShowMobileMenu(false); if (isUserLoggedIn) openUserDashboard('cart'); else setShowCart(true); }}>
+                <i className="fa-solid fa-cart-shopping"></i>
+                <span>Cart</span>
+                {resolvedCartItems.length > 0 && <span className="mobile-cart-badge">{resolvedCartItems.length}</span>}
+              </button>
+              <button className="mobile-action-item" onClick={() => {
+                setShowMobileMenu(false);
+                if (isUserLoggedIn) {
+                  handleOpenOrderDashboard({ forceOpen: true });
+                } else {
+                  setAuthMode('login');
+                  setAuthErrorMessage(null);
+                  setShowAuthModal(true);
+                  setUserCredentials({ name: '', phone: '', address: '', email: '', password: '', confirmPassword: '' });
+                }
+              }}>
+                <i className="fa-solid fa-user"></i>
+                <span>{isUserLoggedIn ? (activeUser?.name || 'Account') : 'Login / Register'}</span>
+              </button>
+            </div>
+
+            <div className="mobile-nav-divider"></div>
+
+            <div className="mobile-action-item" style={{ cursor: 'default', flexDirection: 'column', alignItems: 'stretch', gap: '0.65rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+                <i className="fa-solid fa-language" style={{ color: '#15803D' }}></i>
+                <span>Language</span>
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.2rem' }}>
+                <button 
+                  type="button"
+                  onClick={() => { setLanguage('en'); setShowMobileMenu(false); }}
+                  style={{
+                    flex: 1,
+                    padding: '0.5rem',
+                    borderRadius: '8px',
+                    border: '1.5px solid',
+                    borderColor: language === 'en' ? '#15803D' : '#E5E7EB',
+                    background: language === 'en' ? 'rgba(21, 128, 61, 0.05)' : '#FFFFFF',
+                    color: language === 'en' ? '#15803D' : '#1F2937',
+                    fontWeight: 700,
+                    fontSize: '0.85rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  English
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => { setLanguage('ta'); setShowMobileMenu(false); }}
+                  style={{
+                    flex: 1,
+                    padding: '0.5rem',
+                    borderRadius: '8px',
+                    border: '1.5px solid',
+                    borderColor: language === 'ta' ? '#15803D' : '#E5E7EB',
+                    background: language === 'ta' ? 'rgba(21, 128, 61, 0.05)' : '#FFFFFF',
+                    color: language === 'ta' ? '#15803D' : '#1F2937',
+                    fontWeight: 700,
+                    fontSize: '0.85rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  தமிழ்
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => { setLanguage('hi'); setShowMobileMenu(false); }}
+                  style={{
+                    flex: 1,
+                    padding: '0.5rem',
+                    borderRadius: '8px',
+                    border: '1.5px solid',
+                    borderColor: language === 'hi' ? '#15803D' : '#E5E7EB',
+                    background: language === 'hi' ? 'rgba(21, 128, 61, 0.05)' : '#FFFFFF',
+                    color: language === 'hi' ? '#15803D' : '#1F2937',
+                    fontWeight: 700,
+                    fontSize: '0.85rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  हिंदी
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </header>
 
@@ -4832,6 +5045,7 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
         handleComplaintSubmit={handleComplaintSubmit}
       />
     </div>
+    )
   );
 }
 

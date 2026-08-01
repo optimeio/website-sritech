@@ -12,11 +12,11 @@ const isValidObjectId = (id) => {
 
 const getProductModel = () => require('../models/Product');
 
-const PRODUCT_QUERY_TIMEOUT_MS = Number(process.env.PRODUCT_QUERY_TIMEOUT_MS || 8000);
+const PRODUCT_QUERY_TIMEOUT_MS = parseInt(process.env.PRODUCT_QUERY_TIMEOUT_MS, 10) || 15000;
 const PRODUCT_IMAGE_LIMIT = Number(process.env.PRODUCT_IMAGE_LIMIT || 2);
 const MAX_DESCRIPTION_LENGTH = Number(process.env.PRODUCT_DESCRIPTION_MAX_LENGTH || 400);
 const MAX_SPECIFICATIONS_LENGTH = Number(process.env.PRODUCT_SPECIFICATIONS_MAX_LENGTH || 600);
-const PRODUCT_SELECT_FIELDS = 'name price category description specifications howToUse stock icon isNewArrival images video createdAt sku slug';
+const PRODUCT_SELECT_FIELDS = 'name price category description specifications howToUse stock shippingCharge icon isNewArrival images video createdAt sku slug';
 
 const uploadToCloudinary = async (base64Str, resourceType = 'auto') => {
   if (!process.env.CLOUDINARY_CLOUD_NAME || typeof base64Str !== 'string' || !base64Str.startsWith('data:')) {
@@ -98,6 +98,13 @@ const serializeProduct = (product) => {
   const description = truncateText(plainProduct.description, MAX_DESCRIPTION_LENGTH);
   const specifications = truncateText(plainProduct.specifications, MAX_SPECIFICATIONS_LENGTH);
 
+  const courierOptions = Array.isArray(plainProduct.courierOptions) && plainProduct.courierOptions.length > 0
+    ? plainProduct.courierOptions.map(c => ({ name: String(c.name || ''), price: Number(c.price || 0) }))
+    : [
+        { name: 'rathimeena parcel service', price: 100 },
+        { name: 'ST Couriers', price: 150 }
+      ];
+
   const sanitized = {
     ...plainProduct,
     _id: plainProduct._id,
@@ -108,6 +115,10 @@ const serializeProduct = (product) => {
     specifications,
     howToUse: plainProduct.howToUse || '',
     stock: typeof plainProduct.stock === 'number' ? plainProduct.stock : Number(plainProduct.stock) || 0,
+    shippingCharge: typeof plainProduct.shippingCharge === 'number' ? plainProduct.shippingCharge : Number(plainProduct.shippingCharge) || 0,
+    gstPercent: typeof plainProduct.gstPercent === 'number' ? plainProduct.gstPercent : Number(plainProduct.gstPercent) || 0,
+    discountPercent: typeof plainProduct.discountPercent === 'number' ? plainProduct.discountPercent : Number(plainProduct.discountPercent) || 0,
+    courierOptions,
     icon: plainProduct.icon || 'fa-box',
     isNewArrival: Boolean(plainProduct.isNewArrival),
     images,
@@ -207,14 +218,14 @@ const getProductsFromStore = async () => {
       PRODUCT_QUERY_TIMEOUT_MS
     );
 
-    if (Array.isArray(products) && products.length > 0) {
+    if (Array.isArray(products)) {
       return products.map((product) => serializeProduct(product));
     }
+    return [];
   } catch (err) {
-    console.warn('Product store unavailable, using fallback catalog:', err.message);
+    console.error('Product query failed:', err.message);
+    throw err;
   }
-
-  return fallbackProducts.filter(p => !deletedFallbackIds.has(p._id));
 };
 
 exports.getProducts = asyncHandler(async (req, res) => {
@@ -226,21 +237,30 @@ exports.getProductById = asyncHandler(async (req, res) => {
   const Product = getProductModel();
   let product = null;
   const isConnected = mongoose.connection?.readyState === 1 || mongoose.isMock?.();
-  const isValid = isValidObjectId(req.params.id);
+  const target = req.params.id;
+  const isValid = isValidObjectId(target);
 
-  if (isConnected && (!mongoose.connection?.readyState === 1 || isValid)) {
+  if (isConnected) {
     try {
-      product = await runProductQuery(
-        () => Product.findById(req.params.id).select(PRODUCT_SELECT_FIELDS),
-        PRODUCT_QUERY_TIMEOUT_MS
-      );
+      if (isValid) {
+        product = await runProductQuery(
+          () => Product.findById(target).select(PRODUCT_SELECT_FIELDS),
+          PRODUCT_QUERY_TIMEOUT_MS
+        );
+      }
+      if (!product) {
+        product = await runProductQuery(
+          () => Product.findOne({ $or: [{ slug: target }, { _id: target }] }).select(PRODUCT_SELECT_FIELDS),
+          PRODUCT_QUERY_TIMEOUT_MS
+        );
+      }
     } catch (err) {
       console.warn('Product lookup failed, using fallback product data:', err.message);
     }
   }
 
   if (!product) {
-    product = fallbackProducts.find(item => item._id === req.params.id);
+    product = fallbackProducts.find(item => item._id === target || item.slug === target || (item.name && item.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') === target));
   }
 
   if (!product) return res.status(404).json({ message: 'Product not found.' });
@@ -258,6 +278,11 @@ exports.createProduct = asyncHandler(async (req, res) => {
   }
   if (payload.video) {
     payload.video = await uploadToCloudinary(payload.video, 'video');
+  }
+
+  if (!payload.slug && payload.name) {
+    const baseSlug = String(payload.name).toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    payload.slug = `${baseSlug}-${Date.now().toString(36)}`;
   }
 
   const product = new Product(payload);

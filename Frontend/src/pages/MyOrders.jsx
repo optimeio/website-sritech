@@ -1,303 +1,292 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import Pagination from '../components/Pagination';
 import './MyOrders.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const BACKEND_URL = API_URL.replace(/\/api\/?$/, '');
+
+const getInvoiceUrl = (order) => {
+  if (!order) return '';
+  const orderId = order.orderId || order._id || order.id || order.invoiceNumber;
+  if (orderId) return `${API_URL}/orders/${encodeURIComponent(orderId)}/invoice`;
+  const path = order.invoicePdfPath || order.invoiceUrl || order.invoiceLink || '';
+  if (!path) return '';
+  if (path.startsWith('http')) return path;
+  return `${BACKEND_URL}${path.startsWith('/') ? '' : '/'}${path}`;
+};
+
 const statusFilters = ['All Orders', 'Delivered', 'Shipped', 'Processing', 'Cancelled', 'Returned'];
-const dateFilters = ['All Time', 'Last 30 Days', 'Last 6 Months'];
-const sortOptions = ['Newest First', 'Oldest First'];
+const dateFilters   = ['All Time', 'Last 30 Days', 'Last 6 Months'];
+const sortOptions   = ['Newest First', 'Oldest First'];
 const trackingSteps = ['Order Confirmed', 'Packed', 'Shipped', 'Out For Delivery', 'Delivered'];
 
 const normalizeOrderStatus = (status) => {
-  const normalized = String(status || '').trim().toLowerCase();
-  if (['delivered', 'complete', 'completed'].includes(normalized)) return 'Delivered';
-  if (['out for delivery', 'out-for-delivery', 'delivery in progress', 'on the way'].includes(normalized)) return 'Out for Delivery';
-  if (['shipped', 'dispatch', 'dispatched', 'in transit'].includes(normalized)) return 'Shipped';
-  if (['cancelled', 'canceled', 'returned', 'refunded', 'return requested'].includes(normalized)) return 'Cancelled';
+  const n = String(status || '').trim().toLowerCase();
+  if (['delivered', 'complete', 'completed'].includes(n))                           return 'Delivered';
+  if (['out for delivery', 'out-for-delivery', 'on the way'].includes(n))           return 'Out for Delivery';
+  if (['shipped', 'dispatch', 'dispatched', 'in transit'].includes(n))              return 'Shipped';
+  if (['cancelled', 'canceled', 'returned', 'refunded', 'return requested'].includes(n)) return 'Cancelled';
   return 'Processing';
 };
 
-const getStatusBadgeVariant = (status) => {
-  const normalized = normalizeOrderStatus(status);
-  if (normalized === 'Delivered') return 'delivered';
-  if (normalized === 'Shipped') return 'shipped';
-  if (normalized === 'Processing') return 'processing';
-  return 'cancelled';
+const getBadgeClass = (status) => {
+  const n = normalizeOrderStatus(status);
+  if (n === 'Delivered')       return 'delivered';
+  if (n === 'Shipped')         return 'shipped';
+  if (n === 'Out for Delivery') return 'shipped';
+  if (n === 'Cancelled')       return 'cancelled';
+  if (n === 'Returned')        return 'returned';
+  return 'processing';
 };
 
-const formatCurrency = (value) => {
-  const number = Number(value || 0);
-  if (Number.isNaN(number)) return '₹0';
-  return `₹${number.toLocaleString('en-IN')}`;
-};
+const fmt = (v) => `₹${Number(v || 0).toLocaleString('en-IN')}`;
 
-const formatOrderDate = (value) => {
-  if (!value) return 'Date unavailable';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return String(value);
-  return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+const fmtDate = (v) => {
+  if (!v) return '—';
+  const d = new Date(v);
+  return isNaN(d) ? String(v) : d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 };
 
 const getDeliveryLabel = (order) => {
-  const dateValue = order.estimatedDelivery || order.deliveryDate || order.delivery || order.deliveredAt;
-  if (!dateValue) return 'Delivery date not available';
-  const formatted = formatOrderDate(dateValue);
-  return normalizeOrderStatus(order.status) === 'Delivered' ? `Delivered on ${formatted}` : `Expected delivery ${formatted}`;
+  const d = order.estimatedDelivery || order.deliveryDate || order.deliveredAt;
+  if (!d) return 'Delivery date TBD';
+  const formatted = fmtDate(d);
+  return normalizeOrderStatus(order.status) === 'Delivered' ? `✓ Delivered on ${formatted}` : `Est. delivery ${formatted}`;
 };
 
-const getPrimaryItem = (order) => {
-  const items = order.items || [];
-  return items[0] || {};
-};
+const getProductImage = (item) => item?.image || item?.images?.[0] || item?.thumbnail || '';
 
-const getProductImage = (item) => item.image || item.images?.[0] || item.thumbnail || '';
-
-const getOrderSummary = (order) => {
-  const items = order.items || [];
-  const subTotalFromItems = items.reduce((sum, item) => {
-    const price = Number(item.totalPrice ?? item.price ?? 0);
-    const quantity = Number(item.quantity ?? 1);
-    return sum + (Number.isFinite(price) ? price * quantity : 0);
-  }, 0);
-
-  const subTotal = Number(order.subtotal ?? order.subTotal ?? subTotalFromItems);
-  const discount = Number(order.discount ?? 0);
-  const coupon = Number(order.couponAmount ?? order.coupon ?? 0);
-  const shipping = Number(order.shippingCost ?? order.shippingCharge ?? order.shippingFee ?? 0);
-  const gst = Number(order.tax ?? order.gst ?? order.taxAmount ?? 0);
-  const total = Number(order.grandTotal ?? order.total ?? order.amount ?? (subTotal - discount - coupon + shipping + gst));
-
-  return {
-    subTotal,
-    discount,
-    coupon,
-    shipping,
-    gst,
-    total,
-    paymentMethod: order.paymentMethod || order.payment || 'N/A',
-    transactionId: order.transactionId || order.paymentId || order.orderTransaction || 'N/A'
-  };
-};
-
-const getTrackingProgressIndex = (status) => {
-  const normalized = String(status || '').trim().toLowerCase();
-  if (['delivered', 'complete', 'completed'].includes(normalized)) return 4;
-  if (['out for delivery', 'out-for-delivery', 'delivery in progress', 'on the way'].includes(normalized)) return 3;
-  if (['shipped', 'dispatch', 'dispatched', 'in transit'].includes(normalized)) return 2;
-  if (['cancelled', 'canceled', 'returned', 'refunded', 'return requested'].includes(normalized)) return 0;
+const getProgressIndex = (status) => {
+  const n = String(status || '').trim().toLowerCase();
+  if (['delivered', 'complete', 'completed'].includes(n))                          return 4;
+  if (['out for delivery', 'out-for-delivery', 'on the way'].includes(n))          return 3;
+  if (['shipped', 'dispatch', 'dispatched', 'in transit'].includes(n))             return 2;
+  if (['cancelled', 'canceled', 'returned', 'refunded', 'return requested'].includes(n)) return 0;
   return 1;
 };
 
-const OrderStatusBadge = ({ status }) => {
-  const variant = getStatusBadgeVariant(status);
-  return <span className={`premium-orders-badge premium-orders-badge-${variant}`}>{normalizeOrderStatus(status)}</span>;
+const getOrderSummary = (order) => {
+  const items = order.items || [];
+  const subFromItems = items.reduce((s, i) => s + (Number(i.totalPrice ?? i.price ?? 0) * Number(i.quantity ?? 1)), 0);
+  return {
+    subTotal: Number(order.subtotal ?? order.subTotal ?? subFromItems),
+    discount: Number(order.discount ?? 0),
+    coupon:   Number(order.couponAmount ?? 0),
+    shipping: Number(order.shippingCost ?? order.shippingCharge ?? 0),
+    gst:      Number(order.tax ?? order.gst ?? 0),
+    total:    Number(order.grandTotal ?? order.total ?? 0),
+    paymentMethod:  order.paymentMethod  || 'N/A',
+    transactionId:  order.paymentId || order.orderTransaction || 'N/A',
+  };
 };
 
-const OrderProductThumbnails = ({ items }) => {
-  if (!items || items.length <= 1) return null;
-  return (
-    <div className="premium-orders-product-thumbnails">
-      {items.slice(0, 4).map((item, index) => (
-        <div key={index} className="premium-orders-thumbnail-item">
-          <img src={getProductImage(item)} alt={item.name || 'Product'} loading="lazy" />
-        </div>
-      ))}
-      {items.length > 4 && <div className="premium-orders-thumbnail-more">+{items.length - 4}</div>}
+/* ── Sub-components ─────────────────────── */
+const StatusBadge = ({ status }) => (
+  <span className={`mo-badge ${getBadgeClass(status)}`}>{normalizeOrderStatus(status)}</span>
+);
+
+const Skeleton = () => (
+  <div className="mo-skeleton-card">
+    <div className="mo-skeleton-img" />
+    <div className="mo-skeleton-lines">
+      <div className="mo-skeleton-line l" />
+      <div className="mo-skeleton-line m" />
+      <div className="mo-skeleton-line s" />
     </div>
-  );
-};
+  </div>
+);
 
-const OrderActions = ({ onTrack, onViewDetails }) => (
-  <div className="premium-orders-actions">
-    <button type="button" className="premium-orders-btn premium-orders-btn-primary" onClick={onTrack}>
-      Track Order
-    </button>
-    <button type="button" className="premium-orders-btn premium-orders-btn-secondary" onClick={onViewDetails}>
-      View Details
-    </button>
-    <button type="button" className="premium-orders-btn premium-orders-btn-link">
-      Download Invoice
-    </button>
-    <button type="button" className="premium-orders-btn premium-orders-btn-link">
-      Need Help
-    </button>
-    <button type="button" className="premium-orders-btn premium-orders-btn-link">
-      Buy Again
+const EmptyOrders = ({ onShop }) => (
+  <div className="mo-empty">
+    <div className="mo-empty-icon">🛍️</div>
+    <h2>No orders yet</h2>
+    <p>Start shopping and your orders will appear here.</p>
+    <button className="mo-btn-track" style={{ width: 'auto', padding: '12px 28px', borderRadius: 12 }} onClick={onShop}>
+      Start Shopping
     </button>
   </div>
 );
 
 const TrackingTimeline = ({ currentIndex }) => (
-  <div className="premium-orders-tracking-timeline">
-    {trackingSteps.map((step, index) => {
-      const completed = index <= currentIndex;
+  <div className="mo-timeline">
+    {trackingSteps.map((step, i) => {
+      const done = i <= currentIndex;
       return (
-        <div key={step} className={`premium-orders-step-item ${completed ? 'completed' : ''}`}>
-          <div className="premium-orders-step-dot">{completed ? <i className="fa-solid fa-check" /> : index + 1}</div>
-          <p>{step}</p>
+        <div key={step} className={`mo-timeline-step${done ? ' done' : ''}`}>
+          <div className="mo-timeline-dot">
+            {done ? <i className="fa-solid fa-check" /> : i + 1}
+          </div>
+          <div className="mo-timeline-text">{step}</div>
         </div>
       );
     })}
   </div>
 );
 
-const ShippingCard = ({ order }) => {
-  const address = order.shippingAddress || order.address || order.shipping || {};
-  return (
-    <div className="premium-orders-card premium-orders-small-card">
-      <h3>Shipping Details</h3>
-      <div className="premium-orders-card-row">
-        <span>Customer</span>
-        <strong>{address.name || order.customerName || 'Customer'}</strong>
-      </div>
-      {address.addressLine1 && <p>{address.addressLine1}</p>}
-      {address.addressLine2 && <p>{address.addressLine2}</p>}
-      <p>{[address.city, address.state, address.zipCode].filter(Boolean).join(', ')}</p>
-      <p>{address.country}</p>
-      {address.phone && <p>Phone: {address.phone}</p>}
-      <div className="premium-orders-card-row">
-        <span>Courier Partner</span>
-        <strong>{order.courierPartner || order.carrier || order.courier || 'SriTech Express'}</strong>
-        <span>Estimated Delivery</span>
-        <strong>{getDeliveryLabel(order)}</strong>
-      </div>
-    </div>
-  );
-};
-
-const OrderSummaryCard = ({ order }) => {
-  const summary = getOrderSummary(order);
-  return (
-    <div className="premium-orders-card premium-orders-small-card">
-      <h3>Order Summary</h3>
-      <div className="premium-orders-card-row">
-        <span>Subtotal</span>
-        <strong>{formatCurrency(summary.subTotal)}</strong>
-      </div>
-      <div className="premium-orders-card-row">
-        <span>Discount</span>
-        <strong>{formatCurrency(-summary.discount)}</strong>
-      </div>
-      <div className="premium-orders-card-row">
-        <span>Coupon</span>
-        <strong>{formatCurrency(-summary.coupon)}</strong>
-      </div>
-      <div className="premium-orders-card-row">
-        <span>Shipping</span>
-        <strong>{summary.shipping === 0 ? 'FREE' : formatCurrency(summary.shipping)}</strong>
-      </div>
-      <div className="premium-orders-card-row">
-        <span>GST</span>
-        <strong>{formatCurrency(summary.gst)}</strong>
-      </div>
-      <div className="premium-orders-card-divider" />
-      <div className="premium-orders-card-row total-row">
-        <span>Total</span>
-        <strong>{formatCurrency(summary.total)}</strong>
-      </div>
-      <div className="premium-orders-card-divider" />
-      <div className="premium-orders-card-row">
-        <span>Payment Method</span>
-        <strong>{summary.paymentMethod}</strong>
-      </div>
-      <div className="premium-orders-card-row">
-        <span>Transaction ID</span>
-        <strong>{summary.transactionId}</strong>
-      </div>
-    </div>
-  );
-};
-
-const InvoiceButton = ({ invoiceUrl }) => (
-  <button type="button" className="premium-orders-btn premium-orders-btn-secondary" onClick={() => window.open(invoiceUrl || '#', '_blank')}>
-    Invoice
-  </button>
-);
-
-const NeedHelpButton = () => (
-  <button type="button" className="premium-orders-btn premium-orders-btn-link">Need Help</button>
-);
-
-const SkeletonLoader = () => (
-  <div className="premium-orders-skeleton-card animate-pulse">
-    <div className="premium-orders-skeleton-row">
-      <div className="premium-orders-skeleton-box" />
-      <div className="premium-orders-skeleton-content">
-        <div className="premium-orders-skeleton-line short" />
-        <div className="premium-orders-skeleton-line medium" />
-        <div className="premium-orders-skeleton-line long" />
-      </div>
-    </div>
-    <div className="premium-orders-skeleton-actions">
-      <div className="premium-orders-skeleton-btn" />
-      <div className="premium-orders-skeleton-btn" />
-      <div className="premium-orders-skeleton-btn small" />
-    </div>
-  </div>
-);
-
-const EmptyOrders = ({ onStartShopping }) => (
-  <div className="premium-orders-empty-state">
-    <div className="premium-orders-empty-illustration" />
-    <h2>No Orders Yet</h2>
-    <p>Find your next favorite product and place your first order with SriTech.</p>
-    <button type="button" className="premium-orders-btn premium-orders-btn-primary" onClick={onStartShopping}>
-      Start Shopping
-    </button>
-  </div>
-);
-
-const OrderCard = ({ order, onTrack, onViewDetails }) => {
-  const firstItem = getPrimaryItem(order);
+const TrackingDrawer = ({ order, open, onClose }) => {
+  if (!open || !order) return null;
+  const currentIndex = getProgressIndex(order.status);
+  const firstItem = (order.items || [])[0] || {};
   const productImage = getProductImage(firstItem);
-  const productName = firstItem.name || firstItem.title || 'Product Name';
-  const brand = firstItem.brand || order.brand || 'SriTech';
-  const variant = [firstItem.color, firstItem.size, firstItem.variant].filter(Boolean).join(' / ');
-  const seller = order.seller || firstItem.seller || 'SriTech Marketplace';
-  const quantity = (order.items || []).reduce((sum, item) => sum + (Number(item.quantity) || 1), 0);
-  const price = order.grandTotal ?? order.total ?? (order.items || []).reduce((sum, item) => {
-    const priceValue = Number(item.totalPrice ?? item.price ?? 0);
-    const quantityValue = Number(item.quantity ?? 1);
-    return sum + (Number.isFinite(priceValue) ? priceValue * quantityValue : 0);
-  }, 0);
+  const summary = getOrderSummary(order);
+  const addr = order.shippingAddress || {};
+  const invoiceUrl = getInvoiceUrl(order);
 
   return (
-    <article className="premium-orders-card premium-orders-order-card">
-      <div className="premium-orders-card-left">
-        <div className="premium-orders-card-image">
-          {productImage ? <img src={productImage} alt={productName} /> : <span>{productName.charAt(0)}</span>}
+    <div className="mo-drawer-overlay" onClick={onClose}>
+      <div className="mo-drawer" onClick={(e) => e.stopPropagation()}>
+
+        <div className="mo-drawer-header">
+          <h2>Order Details</h2>
+          <button className="mo-drawer-close" onClick={onClose} aria-label="Close">×</button>
         </div>
-      </div>
-      <div className="premium-orders-card-center">
-        <p className="premium-orders-order-label">{productName}</p>
-        <p className="premium-orders-order-brand">{brand}</p>
-        {variant && <p className="premium-orders-order-variant">{variant}</p>}
-        <p className="premium-orders-order-meta">Quantity: {quantity}</p>
-        <p className="premium-orders-order-meta">Seller: {seller}</p>
-        <p className="premium-orders-order-meta">Order Date: {formatOrderDate(order.createdAt || order.orderDate)}</p>
-        <p className="premium-orders-order-meta">Order ID: {order.orderId || order.invoiceNumber || order._id || order.id}</p>
-        <p className="premium-orders-order-delivery">{getDeliveryLabel(order)}</p>
-        <OrderProductThumbnails items={order.items || []} />
-      </div>
-      <div className="premium-orders-card-right">
-        <OrderStatusBadge status={order.status} />
-        <p className="premium-orders-order-price">{formatCurrency(price)}</p>
-        <div className="premium-orders-card-row" style={{ gap: '0.75rem', flexWrap: 'wrap' }}>
-          <button type="button" className="premium-orders-btn premium-orders-btn-primary" onClick={onTrack}>
-            Track Order
-          </button>
-          <button type="button" className="premium-orders-btn premium-orders-btn-secondary" onClick={onViewDetails}>
-            View Details
-          </button>
+
+        {/* Product preview */}
+        <div className="mo-drawer-product">
+          <div className="mo-drawer-thumb">
+            {productImage
+              ? <img src={productImage} alt={firstItem.name || 'Product'} />
+              : <span className="mo-img-fallback">{(firstItem.name || 'P').charAt(0)}</span>
+            }
+          </div>
+          <div className="mo-drawer-product-info">
+            <h3>{firstItem.name || firstItem.title || 'Product'}</h3>
+            <p>Order: {order.orderId || order._id || '—'}</p>
+            <p>{order.items?.length || 0} item(s) · {fmt(order.grandTotal ?? order.total ?? 0)}</p>
+          </div>
+          <StatusBadge status={order.status} />
         </div>
-        <div className="premium-orders-card-row" style={{ marginTop: '1rem', gap: '0.75rem' }}>
-          {order.invoicePdfPath || order.invoiceUrl || order.invoiceLink ? (
-            <button type="button" className="premium-orders-btn premium-orders-btn-link" onClick={() => window.open(order.invoicePdfPath || order.invoiceUrl || order.invoiceLink, '_blank')}>
+
+        {/* Tracking timeline */}
+        <div>
+          <h3 style={{ margin: '0 0 14px', fontSize: '0.92rem', fontWeight: 700, color: '#0f172a' }}>
+            <i className="fa-solid fa-location-dot" style={{ marginRight: 8, color: '#6366f1' }} />
+            Tracking Timeline
+          </h3>
+          <TrackingTimeline currentIndex={currentIndex} />
+        </div>
+
+        {/* Info Grid */}
+        <div className="mo-info-grid">
+          {/* Shipping info */}
+          <div className="mo-info-card">
+            <h4>📦 Shipping</h4>
+            <div className="mo-info-row"><span>Name</span><strong>{addr.name || order.customerName || '—'}</strong></div>
+            {addr.phone && <div className="mo-info-row"><span>Phone</span><strong>{addr.phone}</strong></div>}
+            <div className="mo-info-row"><span>Address</span><strong>{[addr.addressLine1, addr.city, addr.state].filter(Boolean).join(', ') || '—'}</strong></div>
+            <div className="mo-info-row"><span>Courier</span><strong>{order.courierPartner || 'SriTech Express'}</strong></div>
+          </div>
+
+          {/* Order summary */}
+          <div className="mo-info-card">
+            <h4>💳 Payment</h4>
+            <div className="mo-info-row"><span>Subtotal</span><strong>{fmt(summary.subTotal)}</strong></div>
+            {summary.discount > 0 && <div className="mo-info-row"><span>Discount</span><strong style={{ color: '#16a34a' }}>-{fmt(summary.discount)}</strong></div>}
+            <div className="mo-info-row"><span>Shipping</span><strong>{summary.shipping === 0 ? 'FREE' : fmt(summary.shipping)}</strong></div>
+            {summary.gst > 0 && <div className="mo-info-row"><span>GST</span><strong>{fmt(summary.gst)}</strong></div>}
+            <div className="mo-info-row mo-info-total"><span>Total</span><strong>{fmt(summary.total)}</strong></div>
+            <div className="mo-info-row" style={{ marginTop: 6 }}><span>Method</span><strong>{summary.paymentMethod}</strong></div>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="mo-drawer-actions">
+          {invoiceUrl && (
+            <button className="mo-btn-outline" style={{ flex: 1 }} onClick={() => window.open(invoiceUrl, '_blank')}>
+              <i className="fa-solid fa-file-invoice" style={{ marginRight: 6 }} />
               Download Invoice
             </button>
-          ) : null}
-          <button type="button" className="premium-orders-btn premium-orders-btn-link">
+          )}
+          <button
+            className="mo-btn-ghost"
+            onClick={() => window.open(`mailto:support@thesritech.com?subject=Help - Order ${order.orderId || order._id || ''}`, '_self')}
+          >
+            <i className="fa-solid fa-headset" />
             Contact Support
+          </button>
+        </div>
+
+      </div>
+    </div>
+  );
+};
+
+const OrderCard = ({ order, onTrack }) => {
+  const items = order.items || [];
+  const firstItem = items[0] || {};
+  const productImage = getProductImage(firstItem);
+  const productName = firstItem.name || firstItem.title || 'Product';
+  const price = order.grandTotal ?? order.total ?? 0;
+  const qty = items.reduce((s, i) => s + (Number(i.quantity) || 1), 0);
+  const orderId = order.orderId || order.invoiceNumber || order._id || order.id || '';
+
+  return (
+    <article className="mo-card">
+      {/* Top Bar */}
+      <div className="mo-card-top">
+        <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+          <span className="mo-card-order-id"># {orderId}</span>
+          <span className="mo-card-date">{fmtDate(order.createdAt || order.orderDate)}</span>
+        </div>
+        <StatusBadge status={order.status} />
+      </div>
+
+      {/* Body */}
+      <div className="mo-card-body">
+        {/* Product Image */}
+        <div className="mo-product-img">
+          {productImage
+            ? <img src={productImage} alt={productName} loading="lazy" />
+            : <span className="mo-img-fallback">{productName.charAt(0)}</span>
+          }
+        </div>
+
+        {/* Product Info */}
+        <div className="mo-product-info">
+          <h3>{productName}</h3>
+          <div className="mo-product-meta">
+            <span className="mo-meta-pill">Qty: {qty}</span>
+            {items.length > 1 && <span className="mo-meta-pill">{items.length} items</span>}
+            <span className="mo-meta-pill">{order.paymentMethod || 'Razorpay'}</span>
+          </div>
+          <div className="mo-delivery-label">{getDeliveryLabel(order)}</div>
+
+          {/* Additional item thumbnails */}
+          {items.length > 1 && (
+            <div className="mo-more-items">
+              {items.slice(1, 4).map((item, i) => (
+                <div key={i} className="mo-more-item-thumb">
+                  {getProductImage(item)
+                    ? <img src={getProductImage(item)} alt={item.name || 'Product'} />
+                    : <div style={{ width: '100%', height: '100%', background: '#e2e8f0' }} />
+                  }
+                </div>
+              ))}
+              {items.length > 4 && (
+                <div className="mo-more-count">+{items.length - 4}</div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Price & Actions */}
+        <div className="mo-card-actions">
+          <div className="mo-price">{fmt(price)}</div>
+          <button className="mo-btn-track" onClick={onTrack}>
+            <i className="fa-solid fa-truck-fast" style={{ marginRight: 6 }} />
+            Track Order
+          </button>
+          <button className="mo-btn-outline" onClick={onTrack}>
+            View Details
+          </button>
+          <button
+            className="mo-btn-ghost"
+            onClick={() => {
+              const url = getInvoiceUrl(order);
+              if (url) window.open(url, '_blank');
+            }}
+          >
+            <i className="fa-solid fa-file-invoice" />
+            Invoice
           </button>
         </div>
       </div>
@@ -305,246 +294,219 @@ const OrderCard = ({ order, onTrack, onViewDetails }) => {
   );
 };
 
-const TrackingDrawer = ({ order, open, onClose }) => {
-  if (!open || !order) return null;
-  const currentIndex = getTrackingProgressIndex(order.status);
-  const firstItem = getPrimaryItem(order);
-  const productImage = getProductImage(firstItem);
-
-  return (
-    <div className="premium-orders-drawer-overlay" onClick={onClose}>
-      <div className="premium-orders-drawer" onClick={(event) => event.stopPropagation()}>
-        <div className="premium-orders-drawer-header">
-          <h2>Track Order</h2>
-          <button type="button" className="premium-orders-close-btn" onClick={onClose} aria-label="Close drawer">×</button>
-        </div>
-        <div className="premium-orders-drawer-top">
-          <div className="premium-orders-drawer-product-image">
-            {productImage ? <img src={productImage} alt={firstItem.name || 'Product'} /> : <span>{(firstItem.name || 'P').charAt(0)}</span>}
-          </div>
-          <div>
-            <p className="premium-orders-drawer-product-name">{firstItem.name || firstItem.title || 'Product details'}</p>
-            <p className="premium-orders-drawer-product-subtitle">Order ID: {order.orderId || order.invoiceNumber || order._id || order.id}</p>
-            <p className="premium-orders-drawer-product-subtitle">{order.items?.length || 0} item(s) · {formatCurrency(order.grandTotal ?? order.total ?? 0)}</p>
-          </div>
-        </div>
-
-        <div className="premium-orders-drawer-section">
-          <h3>Tracking Timeline</h3>
-          <TrackingTimeline currentIndex={currentIndex} />
-        </div>
-
-        <div className="premium-orders-drawer-grid">
-          <ShippingCard order={order} />
-          <OrderSummaryCard order={order} />
-        </div>
-
-        <div className="premium-orders-drawer-actions">
-          <InvoiceButton invoiceUrl={order.invoiceUrl || order.invoiceLink} />
-          <NeedHelpButton />
-        </div>
-      </div>
-    </div>
-  );
-};
-
+/* ── Main Page Component ────────────────── */
 const MyOrders = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const [perPage] = useState(8);
+  const perPage = 8;
   const [query, setQuery] = useState('');
-  const [activeStatusFilter, setActiveStatusFilter] = useState('All Orders');
-  const [activeDateFilter, setActiveDateFilter] = useState('All Time');
-  const [activeSort, setActiveSort] = useState('Newest First');
+  const [statusFilter, setStatusFilter] = useState('All Orders');
+  const [dateFilter, setDateFilter] = useState('All Time');
+  const [sortOrder, setSortOrder] = useState('Newest First');
   const [drawerOrderId, setDrawerOrderId] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  const orderCounts = useMemo(() => {
-    const counts = { total: orders.length, Delivered: 0, Shipped: 0, Processing: 0, Cancelled: 0, Returned: 0 };
-    orders.forEach((order) => {
-      const status = normalizeOrderStatus(order.status);
-      if (status === 'Delivered') counts.Delivered += 1;
-      else if (status === 'Shipped') counts.Shipped += 1;
-      else if (status === 'Processing') counts.Processing += 1;
-      else if (status === 'Cancelled') counts.Cancelled += 1;
-      else if (status === 'Returned') counts.Returned += 1;
+  const counts = useMemo(() => {
+    const c = { total: orders.length, Delivered: 0, Shipped: 0, Processing: 0, Cancelled: 0, Returned: 0 };
+    orders.forEach((o) => {
+      const s = normalizeOrderStatus(o.status);
+      if (s === 'Delivered')  c.Delivered++;
+      else if (s === 'Shipped') c.Shipped++;
+      else if (s === 'Processing') c.Processing++;
+      else if (s === 'Cancelled')  c.Cancelled++;
     });
-    return counts;
+    return c;
   }, [orders]);
 
-  const filteredOrders = useMemo(() => {
-    const lowerQuery = String(query || '').trim().toLowerCase();
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
     return orders
-      .filter((order) => {
-        if (activeStatusFilter !== 'All Orders') return normalizeOrderStatus(order.status) === activeStatusFilter;
+      .filter((o) => statusFilter === 'All Orders' || normalizeOrderStatus(o.status) === statusFilter)
+      .filter((o) => {
+        if (dateFilter === 'Last 30 Days')
+          return Date.now() - new Date(o.createdAt || o.orderDate || 0) <= 30 * 86400000;
+        if (dateFilter === 'Last 6 Months')
+          return Date.now() - new Date(o.createdAt || o.orderDate || 0) <= 180 * 86400000;
         return true;
       })
-      .filter((order) => {
-        if (activeDateFilter === 'Last 30 Days') {
-          const created = new Date(order.createdAt || order.orderDate || Date.now());
-          return (Date.now() - created.getTime()) <= 30 * 24 * 60 * 60 * 1000;
-        }
-        if (activeDateFilter === 'Last 6 Months') {
-          const created = new Date(order.createdAt || order.orderDate || Date.now());
-          return (Date.now() - created.getTime()) <= 180 * 24 * 60 * 60 * 1000;
-        }
-        return true;
-      })
-      .filter((order) => {
-        if (!lowerQuery) return true;
-        const orderId = String(order.orderId || order.invoiceNumber || order._id || order.id || '').toLowerCase();
-        const productNames = (order.items || []).map((item) => String(item.name || item.title || item.product || '').toLowerCase()).join(' ');
-        return orderId.includes(lowerQuery) || productNames.includes(lowerQuery);
+      .filter((o) => {
+        if (!q) return true;
+        const id = String(o.orderId || o._id || '').toLowerCase();
+        const names = (o.items || []).map((i) => String(i.name || '').toLowerCase()).join(' ');
+        return id.includes(q) || names.includes(q);
       })
       .sort((a, b) => {
-        if (activeSort === 'Oldest First') return new Date(a.createdAt || a.orderDate || 0).getTime() - new Date(b.createdAt || b.orderDate || 0).getTime();
-        return new Date(b.createdAt || b.orderDate || 0).getTime() - new Date(a.createdAt || a.orderDate || 0).getTime();
+        const ta = new Date(a.createdAt || a.orderDate || 0).getTime();
+        const tb = new Date(b.createdAt || b.orderDate || 0).getTime();
+        return sortOrder === 'Oldest First' ? ta - tb : tb - ta;
       });
-  }, [orders, activeStatusFilter, activeDateFilter, activeSort, query]);
+  }, [orders, statusFilter, dateFilter, sortOrder, query]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredOrders.length / perPage));
-  const visibleOrders = filteredOrders.slice((page - 1) * perPage, page * perPage);
-  const drawerOrder = useMemo(() => orders.find((order) => (order._id || order.id) === drawerOrderId), [orders, drawerOrderId]);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
+  const visible    = filtered.slice((page - 1) * perPage, page * perPage);
+  const drawerOrder = useMemo(() => orders.find((o) => (o._id || o.id) === drawerOrderId), [orders, drawerOrderId]);
 
-  const handleTrackOrder = (orderId) => {
-    setDrawerOrderId(orderId);
-    setDrawerOpen(true);
-  };
+  useEffect(() => {
+    const fetchOrders = async () => {
+      setLoading(true);
+      try {
+        const token = localStorage.getItem('sriTechToken');
+        const res = await fetch(`${API_URL}/orders/me`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (!res.ok) throw new Error('Failed');
+        const data = await res.json();
+        setOrders(Array.isArray(data) ? data : data.orders || []);
+      } catch {
+        setOrders([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchOrders();
+  }, [statusFilter, dateFilter, sortOrder]);
 
-  const handleCloseDrawer = () => setDrawerOpen(false);
-
-  const fetchOrders = async () => {
-    setLoading(true);
-    try {
-      const queryParam = encodeURIComponent(query || '');
-      const token = localStorage.getItem('sriTechToken');
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      const res = await fetch(`${API_URL}/orders/me?search=${queryParam}`, { headers });
-      if (!res.ok) throw new Error('Failed to load orders');
-      const data = await res.json();
-      setOrders(Array.isArray(data) ? data : data.orders || []);
-    } catch (err) {
-      console.error(err);
-      setOrders([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => { fetchOrders(); }, [query, activeStatusFilter, activeDateFilter, activeSort]);
-  useEffect(() => { setPage(1); }, [query, activeStatusFilter, activeDateFilter, activeSort]);
+  useEffect(() => setPage(1), [query, statusFilter, dateFilter, sortOrder]);
 
   return (
-    <div className="premium-orders-page">
-      <div className="premium-orders-shell">
-        <header className="premium-orders-header">
-          <p className="premium-orders-eyebrow">Orders</p>
-          <h1>My Orders</h1>
-          <p className="premium-orders-subtitle">Browse your purchased products, review delivery status, and access order actions only when needed.</p>
-        </header>
+    <div className="mo-page">
+      <div className="mo-shell">
 
-        <section className="premium-orders-controls">
-          <div className="premium-orders-search">
+        {/* Header */}
+        <div className="mo-header">
+          <div className="mo-header-text">
+            <h1>My Orders</h1>
+            <p>Track deliveries, download invoices, and manage your purchases.</p>
+          </div>
+          <div className="mo-header-badge">
+            <span>Total Orders</span>
+            <strong>{counts.total}</strong>
+          </div>
+        </div>
+
+        {/* Stats */}
+        <div className="mo-stats">
+          <div className="mo-stat-card">
+            <div className="mo-stat-icon delivered"><i className="fa-solid fa-circle-check" /></div>
+            <div className="mo-stat-info"><span>Delivered</span><strong>{counts.Delivered}</strong></div>
+          </div>
+          <div className="mo-stat-card">
+            <div className="mo-stat-icon shipped"><i className="fa-solid fa-truck" /></div>
+            <div className="mo-stat-info"><span>Shipped</span><strong>{counts.Shipped}</strong></div>
+          </div>
+          <div className="mo-stat-card">
+            <div className="mo-stat-icon processing"><i className="fa-solid fa-gear" /></div>
+            <div className="mo-stat-info"><span>Processing</span><strong>{counts.Processing}</strong></div>
+          </div>
+          <div className="mo-stat-card">
+            <div className="mo-stat-icon cancelled"><i className="fa-solid fa-xmark" /></div>
+            <div className="mo-stat-info"><span>Cancelled</span><strong>{counts.Cancelled}</strong></div>
+          </div>
+          <div className="mo-stat-card">
+            <div className="mo-stat-icon total"><i className="fa-solid fa-bag-shopping" /></div>
+            <div className="mo-stat-info"><span>All Orders</span><strong>{counts.total}</strong></div>
+          </div>
+        </div>
+
+        {/* Filters */}
+        <div className="mo-filters">
+          <div className="mo-search-row">
             <input
+              className="mo-search-input"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search by Order ID or product name"
+              placeholder="Search by Order ID or product name…"
               aria-label="Search orders"
             />
-            <button type="button" className="premium-orders-btn premium-orders-btn-primary" onClick={() => setPage(1)}>
-              Search
+            <button className="mo-search-btn" onClick={() => setPage(1)}>
+              <i className="fa-solid fa-magnifying-glass" />
             </button>
           </div>
 
-          <div className="premium-orders-chip-groups">
-            <div className="premium-orders-filter-group">
-              <span>Status</span>
-              <div className="premium-orders-chip-row">
-                {statusFilters.map((status) => (
-                  <button
-                    key={status}
-                    type="button"
-                    className={`premium-orders-chip ${activeStatusFilter === status ? 'active' : ''}`}
-                    onClick={() => setActiveStatusFilter(status)}
-                  >
-                    {status}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="premium-orders-filter-group">
-              <span>Date</span>
-              <div className="premium-orders-chip-row">
-                {dateFilters.map((date) => (
-                  <button
-                    key={date}
-                    type="button"
-                    className={`premium-orders-chip ${activeDateFilter === date ? 'active' : ''}`}
-                    onClick={() => setActiveDateFilter(date)}
-                  >
-                    {date}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="premium-orders-filter-group">
-              <span>Sort</span>
-              <div className="premium-orders-chip-row">
-                {sortOptions.map((option) => (
-                  <button
-                    key={option}
-                    type="button"
-                    className={`premium-orders-chip ${activeSort === option ? 'active' : ''}`}
-                    onClick={() => setActiveSort(option)}
-                  >
-                    {option}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="premium-orders-summary-grid">
-          <div className="premium-orders-summary-card-mini"><span>Total Orders</span><strong>{orderCounts.total}</strong></div>
-          <div className="premium-orders-summary-card-mini"><span>Delivered</span><strong>{orderCounts.Delivered}</strong></div>
-          <div className="premium-orders-summary-card-mini"><span>Shipped</span><strong>{orderCounts.Shipped}</strong></div>
-          <div className="premium-orders-summary-card-mini"><span>Processing</span><strong>{orderCounts.Processing}</strong></div>
-          <div className="premium-orders-summary-card-mini"><span>Cancelled</span><strong>{orderCounts.Cancelled}</strong></div>
-          <div className="premium-orders-summary-card-mini"><span>Returned</span><strong>{orderCounts.Returned}</strong></div>
-        </section>
-
-        {loading ? (
-          <div className="premium-orders-skeleton-grid">
-            {Array.from({ length: 3 }).map((_, index) => (
-              <SkeletonLoader key={index} />
+          <div className="mo-filter-row">
+            <span className="mo-filter-label">Status</span>
+            {statusFilters.map((s) => (
+              <button key={s} className={`mo-chip${statusFilter === s ? ' active' : ''}`} onClick={() => setStatusFilter(s)}>
+                {s}
+              </button>
+            ))}
+            <div className="mo-divider" />
+            <span className="mo-filter-label">Sort</span>
+            {sortOptions.map((s) => (
+              <button key={s} className={`mo-chip${sortOrder === s ? ' active' : ''}`} onClick={() => setSortOrder(s)}>
+                {s}
+              </button>
             ))}
           </div>
-        ) : filteredOrders.length === 0 ? (
-          <EmptyOrders onStartShopping={() => window.location.assign('/')} />
+
+          <div className="mo-filter-row">
+            <span className="mo-filter-label">Date</span>
+            {dateFilters.map((d) => (
+              <button key={d} className={`mo-chip${dateFilter === d ? ' active' : ''}`} onClick={() => setDateFilter(d)}>
+                {d}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Order List */}
+        {loading ? (
+          <div className="mo-list">
+            {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} />)}
+          </div>
+        ) : filtered.length === 0 ? (
+          <EmptyOrders onShop={() => window.location.assign('/')} />
         ) : (
           <>
-            <div className="premium-orders-card-list">
-              {visibleOrders.map((order) => (
+            <div className="mo-list">
+              {visible.map((order) => (
                 <OrderCard
                   key={order._id || order.id}
                   order={order}
-                  onTrack={() => handleTrackOrder(order._id || order.id)}
-                  onViewDetails={() => handleTrackOrder(order._id || order.id)}
+                  onTrack={() => { setDrawerOrderId(order._id || order.id); setDrawerOpen(true); }}
                 />
               ))}
             </div>
-            <div className="premium-orders-pagination-row">
-              <Pagination page={page} setPage={setPage} />
-            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="mo-pagination">
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    className="mo-btn-outline"
+                    style={{ width: 40, height: 40, padding: 0, borderRadius: 10 }}
+                    disabled={page === 1}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  >‹</button>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                    <button
+                      key={p}
+                      onClick={() => setPage(p)}
+                      style={{
+                        width: 40, height: 40, borderRadius: 10, border: '1.5px solid',
+                        borderColor: p === page ? '#6366f1' : '#e2e8f0',
+                        background: p === page ? '#6366f1' : '#fff',
+                        color: p === page ? '#fff' : '#475569',
+                        fontWeight: 700, fontSize: '0.88rem', cursor: 'pointer', fontFamily: 'inherit'
+                      }}
+                    >{p}</button>
+                  ))}
+                  <button
+                    className="mo-btn-outline"
+                    style={{ width: 40, height: 40, padding: 0, borderRadius: 10 }}
+                    disabled={page === totalPages}
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  >›</button>
+                </div>
+              </div>
+            )}
           </>
         )}
       </div>
 
-      <TrackingDrawer order={drawerOrder} open={drawerOpen} onClose={handleCloseDrawer} />
+      {/* Tracking Drawer */}
+      <TrackingDrawer order={drawerOrder} open={drawerOpen} onClose={() => setDrawerOpen(false)} />
     </div>
   );
 };

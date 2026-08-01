@@ -233,6 +233,13 @@ const AdminDashboard = ({
     specifications: '',
     howToUse: '',
     stock: 0,
+    shippingCharge: 0,
+    gstPercent: 0,
+    discountPercent: 0,
+    courierOptions: [
+      { name: 'rathimeena parcel service', price: 100 },
+      { name: 'ST Couriers', price: 150 }
+    ],
     category: categories[0]?.slug || categories[0]?.name || 'engraining-products', 
     icon: 'fa-box',
     isNewArrival: false,
@@ -243,7 +250,7 @@ const AdminDashboard = ({
   // --- Edit Product State ---
   const [editingProductId, setEditingProductId] = useState(null);
   const [editProduct, setEditProduct] = useState({
-    name: '', price: '', description: '', specifications: '', howToUse: '', stock: 0, category: '', isNewArrival: false, images: [], video: ''
+    name: '', price: '', description: '', specifications: '', howToUse: '', stock: 0, shippingCharge: 0, gstPercent: 0, discountPercent: 0, courierOptions: [], category: '', isNewArrival: false, images: [], video: ''
   });
   const [replaceEditImages, setReplaceEditImages] = useState(false);
 
@@ -256,6 +263,13 @@ const AdminDashboard = ({
       specifications: p.specifications || '',
       howToUse: p.howToUse || '',
       stock: typeof p.stock === 'number' ? p.stock : 0,
+      shippingCharge: typeof p.shippingCharge === 'number' ? p.shippingCharge : 0,
+      gstPercent: typeof p.gstPercent === 'number' ? p.gstPercent : 0,
+      discountPercent: typeof p.discountPercent === 'number' ? p.discountPercent : 0,
+      courierOptions: Array.isArray(p.courierOptions) && p.courierOptions.length > 0 ? p.courierOptions : [
+        { name: 'rathimeena parcel service', price: 100 },
+        { name: 'ST Couriers', price: 150 }
+      ],
       category: p.category || categories[0]?.slug || categories[0]?.name || '',
       isNewArrival: p.isNewArrival || false,
       images: p.images || [],
@@ -268,7 +282,7 @@ const AdminDashboard = ({
 
   const cancelEditProduct = () => {
     setEditingProductId(null);
-    setEditProduct({ name: '', price: '', category: '', isNewArrival: false, images: [], video: '' });
+    setEditProduct({ name: '', price: '', category: '', isNewArrival: false, images: [], video: '', shippingCharge: 0 });
     setReplaceEditImages(false);
   };
 
@@ -480,6 +494,9 @@ const AdminDashboard = ({
       description: String(newProduct.description || '').trim(),
       specifications: String(newProduct.specifications || '').trim(),
       stock: Number(newProduct.stock || 0),
+      shippingCharge: Number(newProduct.shippingCharge || 0),
+      gstPercent: Number(newProduct.gstPercent || 0),
+      discountPercent: Number(newProduct.discountPercent || 0),
       icon: String(newProduct.icon || 'fa-box').trim(),
       isNewArrival: Boolean(newProduct.isNewArrival),
       video: String(newProduct.video || '').trim(),
@@ -495,7 +512,7 @@ const AdminDashboard = ({
       const success = await onAddProduct(payload);
       if (success) {
         alert('Product added successfully!');
-        setNewProduct({ name: '', price: '', description: '', specifications: '', howToUse: '', stock: 0, category: categories[0]?.slug || categories[0]?.name || 'stoves', icon: 'fa-box', isNewArrival: false, images: [], video: '' });
+        setNewProduct({ name: '', price: '', description: '', specifications: '', howToUse: '', stock: 0, shippingCharge: 0, gstPercent: 0, discountPercent: 0, category: categories[0]?.slug || categories[0]?.name || 'stoves', icon: 'fa-box', isNewArrival: false, images: [], video: '' });
       } else {
         alert('Failed to add product. Please try again.');
       }
@@ -1019,6 +1036,41 @@ const AdminDashboard = ({
                         />
                       </div>
                       <div className="admin-form-group">
+                        <label htmlFor="editProductShippingCharge">Shipping Charge (₹)</label>
+                        <input
+                          id="editProductShippingCharge"
+                          type="number"
+                          min="0"
+                          placeholder="Shipping charge in ₹"
+                          value={editProduct.shippingCharge}
+                          onChange={(e) => setEditProduct({ ...editProduct, shippingCharge: Number(e.target.value) })}
+                        />
+                      </div>
+                      <div className="admin-form-group">
+                        <label htmlFor="editProductGstPercent">GST Rate (% - Optional)</label>
+                        <input
+                          id="editProductGstPercent"
+                          type="number"
+                          min="0"
+                          max="100"
+                          placeholder="e.g. 0 or 18"
+                          value={editProduct.gstPercent}
+                          onChange={(e) => setEditProduct({ ...editProduct, gstPercent: Number(e.target.value) })}
+                        />
+                      </div>
+                      <div className="admin-form-group">
+                        <label htmlFor="editProductDiscountPercent">Discount Rate (% - Optional)</label>
+                        <input
+                          id="editProductDiscountPercent"
+                          type="number"
+                          min="0"
+                          max="100"
+                          placeholder="e.g. 0 or 20"
+                          value={editProduct.discountPercent}
+                          onChange={(e) => setEditProduct({ ...editProduct, discountPercent: Number(e.target.value) })}
+                        />
+                      </div>
+                      <div className="admin-form-group">
                         <label htmlFor="editProductCategory">Category</label>
                         <select
                           id="editProductCategory"
@@ -1228,6 +1280,100 @@ const AdminDashboard = ({
                         value={newProduct.stock}
                         onChange={(e) => setNewProduct({...newProduct, stock: Number(e.target.value)})}
                       />
+                    </div>
+                    <div className="admin-form-group">
+                      <label htmlFor="newProductShippingCharge">Base Shipping Charge (₹)</label>
+                      <input
+                        id="newProductShippingCharge"
+                        type="number"
+                        min="0"
+                        placeholder="Shipping charge in ₹"
+                        value={newProduct.shippingCharge}
+                        onChange={(e) => setNewProduct({...newProduct, shippingCharge: Number(e.target.value)})}
+                      />
+                    </div>
+                    <div className="admin-form-group">
+                      <label htmlFor="newProductGstPercent">GST Rate (% - Optional)</label>
+                      <input
+                        id="newProductGstPercent"
+                        type="number"
+                        min="0"
+                        max="100"
+                        placeholder="e.g. 0 or 18"
+                        value={newProduct.gstPercent}
+                        onChange={(e) => setNewProduct({...newProduct, gstPercent: Number(e.target.value)})}
+                      />
+                      <span style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>Leave 0 to omit GST charge from customer checkout.</span>
+                    </div>
+                    <div className="admin-form-group">
+                      <label htmlFor="newProductDiscountPercent">Discount Rate (% - Optional)</label>
+                      <input
+                        id="newProductDiscountPercent"
+                        type="number"
+                        min="0"
+                        max="100"
+                        placeholder="e.g. 0 or 20"
+                        value={newProduct.discountPercent}
+                        onChange={(e) => setNewProduct({...newProduct, discountPercent: Number(e.target.value)})}
+                      />
+                      <span style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>Leave 0 for no discount during checkout.</span>
+                    </div>
+                    <div className="admin-form-group" style={{ gridColumn: '1 / -1', background: '#f8fafc', padding: '1rem', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                      <label style={{ fontWeight: '700', fontSize: '0.95rem', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                        <i className="fa-solid fa-truck-fast" style={{ color: '#ff7a00' }} />
+                        Courier Partner Options & Shipping Charges
+                      </label>
+                      <span style={{ fontSize: '0.8rem', color: '#64748b', display: 'block', marginBottom: '0.75rem' }}>
+                        Define available courier services and rates selectable by customers during checkout.
+                      </span>
+                      {(newProduct.courierOptions || []).map((courier, idx) => (
+                        <div key={idx} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
+                          <input
+                            type="text"
+                            placeholder="Courier Name (e.g. ST Couriers)"
+                            value={courier.name}
+                            onChange={(e) => {
+                              const updated = [...(newProduct.courierOptions || [])];
+                              updated[idx].name = e.target.value;
+                              setNewProduct({ ...newProduct, courierOptions: updated });
+                            }}
+                            style={{ flex: 2, padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                          />
+                          <input
+                            type="number"
+                            placeholder="Price (₹)"
+                            value={courier.price}
+                            onChange={(e) => {
+                              const updated = [...(newProduct.courierOptions || [])];
+                              updated[idx].price = Number(e.target.value);
+                              setNewProduct({ ...newProduct, courierOptions: updated });
+                            }}
+                            style={{ flex: 1, padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updated = newProduct.courierOptions.filter((_, i) => i !== idx);
+                              setNewProduct({ ...newProduct, courierOptions: updated });
+                            }}
+                            style={{ background: '#ef4444', color: 'white', border: 'none', borderRadius: '6px', padding: '0.5rem 0.75rem', cursor: 'pointer' }}
+                          >
+                            <i className="fa-solid fa-trash" />
+                          </button>
+                        </div>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setNewProduct({
+                            ...newProduct,
+                            courierOptions: [...(newProduct.courierOptions || []), { name: '', price: 0 }]
+                          });
+                        }}
+                        style={{ background: '#e2e8f0', color: '#0f172a', border: 'none', borderRadius: '6px', padding: '0.4rem 0.8rem', fontSize: '0.82rem', fontWeight: '600', cursor: 'pointer', marginTop: '0.25rem' }}
+                      >
+                        + Add Courier Partner Option
+                      </button>
                     </div>
                     <div className="admin-form-group">
                       <label htmlFor="newProductCategory">Category</label>

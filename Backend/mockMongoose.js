@@ -4,12 +4,21 @@ const path = require('path');
 const DB_FILE = path.join(__dirname, 'db.json');
 
 // Helper to load and save DB data
+let cachedDB = null;
+let lastCacheTime = 0;
+
 function loadDB() {
   if (!fs.existsSync(DB_FILE)) {
     return {};
   }
   try {
-    return JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
+    const stats = fs.statSync(DB_FILE);
+    if (cachedDB && stats.mtimeMs <= lastCacheTime) {
+      return cachedDB;
+    }
+    cachedDB = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
+    lastCacheTime = stats.mtimeMs;
+    return cachedDB;
   } catch (e) {
     return {};
   }
@@ -17,6 +26,8 @@ function loadDB() {
 
 function saveDB(db) {
   fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), 'utf8');
+  cachedDB = db;
+  lastCacheTime = fs.statSync(DB_FILE).mtimeMs;
 }
 
 // Simple unique ID generator
@@ -173,6 +184,10 @@ class MockQuery {
       if (!Array.isArray(docs)) return docs;
       return docs.slice(0, limitNum);
     });
+    return this;
+  }
+
+  allowDiskUse() {
     return this;
   }
 

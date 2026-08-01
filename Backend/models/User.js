@@ -30,10 +30,9 @@ const userSchema = new mongoose.Schema({
   otpExpires: { type: Date },
   resetPasswordToken: String,
   resetPasswordExpires: Date,
-  createdAt: { type: Date, default: Date.now }
+  createdAt: { type: Date, default: Date.now },
+  addresses: [addressSchema]
 });
-
-userSchema.add({ addresses: [addressSchema] });
 
 userSchema.pre('save', async function () {
   if (!this.isModified('password')) return;

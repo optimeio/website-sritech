@@ -11,6 +11,7 @@ const dotenv = require('dotenv');
 dotenv.config({ path: path.resolve(__dirname, '.env') });
 
 const connectDatabase = require('./config/db');
+const mongoose = require('./mongoose');
 require('./config/cloudinary');
 require('./config/razorpay');
 const errorHandler = require('./middleware/errorHandler');
@@ -102,6 +103,13 @@ const setupRoutes = () => {
   console.log('🔌 Registering routes...');
   app.get('/', (req, res) => {
     res.json({ status: 'ok', message: 'SriTech Backend API is running' });
+  });
+  app.get('/api/debug-state', (req, res) => {
+    res.json({
+      isMock: mongoose.isMock?.(),
+      readyState: mongoose.connection?.readyState,
+      fallbackLength: require('./controllers/productController').fallbackProducts?.length
+    });
   });
   app.use('/api/auth', authRoutes);
   app.use('/api/admin', adminRoutes);
@@ -286,16 +294,21 @@ const seedProducts = async () => {
 };
 
 const startServer = async () => {
+  // Setup routes and error handling first so server starts fast
+  console.log('📍 Setting up routes...');
+  setupRoutes();
+  console.log('✅ Routes setup complete');
+  console.log('📍 Setting up error handling...');
+  setupErrorHandling();
+  console.log('✅ Error handling setup complete');
+
+  // Start listening immediately so proxy doesn't get ECONNREFUSED
+  app.listen(PORT, () => console.log(`🚀 Server is running on port ${PORT}`));
+
+  // Connect to database in background (non-blocking)
   try {
     console.log('📍 Connecting to database...');
     const dbInfo = await connectDatabase();
-    console.log('📍 Setting up routes...');
-    setupRoutes();
-    console.log('✅ Routes setup complete');
-    
-    console.log('📍 Setting up error handling...');
-    setupErrorHandling();
-    console.log('✅ Error handling setup complete');
 
     if (dbInfo.mode === 'Mock') {
       console.warn('⚠️ MongoDB unavailable: running in mock fallback mode with Backend/db.json');
@@ -303,21 +316,39 @@ const startServer = async () => {
     }
 
     if (dbInfo.mode === 'MongoDB' || dbInfo.mode === 'Mock') {
-      console.log('📍 Seeding default categories...');
-      await seedCategories();
-      console.log('📍 Seeding default products...');
-      await seedProducts();
-      console.log('📍 Ensuring demo user account...');
-      await ensureDemoUser();
-    } else {
-      console.warn('⚠️ Skipping category and product seeding because no usable database mode is available.');
-    }
+      const runWithTimeout = (promise, name) => {
+        return Promise.race([
+          promise,
+          new Promise((_, reject) => setTimeout(() => reject(new Error(`${name} timed out after 12000ms`)), 12000))
+        ]);
+      };
 
-    app.listen(PORT, () => console.log(`🚀 Server is running on port ${PORT}`));
+      console.log('📍 Seeding default categories...');
+      await runWithTimeout(seedCategories(), 'Category seeding').catch(e => {
+        console.warn('⚠️ Category seed warning:', e.message);
+        if (mongoose.useMock) mongoose.useMock();
+      });
+
+      console.log('📍 Seeding default products...');
+      await runWithTimeout(seedProducts(), 'Product seeding').catch(e => {
+        console.warn('⚠️ Product seed warning:', e.message);
+        if (mongoose.useMock) mongoose.useMock();
+      });
+
+      console.log('📍 Ensuring demo user account...');
+      await runWithTimeout(ensureDemoUser(), 'Ensuring demo user').catch(e => {
+        console.warn('⚠️ Demo user warning:', e.message);
+        if (mongoose.useMock) mongoose.useMock();
+      });
+    }
   } catch (err) {
-    console.error('Startup error:', err);
-    process.exit(1);
+    // Don't crash – log and continue with mock mode
+    console.warn('⚠️ Database startup warning (server still running):', err.message);
+    if (mongoose.useMock) mongoose.useMock();
   }
 };
 
 startServer();
+
+// Prevent clean exit behavior during local development
+setInterval(() => {}, 1000 * 60 * 60);

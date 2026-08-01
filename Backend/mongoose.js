@@ -2,6 +2,7 @@ const realMongoose = require('mongoose');
 const mockMongoose = require('./mockMongoose');
 
 let activeMongoose = realMongoose;
+const modelProxies = {};
 
 const handler = {
   get(target, prop) {
@@ -28,17 +29,53 @@ const handler = {
     const value = activeMongoose[prop];
     
     // If it's a nested object like Schema, we need to handle it specially
-    if (prop === 'Schema' && value) {
-      // Ensure Schema.Types.ObjectId is available
-      if (!value.Types) {
-        value.Types = { ObjectId: String };
-      }
-      // Return Schema directly without binding
-      return value;
+    if (prop === 'Schema') {
+      return realMongoose.Schema;
+    }
+    
+    // Intercept model to return a dynamic proxy model
+    if (prop === 'model') {
+      return (name, schema, ...args) => {
+        let realModel;
+        try {
+          realModel = schema ? realMongoose.model(name, schema, ...args) : realMongoose.model(name);
+        } catch(e) {
+          realModel = realMongoose.model(name);
+        }
+        
+        let mockModel;
+        try {
+          mockModel = schema ? mockMongoose.model(name, schema, ...args) : mockMongoose.model(name);
+        } catch(e) {
+          mockModel = mockMongoose.model(name);
+        }
+
+        if (!modelProxies[name]) {
+          modelProxies[name] = new Proxy(realModel, {
+            get(target, key) {
+              const activeModel = activeMongoose === mockMongoose ? mockModel : realModel;
+              const val = activeModel[key];
+              if (typeof val === 'function') {
+                return val.bind(activeModel);
+              }
+              return val;
+            },
+            apply(target, thisArg, args) {
+              const activeModel = activeMongoose === mockMongoose ? mockModel : realModel;
+              return activeModel.apply(thisArg, args);
+            },
+            construct(target, args) {
+              const activeModel = activeMongoose === mockMongoose ? mockModel : realModel;
+              return new activeModel(...args);
+            }
+          });
+        }
+        return modelProxies[name];
+      };
     }
     
     // Only bind actual functions, not classes/constructors
-    if (typeof value === 'function' && prop !== 'Schema' && prop !== 'model') {
+    if (typeof value === 'function' && prop !== 'Schema') {
       return value.bind(activeMongoose);
     }
     return value;

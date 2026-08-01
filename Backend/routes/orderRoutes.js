@@ -8,6 +8,8 @@ const router = express.Router();
 
 router.get('/', protect, authorizeRoles('admin'), orderController.getOrders);
 router.get('/me', protect, orderController.getOrdersForUser);
+router.get('/:id/invoice', orderController.downloadInvoice);
+router.get('/:id/invoice-pdf', orderController.downloadInvoice);
 router.get('/:id', protect, orderController.getOrderById);
 router.post('/',
   [

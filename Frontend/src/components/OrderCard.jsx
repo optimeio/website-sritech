@@ -3,6 +3,21 @@ import OrderTimeline from './OrderTimeline';
 import OrderDetailsModal from './OrderDetailsModal';
 import TrackingDrawer from './TrackingDrawer';
 
+const CARD_API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const CARD_BACKEND_URL = CARD_API_URL.replace(/\/api\/?$/, '');
+
+const getCardInvoiceUrl = (order) => {
+  if (!order) return '';
+  const orderId = order.orderId || order._id || order.id || order.invoiceNumber;
+  if (orderId) {
+    return `${CARD_API_URL}/orders/${encodeURIComponent(orderId)}/invoice`;
+  }
+  const path = order.invoicePdfPath || order.invoiceUrl || order.invoiceLink || '';
+  if (!path) return '';
+  if (path.startsWith('http')) return path;
+  return `${CARD_BACKEND_URL}${path.startsWith('/') ? '' : '/'}${path}`;
+};
+
 const OrderCard = ({ order }) => {
   const [openDetails, setOpenDetails] = useState(false);
   const [openTracking, setOpenTracking] = useState(false);
@@ -37,7 +52,12 @@ const OrderCard = ({ order }) => {
         <div className="mt-4 flex flex-wrap gap-2">
           <button onClick={()=>setOpenDetails(true)} className="px-3 py-2 bg-white border rounded hover:shadow">View Details</button>
           <button onClick={()=>setOpenTracking(true)} className="px-3 py-2 bg-[#2874F0] text-white rounded hover:scale-105 transition">Track Order</button>
-          <button className="px-3 py-2 bg-white border rounded">Download Invoice</button>
+          {(() => {
+            const invoiceUrl = getCardInvoiceUrl(order);
+            return invoiceUrl ? (
+              <button onClick={() => window.open(invoiceUrl, '_blank')} className="px-3 py-2 bg-white border rounded"><i className="fa-solid fa-file-invoice" style={{ marginRight: '0.4rem' }} />Download Invoice</button>
+            ) : null;
+          })()}
           <button className="px-3 py-2 bg-white border rounded">Buy Again</button>
         </div>
       </div>

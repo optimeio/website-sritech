@@ -14,6 +14,15 @@ const productSchema = new mongoose.Schema({
   isNewArrival: { type: Boolean, default: false },
   images: [{ type: String }], // Array of base64 strings or URLs
   video: { type: String, default: '' }, // Video URL or base64
+  shippingCharge: { type: Number, default: 0 },
+  gstPercent: { type: Number, default: 0 },
+  discountPercent: { type: Number, default: 0 },
+  courierOptions: [
+    {
+      name: { type: String },
+      price: { type: Number, default: 0 }
+    }
+  ],
   createdAt: { type: Date, default: Date.now }
 });
 

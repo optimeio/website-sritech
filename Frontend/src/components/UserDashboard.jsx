@@ -1,5 +1,20 @@
 import { useEffect, useMemo, useState } from 'react';
 
+const DASHBOARD_API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const DASHBOARD_BACKEND_URL = DASHBOARD_API_URL.replace(/\/api\/?$/, '');
+
+const getDashboardInvoiceUrl = (order) => {
+  if (!order) return '';
+  const orderId = order.orderId || order._id || order.id || order.invoiceNumber;
+  if (orderId) {
+    return `${DASHBOARD_API_URL}/orders/${encodeURIComponent(orderId)}/invoice`;
+  }
+  const path = order.invoicePdfPath || order.invoiceUrl || order.invoiceLink || '';
+  if (!path) return '';
+  if (path.startsWith('http')) return path;
+  return `${DASHBOARD_BACKEND_URL}${path.startsWith('/') ? '' : '/'}${path}`;
+};
+
 const menuItems = [
   { key: 'overview', label: 'Dashboard', icon: 'fa-chart-pie' },
   { key: 'orders', label: 'My Orders', icon: 'fa-box' },
@@ -15,8 +30,8 @@ const menuItems = [
 
 const orderStatusSteps = [
   'Ordered',
-  'Shipped',
-  'Out for Delivery',
+  'Packing',
+  'On the way',
   'Delivered'
 ];
 
@@ -53,7 +68,8 @@ function UserDashboard({
   onLogout,
   getProductFinalPrice,
   totalCartAmount,
-  currency = '₹'
+  currency = '₹',
+  onViewProduct
 }) {
   const [activeTab, setActiveTab] = useState('overview');
   const [selectedOrderId, setSelectedOrderId] = useState(null);
@@ -106,9 +122,9 @@ function UserDashboard({
 
   const getOrderStatusLabel = (status) => {
     const normalized = String(status || '').trim().toLowerCase();
-    if (['ordered', 'order placed', 'order-placed', 'placed', 'pending', 'processing', 'confirmed', 'confirmed order', 'approved', 'packed', 'packing', 'ready to ship'].includes(normalized)) return 'Ordered';
-    if (['shipped', 'dispatch', 'dispatched', 'out for shipment', 'in transit'].includes(normalized)) return 'Shipped';
-    if (['out for delivery', 'out-for-delivery', 'delivery in progress', 'on the way'].includes(normalized)) return 'Out for Delivery';
+    if (['ordered', 'order placed', 'order-placed', 'placed', 'pending', 'processing', 'confirmed', 'confirmed order', 'approved'].includes(normalized)) return 'Ordered';
+    if (['packed', 'packing', 'ready to ship'].includes(normalized)) return 'Packing';
+    if (['shipped', 'dispatch', 'dispatched', 'out for shipment', 'in transit', 'out for delivery', 'out-for-delivery', 'delivery in progress', 'on the way'].includes(normalized)) return 'On the way';
     if (['delivered', 'complete', 'completed'].includes(normalized)) return 'Delivered';
     if (['cancelled', 'canceled', 'cancel', 'cancelled by user'].includes(normalized)) return 'Cancelled';
     if (['returned', 'return initiated', 'refund requested'].includes(normalized)) return 'Returned';
@@ -174,7 +190,7 @@ function UserDashboard({
     }
 
     const statusLabel = getOrderStatusLabel(selectedOrder.status);
-    const currentIndex = ['Ordered', 'Packed', 'Shipped', 'Out for Delivery', 'Delivered'].indexOf(statusLabel);
+    const currentIndex = ['Ordered', 'Packing', 'On the way', 'Delivered'].indexOf(statusLabel);
     const steps = [
       { title: 'Order Placed', description: 'Your order has been placed successfully.', icon: '✓' },
       { title: 'Payment Confirmed', description: 'Payment was received and verified.', icon: '✓' },
@@ -397,161 +413,138 @@ function UserDashboard({
           )}
 
           {activeTab === 'orders' && (
-            <div className="user-dashboard-orders-section">
-              <div className="user-dashboard-card user-dashboard-orders-list-panel">
-                <div className="user-dashboard-section-title">
-                  <div>
-                    <h3>My Orders</h3>
-                    <p className="user-dashboard-muted">Track recent purchases, invoices, and delivery updates</p>
-                  </div>
-                  <span className="user-dashboard-muted">{filteredOrders.length} orders</span>
-                </div>
-                <div className="user-dashboard-order-list">
-                  {filteredOrders.length === 0 ? (
-                    <div className="user-dashboard-empty">No matching orders.</div>
-                  ) : filteredOrders.map(order => (
-                    <button key={order._id || order.id} type="button" className={`user-dashboard-order-card ${selectedOrder && (selectedOrder._id || selectedOrder.id) === (order._id || order.id) ? 'selected' : ''}`} onClick={() => setSelectedOrderId(order._id || order.id)}>
-                      <div className="user-dashboard-order-card-main">
-                        <div>
-                          <strong>{order.orderId || order.invoiceNumber || 'Order'}</strong>
-                          <p>{order.items?.length || 0} item(s) · {currency}{Number(order.grandTotal || 0).toLocaleString('en-IN')}</p>
-                        </div>
-                        <span className="user-dashboard-badge">{getOrderStatusLabel(order.status)}</span>
-                      </div>
-                      <div className="user-dashboard-order-card-meta">
-                        <span>{order.orderDate ? new Date(order.orderDate).toLocaleDateString('en-IN') : order.createdAt ? new Date(order.createdAt).toLocaleDateString('en-IN') : 'Date unknown'}</span>
-                        <span>{order.paymentStatus || 'Payment pending'}</span>
-                      </div>
-                    </button>
-                  ))}
-                </div>
+            <div className="ud-orders-page">
+              <div className="ud-orders-page-header">
+                <h2>My Orders</h2>
               </div>
 
-              <div className="user-dashboard-card user-dashboard-order-detail-card">
-                <div className="user-dashboard-section-title">
-                  <div>
-                    <h3>Order Tracking</h3>
-                    <p className="user-dashboard-muted">Premium shipment tracking with live updates</p>
-                  </div>
+              {filteredOrders.length === 0 ? (
+                <div className="ud-orders-empty">
+                  <i className="fa-solid fa-bag-shopping" style={{ fontSize: '3rem', color: '#94a3b8', marginBottom: '1rem' }} />
+                  <h3>No orders yet</h3>
+                  <p>Your orders will appear here once you make a purchase.</p>
                 </div>
-                {selectedOrder ? (
-                  <div className="user-dashboard-order-tracking-shell">
-                    <div className="user-dashboard-order-hero">
-                      <div>
-                        <div className="user-dashboard-order-hero-meta">
-                          <span className="user-dashboard-order-pill">#{selectedOrder.orderId || selectedOrder.invoiceNumber || 'Order'}</span>
-                          <span className="user-dashboard-order-pill user-dashboard-order-pill-muted">Ordered on {selectedOrder.orderDate ? new Date(selectedOrder.orderDate).toLocaleDateString('en-IN') : selectedOrder.createdAt ? new Date(selectedOrder.createdAt).toLocaleDateString('en-IN') : 'Recently placed'}</span>
-                        </div>
-                        <h4>{selectedOrder.orderId || selectedOrder.invoiceNumber || 'Order details'}</h4>
-                        <p>Manage your delivery progress, shipment details, and order summary in one place.</p>
-                      </div>
-                      <div className="user-dashboard-order-hero-status">
-                        <span className="user-dashboard-order-hero-date">Estimated delivery {selectedOrder.estimatedDelivery ? new Date(selectedOrder.estimatedDelivery).toLocaleDateString('en-IN') : 'soon'}</span>
-                        <span className={`user-dashboard-status-badge ${getOrderStatusTone(selectedOrder.status)}`}>{getOrderStatusLabel(selectedOrder.status)}</span>
-                      </div>
-                    </div>
+              ) : filteredOrders.map(order => {
+                const orderId = order.orderId || order.invoiceNumber || order._id || '';
+                const orderDate = order.orderDate || order.createdAt;
+                const formattedDate = orderDate ? new Date(orderDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : 'Date unknown';
+                const total = Number(order.grandTotal || order.total || 0);
+                const statusLabel = getOrderStatusLabel(order.status);
+                const isPaid = (order.paymentStatus || '').toLowerCase() === 'paid' || (order.paymentStatus || '').toLowerCase() === 'completed' || (order.paymentStatus || '').toLowerCase() === 'success';
+                const statusIndex = orderStatusSteps.indexOf(statusLabel);
+                const addr = order.shippingAddress || {};
+                const items = order.items || [];
+                const invoiceUrl = getDashboardInvoiceUrl(order);
 
-                    <div className="user-dashboard-progress-rail" aria-label="Order progress tracker">
-                      {selectedOrderTimeline.map((step, index) => (
-                        <div key={step.step} className={`user-dashboard-progress-step ${step.completed ? 'completed' : ''} ${step.current ? 'current' : ''}`}>
-                          <div className="user-dashboard-progress-circle">
-                            <span>{step.completed ? '✓' : index + 1}</span>
-                          </div>
-                          <strong>{step.step}</strong>
-                        </div>
-                      ))}
-                    </div>
+                const statusDescription = {
+                  'Ordered': 'Your order has been placed and is being processed.',
+                  'Packing': 'Your order is being packed and prepared for dispatch.',
+                  'On the way': 'Your order has been shipped and is on the way.',
+                  'Delivered': 'Your order has been successfully delivered. Thank you!',
+                  'Cancelled': 'This order has been cancelled.',
+                  'Returned': 'This order has been returned.'
+                };
 
-                    <div className="user-dashboard-order-info-grid">
-                      <div className="user-dashboard-order-info-card">
-                        <h4>Shipping Details</h4>
-                        <p><strong>{selectedOrder.customerName || selectedOrder.shippingAddress?.name || 'Customer'}</strong></p>
-                        <p>{selectedOrder.shippingAddress?.phone || selectedOrder.phone || 'Phone not provided'}</p>
-                        <p>{formatOrderAddress(selectedOrder)}</p>
+                return (
+                  <div key={order._id || order.id} className="ud-order-card">
+                    {/* Order Header Row */}
+                    <div className="ud-order-header">
+                      <div className="ud-order-header-col">
+                        <span className="ud-order-header-label">ORDER PLACED</span>
+                        <strong>{formattedDate}</strong>
                       </div>
-                      <div className="user-dashboard-order-info-card">
-                        <h4>Tracking Details</h4>
-                        <div className="user-dashboard-order-info-row"><span>Tracking ID</span><strong>{selectedOrder.trackingNumber || (selectedOrder.trackingUrl ? 'Available' : 'N/A')}</strong></div>
-                        <div className="user-dashboard-order-info-row"><span>Courier</span><strong>{selectedOrder.carrier || 'Courier service'}</strong></div>
-                        <div className="user-dashboard-order-info-row"><span>Created</span><strong>{selectedOrder.createdAt ? new Date(selectedOrder.createdAt).toLocaleDateString('en-IN') : 'Pending'}</strong></div>
-                        <div className="user-dashboard-order-info-row"><span>Expected</span><strong>{selectedOrder.estimatedDelivery ? new Date(selectedOrder.estimatedDelivery).toLocaleDateString('en-IN') : 'TBA'}</strong></div>
-                        <div className="user-dashboard-order-info-row"><span>Status</span><strong>{getOrderStatusLabel(selectedOrder.status)}</strong></div>
+                      <div className="ud-order-header-col">
+                        <span className="ud-order-header-label">TOTAL</span>
+                        <strong style={{ color: '#15803d' }}>{currency}{total.toLocaleString('en-IN')}</strong>
                       </div>
-                      <div className="user-dashboard-order-info-card">
-                        <h4>Order Summary</h4>
-                        <div className="user-dashboard-order-info-row"><span>Items</span><strong>{selectedOrder.items?.length || 0}</strong></div>
-                        <div className="user-dashboard-order-info-row"><span>Subtotal</span><strong>{currency}{Number(selectedOrder.grandTotal || 0).toLocaleString('en-IN')}</strong></div>
-                        <div className="user-dashboard-order-info-row"><span>Payment</span><strong>{selectedOrder.paymentStatus || 'Pending'}</strong></div>
-                        <div className="user-dashboard-order-info-row"><span>Method</span><strong>{selectedOrder.paymentMethod || 'Razorpay'}</strong></div>
-                        <div className="user-dashboard-order-info-row"><span>Order ID</span><strong>{selectedOrder.orderId || selectedOrder.invoiceNumber}</strong></div>
+                      <div className="ud-order-header-col">
+                        <span className="ud-order-header-label">ORDER ID</span>
+                        <strong>{orderId}</strong>
                       </div>
-                    </div>
-
-                    <div className="user-dashboard-order-actions-row">
-                      <button type="button" className="user-dashboard-primary-btn">Download Invoice</button>
-                      <button type="button" className="user-dashboard-outline-btn">View Order Details</button>
-                      <button type="button" className="user-dashboard-outline-btn">Contact Support</button>
-                      {!['Shipped', 'Out for Delivery', 'Delivered', 'Cancelled', 'Returned'].includes(getOrderStatusLabel(selectedOrder.status)) && (
-                        <button type="button" className="user-dashboard-danger-btn">Cancel Order</button>
-                      )}
-                    </div>
-
-                    <div className="user-dashboard-timeline-card">
-                      <div className="user-dashboard-section-title">
-                        <h4>Delivery Timeline</h4>
-                      </div>
-                      <div className="user-dashboard-timeline">
-                        {orderTimelineEntries.map((entry, index) => (
-                          <div key={`${entry.title}-${index}`} className={`user-dashboard-timeline-step ${entry.completed ? 'completed' : ''}`}>
-                            <span>{entry.icon}</span>
-                            <div>
-                              <strong>{entry.title}</strong>
-                              <p>{entry.date}{entry.time ? ` · ${entry.time}` : ''}</p>
-                              <small>{entry.description}</small>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="user-dashboard-products-card">
-                      <div className="user-dashboard-section-title">
-                        <h4>Ordered Products</h4>
-                      </div>
-                      <div className="user-dashboard-products-table">
-                        <div className="user-dashboard-products-table-head">
-                          <span>Product</span>
-                          <span>SKU</span>
-                          <span>Qty</span>
-                          <span>Price</span>
-                          <span>Subtotal</span>
-                          <span>Status</span>
-                          <span>Action</span>
-                        </div>
-                        {(selectedOrder.items || []).length > 0 ? selectedOrder.items.map((item, index) => (
-                          <div key={`${item.name || 'item'}-${index}`} className="user-dashboard-products-table-row">
-                            <span className="user-dashboard-product-cell">
-                              <span className="user-dashboard-product-thumb">{item.name?.[0] || 'P'}</span>
-                              <strong>{item.name || 'Product'}</strong>
-                            </span>
-                            <span>{item.sku || item.product || 'N/A'}</span>
-                            <span>{item.quantity || 1}</span>
-                            <span>{currency}{Number(item.price || 0).toLocaleString('en-IN')}</span>
-                            <span>{currency}{Number(item.totalPrice || (Number(item.quantity || 1) * Number(item.price || 0))).toLocaleString('en-IN')}</span>
-                            <span>{getOrderStatusLabel(selectedOrder.status)}</span>
-                            <button type="button" className="user-dashboard-outline-btn">View Product</button>
-                          </div>
-                        )) : (
-                          <div className="user-dashboard-empty">No items listed for this order.</div>
+                      <div className="ud-order-header-col ud-order-paid-col">
+                        {isPaid && (
+                          <span className="ud-paid-badge"><i className="fa-solid fa-square-check" style={{ marginRight: '0.3rem' }} />Paid</span>
                         )}
                       </div>
                     </div>
 
+                    {/* Status Display */}
+                    <div className="ud-order-status-block">
+                      <h3 className={`ud-order-status-text ${statusLabel === 'Delivered' ? 'delivered' : statusLabel === 'Cancelled' ? 'cancelled' : ''}`}>{statusLabel}</h3>
+                      <p className="ud-order-status-desc">{statusDescription[statusLabel] || 'Order status is being updated.'}</p>
+                    </div>
+
+                    {/* Progress Bar */}
+                    <div className="ud-progress-bar">
+                      <div className="ud-progress-line">
+                        <div className="ud-progress-line-fill" style={{ width: statusIndex >= 0 ? `${(statusIndex / (orderStatusSteps.length - 1)) * 100}%` : '0%' }} />
+                      </div>
+                      {orderStatusSteps.map((step, i) => {
+                        const done = i <= statusIndex;
+                        const isCurrent = i === statusIndex;
+                        return (
+                          <div key={step} className={`ud-progress-step ${done ? 'done' : ''} ${isCurrent ? 'current' : ''}`}>
+                            <div className="ud-progress-dot">
+                              {done ? <i className="fa-solid fa-check" /> : i + 1}
+                            </div>
+                            <span className={isCurrent ? 'ud-step-label-current' : ''}>{step}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Info Cards Grid */}
+                    <div className="ud-order-info-row">
+                      <div className="ud-info-card">
+                        <h4>Shipment Info</h4>
+                        <p>Tracking details will appear once your order is dispatched.</p>
+                        {invoiceUrl && (
+                          <button type="button" className="ud-link-btn" onClick={() => window.open(invoiceUrl, '_blank')}>
+                            <i className="fa-solid fa-file-lines" style={{ marginRight: '0.4rem' }} />View Invoice
+                          </button>
+                        )}
+                      </div>
+                      <div className="ud-info-card">
+                        <h4>Shipping Address</h4>
+                        <p><strong>{addr.name || order.customerName || 'Customer'}</strong></p>
+                        <p>{[addr.addressLine1, addr.addressLine2, addr.city, addr.state].filter(Boolean).join(', ') || 'Address not provided'}</p>
+                        {addr.zipCode && <p>{addr.zipCode}</p>}
+                        {(addr.phone || order.phone) && <p>Ph: {addr.phone || order.phone}</p>}
+                      </div>
+                      <div className="ud-info-card ud-info-card-accent">
+                        <h4>Order Info</h4>
+                        <div className="ud-info-row"><span>Subtotal</span><strong>{currency}{total.toLocaleString('en-IN')}</strong></div>
+                        <div className="ud-info-row ud-info-total"><span>Grand Total</span><strong style={{ color: '#15803d' }}>{currency}{total.toLocaleString('en-IN')}</strong></div>
+                        <button type="button" className="ud-link-btn" onClick={() => setSelectedOrderId(order._id || order.id)}>
+                          <i className="fa-solid fa-magnifying-glass" style={{ marginRight: '0.4rem' }} />View order details
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Items in this Order */}
+                    <div className="ud-order-items-section">
+                      <h4 className="ud-items-label">ITEMS IN THIS ORDER</h4>
+                      {items.map((item, idx) => {
+                        const img = item.image || item.images?.[0] || item.thumbnail || '';
+                        return (
+                          <div key={`${item.name || 'item'}-${idx}`} className="ud-order-item-row">
+                            <div className="ud-order-item-img">
+                              {img ? <img src={img} alt={item.name || 'Product'} /> : <span className="ud-item-fallback">{(item.name || 'P')[0]}</span>}
+                            </div>
+                            <div className="ud-order-item-info">
+                              <strong>{item.name || 'Product'}</strong>
+                              <span>Qty: {item.quantity || 1} · {currency}{Number(item.price || 0).toLocaleString('en-IN')} each</span>
+                            </div>
+                            <div className="ud-order-item-price">
+                              <strong>{currency}{Number(item.totalPrice || (Number(item.quantity || 1) * Number(item.price || 0))).toLocaleString('en-IN')}</strong>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                ) : (
-                  <div className="user-dashboard-empty">Choose an order to inspect its progress.</div>
-                )}
-              </div>
+                );
+              })}
             </div>
           )}
 

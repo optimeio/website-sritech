@@ -11,7 +11,17 @@ export default defineConfig({
       '/api': {
         target: 'http://127.0.0.1:5000',
         changeOrigin: true,
+        ws: false,
+        configure: (proxy) => {
+          proxy.on('error', (err) => {
+            // Suppress ECONNREFUSED noise during backend restarts
+            if (err.code !== 'ECONNREFUSED' && err.code !== 'ECONNRESET') {
+              console.warn('[proxy]', err.message);
+            }
+          });
+        },
       },
     },
   },
 })
+

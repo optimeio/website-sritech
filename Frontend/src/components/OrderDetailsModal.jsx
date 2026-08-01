@@ -1,5 +1,20 @@
 import React from 'react';
 
+const MODAL_API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const MODAL_BACKEND_URL = MODAL_API_URL.replace(/\/api\/?$/, '');
+
+const getModalInvoiceUrl = (order) => {
+  if (!order) return '';
+  const orderId = order._id || order.id || order.orderId || order.invoiceNumber;
+  if (orderId) {
+    return `${MODAL_API_URL}/orders/${orderId}/invoice`;
+  }
+  const path = order.invoicePdfPath || order.invoiceUrl || order.invoiceLink || '';
+  if (!path) return '';
+  if (path.startsWith('http')) return path;
+  return `${MODAL_BACKEND_URL}${path.startsWith('/') ? '' : '/'}${path}`;
+};
+
 const PriceRow = ({ label, value }) => (
   <div className="flex justify-between py-1 text-sm">
     <div className="text-gray-600">{label}</div>
@@ -80,8 +95,8 @@ const OrderDetailsModal = ({ order, onClose }) => {
               </div>
 
               <div className="mt-4 space-y-2">
-                <button className="w-full px-3 py-2 bg-[#2874F0] text-white rounded">Download Invoice</button>
-                <button className="w-full px-3 py-2 bg-white border rounded">Contact Support</button>
+                <button className="w-full px-3 py-2 bg-[#2874F0] text-white rounded" onClick={() => { const url = getModalInvoiceUrl(order); if (url) window.open(url, '_blank'); }} disabled={!getModalInvoiceUrl(order)}><i className="fa-solid fa-file-invoice" style={{ marginRight: '0.4rem' }} />Download Invoice</button>
+                <button className="w-full px-3 py-2 bg-white border rounded" onClick={() => window.open(`mailto:support@thesritech.com?subject=Support%20Request%20-%20Order%20${order.orderId || order._id || ''}`, '_self')}>Contact Support</button>
               </div>
             </aside>
           </div>
