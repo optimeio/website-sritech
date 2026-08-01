@@ -2569,7 +2569,7 @@ function App() {
               if (!isAdmin) {
                 setTimeout(() => openUserDashboard('Overview'), 0);
               }
-              showToast('✅ Email verified successfully!', 'success');
+              showToast('Account creation successful!', 'success');
               return;
             }
 
@@ -2890,7 +2890,7 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('verified') === 'true') {
-      showToast('Email verified successfully!', 'success');
+      showToast('Account creation successful!', 'success');
       window.history.replaceState({}, '', window.location.pathname);
     } else if (params.get('loggedin') === 'true') {
       showToast('Login successful!', 'success');

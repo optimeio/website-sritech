@@ -42,7 +42,7 @@ const AuthPage = () => {
         window.dispatchEvent(new Event('auth-change'));
       }
 
-      setMessage('Email verified successfully. Redirecting...');
+      setMessage('Account creation successful! Redirecting...');
       setMessageType('success');
       setTimeout(() => {
         window.location.href = '/?verified=true';
