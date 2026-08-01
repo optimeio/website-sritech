@@ -300,6 +300,18 @@ function createModelClass(modelName, schema) {
     return docs;
   };
 
+  Model.deleteOne = async function(query) {
+    const db = loadDB();
+    const list = db[modelName] || [];
+    const idx = list.findIndex(doc => matchDoc(doc, query));
+    if (idx !== -1) {
+      list.splice(idx, 1);
+      saveDB(db);
+      return { deletedCount: 1 };
+    }
+    return { deletedCount: 0 };
+  };
+
   Model.deleteMany = async function(query) {
     const db = loadDB();
     const list = db[modelName] || [];

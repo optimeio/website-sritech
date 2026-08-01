@@ -94,7 +94,7 @@ exports.signup = asyncHandler(async (req, res) => {
       existingUser.otpExpires = undefined;
       await existingUser.save();
     } else if (user && user._id) {
-      await User.deleteOne({ _id: user._id });
+      await User.findByIdAndDelete(user._id);
     }
     return res.status(500).json({ success: false, error: 'Failed to send OTP email.' });
   }

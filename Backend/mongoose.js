@@ -1,7 +1,7 @@
 const realMongoose = require('mongoose');
 const mockMongoose = require('./mockMongoose');
 
-let activeMongoose = realMongoose;
+let activeMongoose = mockMongoose;
 const modelProxies = {};
 
 const handler = {
