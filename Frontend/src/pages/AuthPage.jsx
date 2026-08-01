@@ -312,43 +312,47 @@ const AuthPage = () => {
             )}
 
 
-            <div className="auth-form-group">
-              <label htmlFor="email">Email Address</label>
-              <div className="auth-input-wrapper">
-                <i className="fa-regular fa-envelope prefix-icon" />
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  className="auth-input"
-                  placeholder="hello@example.com"
-                  required
-                  value={userCredentials.email}
-                  onChange={e => setUserCredentials({ ...userCredentials, email: e.target.value })}
-                />
-              </div>
-            </div>
-            <div className="auth-form-group">
-              <label htmlFor="password">Password</label>
-              <div className="auth-input-wrapper">
-                <i className="fa-solid fa-lock prefix-icon" />
-                <input
-                  id="password"
-                  name="password"
-                  type={showPassword ? 'text' : 'password'}
-                  autoComplete={authMode === 'login' ? 'current-password' : 'new-password'}
-                  className="auth-input"
-                  placeholder="••••••••"
-                  required
-                  value={userCredentials.password}
-                  onChange={e => setUserCredentials({ ...userCredentials, password: e.target.value })}
-                />
-                <button type="button" className="pwd-toggle" onClick={() => setShowPassword(!showPassword)}>
-                  <i className={`fa-regular ${showPassword ? 'fa-eye-slash' : 'fa-eye'}`} />
-                </button>
-              </div>
-            </div>
+            {authMode !== 'verify' && (
+              <>
+                <div className="auth-form-group">
+                  <label htmlFor="email">Email Address</label>
+                  <div className="auth-input-wrapper">
+                    <i className="fa-regular fa-envelope prefix-icon" />
+                    <input
+                      id="email"
+                      name="email"
+                      type="email"
+                      autoComplete="email"
+                      className="auth-input"
+                      placeholder="hello@example.com"
+                      required
+                      value={userCredentials.email}
+                      onChange={e => setUserCredentials({ ...userCredentials, email: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <div className="auth-form-group">
+                  <label htmlFor="password">Password</label>
+                  <div className="auth-input-wrapper">
+                    <i className="fa-solid fa-lock prefix-icon" />
+                    <input
+                      id="password"
+                      name="password"
+                      type={showPassword ? 'text' : 'password'}
+                      autoComplete={authMode === 'login' ? 'current-password' : 'new-password'}
+                      className="auth-input"
+                      placeholder="••••••••"
+                      required={authMode !== 'verify'}
+                      value={userCredentials.password}
+                      onChange={e => setUserCredentials({ ...userCredentials, password: e.target.value })}
+                    />
+                    <button type="button" className="pwd-toggle" onClick={() => setShowPassword(!showPassword)}>
+                      <i className={`fa-regular ${showPassword ? 'fa-eye-slash' : 'fa-eye'}`} />
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
             {authMode === 'signup' && (
                 <div className="auth-form-group">
                   <label htmlFor="confirmPassword">Confirm Password</label>
