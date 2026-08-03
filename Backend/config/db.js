@@ -1,12 +1,12 @@
 const mongoose = require('../mongoose');
 
-const DEFAULT_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/sri_tech_db';
+const DEFAULT_URI = process.env.MONGODB_URI || process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/sri_tech_db';
 const CONNECT_TIMEOUT_MS = Number(process.env.DB_CONNECT_TIMEOUT || 10000);
 const SERVER_SELECTION_TIMEOUT_MS = Number(process.env.DB_SERVER_SELECTION_TIMEOUT || 10000);
 const SOCKET_TIMEOUT_MS = Number(process.env.DB_SOCKET_TIMEOUT_MS || 15000);
 const MONITOR_INTERVAL_MS = Number(process.env.DB_MONITOR_INTERVAL_MS || 300000);
 const MONITOR_MAX_ATTEMPTS = Number(process.env.DB_MONITOR_MAX_ATTEMPTS || 12);
-const FALLBACK_TO_MOCK = true;
+const FALLBACK_TO_MOCK = process.env.NODE_ENV !== 'production';
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
