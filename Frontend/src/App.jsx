@@ -808,11 +808,19 @@ function App() {
     }
 
     if (targetProductKey) {
-      const found = products.find(p => 
+      let found = products.find(p => 
         String(p._id || p.id) === targetProductKey || 
         (p.slug && String(p.slug) === targetProductKey) ||
         getProductSlug(p) === targetProductKey
       );
+      
+      if (!found) {
+        found = products.find(p => 
+          (p.slug && String(p.slug).startsWith(targetProductKey)) ||
+          getProductSlug(p).startsWith(targetProductKey)
+        );
+      }
+
       if (found) {
         if (!selectedProduct || (selectedProduct._id || selectedProduct.id) !== found._id) {
           setSelectedProduct(found);
