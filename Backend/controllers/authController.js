@@ -73,31 +73,30 @@ exports.signup = asyncHandler(async (req, res) => {
 
   console.log('[signup] OTP generated and saved', { email: normalizedEmail, otp });
 
+  let emailSent = false;
   try {
     console.log('[signup] sending verification email', { email: normalizedEmail });
     await sendOtpEmail(user, otp);
     console.log('[signup] verification email sent successfully', { email: normalizedEmail });
-    return res.status(201).json({
-      success: true,
-      message: 'OTP sent successfully.',
-      requiresVerification: true,
-      email: normalizedEmail
-    });
+    emailSent = true;
   } catch (err) {
     console.error('[signup] failed to send verification email', {
       email: normalizedEmail,
-      error: err.message || String(err),
-      stack: err.stack || 'no stack'
+      error: err.message || String(err)
     });
-    if (existingUser) {
-      existingUser.otp = undefined;
-      existingUser.otpExpires = undefined;
-      await existingUser.save();
-    } else if (user && user._id) {
-      await User.findByIdAndDelete(user._id);
-    }
-    return res.status(500).json({ success: false, error: 'Failed to send OTP email.' });
+    // Don't delete the user – keep the OTP so verify-otp can still work.
+    // Log OTP to console so it can be used during development / testing.
+    console.log(`[signup] ⚠️ Email delivery failed. OTP for ${normalizedEmail}: ${otp}`);
   }
+
+  return res.status(201).json({
+    success: true,
+    message: emailSent
+      ? 'OTP sent successfully. Please check your email.'
+      : 'Account created. OTP email could not be delivered – check server console for the OTP.',
+    requiresVerification: true,
+    email: normalizedEmail
+  });
 });
 
 exports.verifyOtp = asyncHandler(async (req, res) => {
@@ -129,14 +128,27 @@ exports.verifyOtp = asyncHandler(async (req, res) => {
   user.otpExpires = undefined;
   await user.save();
 
-  const token = generateToken({ id: user._id, role: user.role });
+  const token = generateToken({ id: user._id, role: user.role || 'user' });
   console.log('[verifyOtp] email verified successfully', normalizedEmail);
+
+  // Build a clean user object (mock mongoose toJSON may not strip fields properly)
+  const safeUser = {
+    _id: user._id,
+    name: user.name,
+    email: user.email,
+    phone: user.phone,
+    address: user.address,
+    role: user.role || 'user',
+    status: user.status || 'active',
+    isVerified: true,
+    createdAt: user.createdAt
+  };
 
   return res.json({
     success: true,
     message: 'Email verified successfully.',
     token,
-    user
+    user: safeUser
   });
 });
 
@@ -159,13 +171,23 @@ exports.resendOtp = asyncHandler(async (req, res) => {
   user.otpExpires = otpExpires;
   await user.save();
 
+  let emailSent = false;
   try {
     await sendOtpEmail(user, otp);
-    return res.json({ success: true, message: 'OTP resent successfully.', requiresVerification: true, email: normalizedEmail });
+    emailSent = true;
   } catch (err) {
     console.error('[resendOtp] failed to resend verification email', { email: normalizedEmail, error: err.message || String(err) });
-    return res.status(500).json({ success: false, error: 'Failed to resend OTP email.' });
+    console.log(`[resendOtp] ⚠️ Email delivery failed. OTP for ${normalizedEmail}: ${otp}`);
   }
+
+  return res.json({
+    success: true,
+    message: emailSent
+      ? 'OTP resent successfully.'
+      : 'New OTP generated. Email could not be delivered – check server console for the OTP.',
+    requiresVerification: true,
+    email: normalizedEmail
+  });
 });
 
 exports.login = asyncHandler(async (req, res) => {
@@ -193,11 +215,23 @@ exports.login = asyncHandler(async (req, res) => {
     });
   }
 
-  const token = generateToken({ id: user._id, role: user.role });
+  const token = generateToken({ id: user._id, role: user.role || 'user' });
+
+  const safeUser = {
+    _id: user._id,
+    name: user.name,
+    email: user.email,
+    phone: user.phone,
+    address: user.address,
+    role: user.role || 'user',
+    status: user.status || 'active',
+    isVerified: user.isVerified,
+    createdAt: user.createdAt
+  };
 
   res.json({
     token,
-    user
+    user: safeUser
   });
 });
 

@@ -49,8 +49,14 @@ const AuthPage = () => {
       }, 800);
     } catch (err) {
       console.error(err);
-      setMessage(err.message || 'OTP verification failed.');
-      setMessageType('error');
+      if (/already verified/i.test(err.message)) {
+        setMessage('Your account is already verified! Please sign in.');
+        setMessageType('success');
+        setAuthMode('login');
+      } else {
+        setMessage(err.message || 'OTP verification failed.');
+        setMessageType('error');
+      }
     }
   };
 

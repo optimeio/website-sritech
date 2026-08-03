@@ -2457,14 +2457,28 @@ function App() {
 
     try {
       if (authMode === 'signup') {
-        if (currentValues.password !== currentValues.confirmPassword) {
-          showToast('Passwords do not match!', 'error');
+        let hasErrors = false;
+        let newErrors = {};
+
+        if (!currentValues.name) { newErrors.name = 'Name is required.'; hasErrors = true; }
+        if (!currentValues.email) { newErrors.email = 'Email is required.'; hasErrors = true; }
+        if (!currentValues.password) { newErrors.password = 'Password is required.'; hasErrors = true; }
+        
+        if (currentValues.password && currentValues.password !== currentValues.confirmPassword) {
+          newErrors.confirmPassword = 'Passwords do not match!';
+          hasErrors = true;
+        }
+        if (currentValues.phone && !/^\d{10}$/.test(currentValues.phone)) {
+          newErrors.phone = 'Phone number must be exactly 10 digits.';
+          hasErrors = true;
+        }
+
+        if (hasErrors) {
+          setAuthFieldErrors(newErrors);
           return;
         }
-        if (!/^\d{10}$/.test(currentValues.phone || '')) {
-          showToast('Phone number must be exactly 10 digits.', 'error');
-          return;
-        }
+        
+        setAuthFieldErrors({});
         const res = await fetch(`${API_URL}/auth/signup`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -2566,17 +2580,22 @@ function App() {
               setShowAuthModal(false);
               setAuthErrorMessage(null);
               setAuthFieldErrors({ email: '', password: '' });
+              showToast('Account verified successfully!', 'success');
               if (!isAdmin) {
-                setTimeout(() => openUserDashboard('Overview'), 0);
+                setTimeout(() => openUserDashboard('Overview'), 500);
               }
-              showToast('Account creation successful!', 'success');
-              return;
+            } else {
+              showToast('Your email has been verified. Please log in.', 'success');
+              setAuthMode('login');
             }
-
-            showToast('Your email has been verified. Please log in.', 'success');
-            setAuthMode('login');
           } else {
-            showToast(data.error || data.message || 'OTP verification failed.', 'error');
+            const errorMsg = data.error || data.message || 'OTP verification failed.';
+            if (/already verified/i.test(errorMsg)) {
+              showToast('Your account is already verified! Please sign in.', 'success');
+              setAuthMode('login');
+            } else {
+              showToast(errorMsg, 'error');
+            }
           }
           return;
         }
@@ -2610,6 +2629,15 @@ function App() {
           showToast(adminData.message || 'Invalid admin credentials.', 'error');
           return;
         }
+
+        if (!normalizedEmail || !currentValues.password) {
+          let newErrors = {};
+          if (!normalizedEmail) newErrors.email = 'Email is required.';
+          if (!currentValues.password) newErrors.password = 'Password is required.';
+          setAuthFieldErrors(newErrors);
+          return;
+        }
+        setAuthFieldErrors({});
 
         let res;
         try {
@@ -3769,7 +3797,7 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
                 </button>
               </div>
 
-              <form onSubmit={handleUserAuthSubmit}>
+              <form onSubmit={handleUserAuthSubmit} noValidate>
                 
                 {/* Sign Up Specific Fields */}
                 {authMode === 'signup' && (
@@ -3781,13 +3809,16 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
                         <input 
                           type="text" 
                           name="name"
-                          className="auth-input" 
+                          className={`auth-input ${authFieldErrors.name ? 'invalid' : ''}`} 
                           placeholder="John Doe" 
                           required
                           value={userCredentials.name}
                           onChange={(e) => updateUserCredentials('name', e.target.value)}
                         />
                       </div>
+                      {authFieldErrors.name && (
+                        <p className="auth-field-error">{authFieldErrors.name}</p>
+                      )}
                     </div>
                     <div className="auth-form-group">
                       <label>Mobile Number</label>
@@ -3797,13 +3828,16 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
                           type="tel" 
                           name="phone"
                           inputMode="numeric"
-                          className="auth-input" 
+                          className={`auth-input ${authFieldErrors.phone ? 'invalid' : ''}`} 
                           placeholder="9876543210" 
                           required
                           value={userCredentials.phone || ''}
                           onChange={(e) => updateUserCredentials('phone', e.target.value)}
                         />
                       </div>
+                      {authFieldErrors.phone && (
+                        <p className="auth-field-error">{authFieldErrors.phone}</p>
+                      )}
                     </div>
                     <div className="auth-form-group">
                       <label>Address</label>
@@ -3879,7 +3913,7 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
                       <input 
                         type={showConfirmPassword ? "text" : "password"} 
                         name="confirmPassword"
-                        className="auth-input" 
+                        className={`auth-input ${authFieldErrors.confirmPassword ? 'invalid' : ''}`} 
                         placeholder="••••••••" 
                         required
                         value={userCredentials.confirmPassword || ''}
@@ -3889,6 +3923,9 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
                         <i className={`fa-regular ${showConfirmPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
                       </button>
                     </div>
+                    {authFieldErrors.confirmPassword && (
+                      <p className="auth-field-error">{authFieldErrors.confirmPassword}</p>
+                    )}
                   </div>
                 )}
 

@@ -80,6 +80,8 @@ function matchDoc(doc, query) {
 class MockDocument {
   constructor(modelName, data) {
     this._modelName = modelName;
+    this._isNew = !data._id;
+    this._originalData = { ...data };
     
     if (!data._id) {
       this._id = generateId();
@@ -97,6 +99,19 @@ class MockDocument {
       if (this.isVerified === undefined) this.isVerified = false;
     }
     if (!this.createdAt) this.createdAt = new Date().toISOString();
+  }
+
+  get isNew() {
+    return this._isNew;
+  }
+
+  isModified(field) {
+    if (!field) return true;
+    return this._originalData[field] !== this[field];
+  }
+
+  markModified() {
+    // no-op for mock
   }
 
   async save() {
@@ -122,6 +137,16 @@ class MockDocument {
   }
 
   toJSON() {
+    const plainDoc = {};
+    for (let key in this) {
+      if (key !== '_modelName' && typeof this[key] !== 'function') {
+        plainDoc[key] = this[key];
+      }
+    }
+    return plainDoc;
+  }
+
+  toObject() {
     const plainDoc = {};
     for (let key in this) {
       if (key !== '_modelName' && typeof this[key] !== 'function') {
