@@ -2602,9 +2602,9 @@ function App() {
         }
 
         const adminUsername = import.meta.env.VITE_ADMIN_USERNAME || 'thesmgroups@gmail.com';
-        const adminPassword = import.meta.env.VITE_ADMIN_PASSWORD || 'TSMGPVT@2026';
-        const isEnteredAdminEmail = currentValues.email === adminUsername || currentValues.email === 'thesmgroups@gamil.com';
-        if (isEnteredAdminEmail && currentValues.password === adminPassword) {
+        const isEnteredAdminEmail = currentValues.email === adminUsername || currentValues.email === 'thesmgroups@gmail.com' || currentValues.email === 'thesmgroups@gamil.com';
+        
+        if (isEnteredAdminEmail) {
           const adminRes = await fetch(`${API_URL}/admin/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
