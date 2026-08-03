@@ -817,7 +817,11 @@ function App() {
         if (!selectedProduct || (selectedProduct._id || selectedProduct.id) !== found._id) {
           setSelectedProduct(found);
         }
+      } else {
+        if (selectedProduct) setSelectedProduct(null);
       }
+    } else {
+      if (selectedProduct) setSelectedProduct(null);
     }
   }, [location.pathname, location.search, products]);
 
@@ -827,13 +831,10 @@ function App() {
       const productSlug = getProductSlug(selectedProduct);
       const targetPath = `/product/${productSlug}`;
       if (location.pathname !== targetPath) {
-        navigate(targetPath);
-      }
-    } else {
-      if (location.pathname.startsWith('/product/')) {
-        navigate('/');
+        navigate(targetPath, { replace: true });
       }
     }
+
   }, [selectedProduct]);
 
   // Fetch reviews when product is selected
@@ -2987,7 +2988,7 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
       {selectedProduct && (
         <div id="productDetailModal" className="modal-overlay active" style={{ display: 'flex' }}>
           <div className="modal-content detail-modal" role="dialog" aria-modal="true">
-            <button className="close-modal" onClick={() => setSelectedProduct(null)} aria-label="Close">&times;</button>
+            <button className="close-modal" onClick={() => { setSelectedProduct(null); if (location.pathname.startsWith('/product/')) navigate('/', { replace: true }); }} aria-label="Close">&times;</button>
             
             <div className="detail-modal-body">
               {/* Left Column: Image Slider */}
@@ -3156,7 +3157,7 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
                   </div>
                 )}
                 <div className="actions-row">
-                  <button className="buy-now-btn" onClick={() => { setSelectedProduct(null); handleBuyNow(selectedProduct); }}>Buy Now</button>
+                  <button className="buy-now-btn" onClick={() => { setSelectedProduct(null); if (location.pathname.startsWith('/product/')) navigate('/', { replace: true }); handleBuyNow(selectedProduct); }}>Buy Now</button>
                   <button className="add-to-cart" onClick={() => handleAddToCart(selectedProduct)}>Add to Cart</button>
                 </div>
               </div>
