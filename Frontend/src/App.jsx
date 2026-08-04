@@ -976,9 +976,10 @@ function App() {
       });
 
       if (res.ok) {
+        const json = await res.json();
         await refreshProducts();
         showToast('Product added successfully!', 'success');
-        return true;
+        return json.product || true;
       }
 
       const errorData = await res.json().catch(() => ({}));
@@ -2948,6 +2949,7 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
         products={products} 
         onAddProduct={addProduct} 
         onDeleteProduct={deleteProduct}
+        navigate={navigate}
         onUpdateProduct={updateProduct}
 
         offers={offers}

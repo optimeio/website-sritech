@@ -218,7 +218,6 @@ const buildCategoryLabel = categoryValue => {
 const seedProducts = async () => {
   const Product = require('./models/Product');
   try {
-    await Product.schema.index({ createdAt: -1 });
     if (Product.ensureIndexes) {
       await Product.ensureIndexes().catch(err => console.warn('Index creation warning:', err));
     }
@@ -248,59 +247,8 @@ const seedProducts = async () => {
     }
 
     if (defaultProducts.length === 0) {
-      defaultProducts = [
-        {
-          name: 'Rocket Stove',
-          price: '₹3,999',
-          category: 'Stoves',
-          icon: 'fa-fire',
-          isNewArrival: true,
-          images: ['/rocket-stove.png']
-        },
-        {
-          name: '10" Stove',
-          price: '₹4,499',
-          category: 'Stoves',
-          icon: 'fa-burn',
-          images: ['/hero-image.png']
-        },
-        {
-          name: 'Rocket Stove Pro',
-          price: '₹5,499',
-          category: 'Stoves',
-          icon: 'fa-fire-flame-simple',
-          images: ['/rocket-stove.png']
-        },
-        {
-          name: 'Stove Cooking Plate Kit',
-          price: '₹1,299',
-          category: 'Stoves',
-          icon: 'fa-hot-tub-person',
-          images: ['/hero-image.png']
-        },
-        {
-          name: 'Home Appliance Starter Kit',
-          price: '₹1,999',
-          category: 'Home Appliances',
-          icon: 'fa-house',
-          images: ['/hero-banner.png']
-        },
-        {
-          name: 'Engraining Premium Pack',
-          price: '₹2,999',
-          category: 'Engraining Products',
-          icon: 'fa-screwdriver-wrench',
-          images: ['/rocket-stove.png']
-        },
-        {
-          name: 'SriTech Welding Torch',
-          price: '₹2,499',
-          category: 'Welding Products',
-          icon: 'fa-fire-flame-curved',
-          isNewArrival: true,
-          images: ['/hero-image.png']
-        }
-      ];
+      console.log('🌱 No default products to seed (hardcoded defaults removed)');
+      return;
     }
 
     await Product.insertMany(defaultProducts);

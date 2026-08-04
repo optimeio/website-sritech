@@ -7,6 +7,7 @@ const AdminDashboard = ({
   onAddProduct, 
   onDeleteProduct,
   onUpdateProduct,
+  navigate,
   offers = [],
   offerData, 
   onUpdateOffer, 
@@ -509,10 +510,15 @@ const AdminDashboard = ({
     };
 
     try {
-      const success = await onAddProduct(payload);
-      if (success) {
+      const savedProduct = await onAddProduct(payload);
+      if (savedProduct) {
         alert('Product added successfully!');
         setNewProduct({ name: '', price: '', description: '', specifications: '', howToUse: '', stock: 0, shippingCharge: 0, gstPercent: 0, discountPercent: 0, category: categories[0]?.slug || categories[0]?.name || 'stoves', icon: 'fa-box', isNewArrival: false, images: [], video: '' });
+        if (navigate && savedProduct.slug) {
+          if (window.confirm('Do you want to view the new product page?')) {
+            navigate(`/product/${savedProduct.slug}`);
+          }
+        }
       } else {
         alert('Failed to add product. Please try again.');
       }
