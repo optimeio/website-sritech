@@ -734,11 +734,14 @@ function App() {
         const res = await fetch(`${API_URL}/admin/verify`, {
           headers: { Authorization: `Bearer ${adminToken}` }
         });
-        if (res.ok) {
+        const data = await res.json();
+        if (data.isAdmin) {
           setIsAdmin(true);
-          setIsViewingPublicProducts(false);
+          const currentPath = window.location.pathname;
+          const isExplicitAdminPath = currentPath === '/admin' || currentPath.startsWith('/admin/');
+          setIsViewingPublicProducts(!isExplicitAdminPath);
         } else {
-          const errorBody = await res.json().catch(() => ({}));
+          const errorBody = data;
           console.warn('Admin session invalid:', errorBody.message || res.statusText);
           clearAdminSession();
           setIsAdmin(false);
