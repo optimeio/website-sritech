@@ -26,7 +26,7 @@ try {
 dotenv.config({ path: path.resolve(__dirname, '.env') });
 
 const connectDatabase = require('./config/db');
-const mongoose = require('./mongoose');
+const mongoose = require('mongoose');
 require('./config/cloudinary');
 require('./config/razorpay');
 const errorHandler = require('./middleware/errorHandler');
@@ -121,7 +121,6 @@ const setupRoutes = () => {
   });
   app.get('/api/debug-state', (req, res) => {
     res.json({
-      isMock: mongoose.isMock?.(),
       readyState: mongoose.connection?.readyState,
       fallbackLength: require('./controllers/productController').fallbackProducts?.length
     });
@@ -271,43 +270,32 @@ const startServer = async () => {
   // Connect to database in background (non-blocking)
   try {
     console.log('📍 Connecting to database...');
-    const dbInfo = await connectDatabase();
+    await connectDatabase();
 
-    if (dbInfo.mode === 'Mock') {
-      console.warn('⚠️ MongoDB unavailable: running in mock fallback mode with Backend/db.json');
-      connectDatabase.monitorMongoAvailability && connectDatabase.monitorMongoAvailability();
-    }
+    const runWithTimeout = (promise, name) => {
+      return Promise.race([
+        promise,
+        new Promise((_, reject) => setTimeout(() => reject(new Error(`${name} timed out after 12000ms`)), 12000))
+      ]);
+    };
 
-    if (dbInfo.mode === 'MongoDB' || dbInfo.mode === 'Mock') {
-      const runWithTimeout = (promise, name) => {
-        return Promise.race([
-          promise,
-          new Promise((_, reject) => setTimeout(() => reject(new Error(`${name} timed out after 12000ms`)), 12000))
-        ]);
-      };
+    console.log('📍 Seeding default categories...');
+    await runWithTimeout(seedCategories(), 'Category seeding').catch(e => {
+      console.warn('⚠️ Category seed warning:', e.message);
+    });
 
-      console.log('📍 Seeding default categories...');
-      await runWithTimeout(seedCategories(), 'Category seeding').catch(e => {
-        console.warn('⚠️ Category seed warning:', e.message);
-        if (mongoose.useMock) mongoose.useMock();
-      });
+    console.log('📍 Seeding default products...');
+    await runWithTimeout(seedProducts(), 'Product seeding').catch(e => {
+      console.warn('⚠️ Product seed warning:', e.message);
+    });
 
-      console.log('📍 Seeding default products...');
-      await runWithTimeout(seedProducts(), 'Product seeding').catch(e => {
-        console.warn('⚠️ Product seed warning:', e.message);
-        if (mongoose.useMock) mongoose.useMock();
-      });
-
-      console.log('📍 Ensuring demo user account...');
-      await runWithTimeout(ensureDemoUser(), 'Ensuring demo user').catch(e => {
-        console.warn('⚠️ Demo user warning:', e.message);
-        if (mongoose.useMock) mongoose.useMock();
-      });
-    }
+    console.log('📍 Ensuring demo user account...');
+    await runWithTimeout(ensureDemoUser(), 'Ensuring demo user').catch(e => {
+      console.warn('⚠️ Demo user warning:', e.message);
+    });
   } catch (err) {
-    // Don't crash – log and continue with mock mode
-    console.warn('⚠️ Database startup warning (server still running):', err.message);
-    if (mongoose.useMock) mongoose.useMock();
+    // Database connection failed, app should still run but API will fail
+    console.warn('⚠️ Database startup error (server still running):', err.message);
   }
 };
 

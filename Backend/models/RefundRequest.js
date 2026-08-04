@@ -1,4 +1,4 @@
-const mongoose = require('../mongoose');
+const mongoose = require('mongoose');
 
 const refundTimelineSchema = new mongoose.Schema({
   status: { type: String, required: true },

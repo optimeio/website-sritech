@@ -1,4 +1,4 @@
-const mongoose = require('../mongoose');
+const mongoose = require('mongoose');
 
 const activityLogSchema = new mongoose.Schema({
   action: { type: String, required: true }, // e.g. "Added Product", "Deleted User"

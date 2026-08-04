@@ -9,7 +9,7 @@ const originalSendEmail = emailService.sendEmail;
 const originalCreateInvoicePdf = invoiceService.createInvoicePdf;
 
 test('createOrder computes totals and saves a new order', async () => {
-  mongoose.useMock();
+  
   delete require.cache[require.resolve('../models/Order')];
   delete require.cache[require.resolve('../models/Invoice')];
   const Order = require('../models/Order');

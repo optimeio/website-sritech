@@ -1,4 +1,4 @@
-const mongoose = require('../mongoose');
+const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
 const addressSchema = new mongoose.Schema({
@@ -61,41 +61,4 @@ userSchema.methods.toJSON = function () {
   return obj;
 };
 
-const overrides = new Map();
-const getActiveMongoose = () => (mongoose.getActive ? mongoose.getActive() : mongoose);
-
-const getActiveUserModel = () => {
-  const activeMongoose = getActiveMongoose();
-  const existingModel = activeMongoose.models?.User;
-  if (existingModel) {
-    return existingModel;
-  }
-  return activeMongoose.model('User', userSchema);
-};
-
-const UserModelProxy = new Proxy(function UserModelProxy() {}, {
-  construct(target, args) {
-    const activeModel = getActiveUserModel();
-    return new activeModel(...args);
-  },
-  get(target, prop) {
-    if (overrides.has(prop)) {
-      return overrides.get(prop);
-    }
-
-    const activeModel = getActiveUserModel();
-    const value = activeModel[prop];
-
-    if (typeof value === 'function') {
-      return value.bind(activeModel);
-    }
-
-    return value;
-  },
-  set(target, prop, value) {
-    overrides.set(prop, value);
-    return true;
-  }
-});
-
-module.exports = UserModelProxy;
+module.exports = mongoose.model('User', userSchema);

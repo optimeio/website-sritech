@@ -1,4 +1,4 @@
-const mongoose = require('../mongoose');
+const mongoose = require('mongoose');
 
 const supportQuerySchema = new mongoose.Schema({
   customerName: { type: String, required: true },

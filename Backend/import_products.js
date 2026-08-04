@@ -172,7 +172,7 @@ const run = async () => {
       process.exit(1);
     }
 
-    const dbMode = mongoose.isMock() ? 'Mock' : 'MongoDB';
+    const dbMode = 
     let summary = {
       imported: 0,
       updated: 0,

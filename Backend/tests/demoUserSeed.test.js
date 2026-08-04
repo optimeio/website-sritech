@@ -5,7 +5,7 @@ const User = require('../models/User');
 const { ensureDemoUser } = require('../utils/ensureDemoUser');
 
 test('ensureDemoUser creates a verified demo account', async () => {
-  mongoose.useMock && mongoose.useMock();
+  
   await User.deleteMany({ email: 'demo@sritech.com' });
 
   const firstUser = await ensureDemoUser();

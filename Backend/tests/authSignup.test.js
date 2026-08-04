@@ -7,7 +7,7 @@ const User = require('../models/User');
 const emailServicePath = require.resolve('../utils/emailService');
 
 test('mock mongoose supports User.create for signup flow', async () => {
-  mongoose.useMock();
+  
 
   const createdUser = await User.create({
     name: 'Test User',
@@ -27,7 +27,7 @@ test('mock mongoose supports User.create for signup flow', async () => {
 });
 
 test('matchPassword accepts legacy plaintext passwords for older accounts', async () => {
-  mongoose.useMock();
+  
 
   const user = new User({
     name: 'Legacy User',
@@ -41,7 +41,7 @@ test('matchPassword accepts legacy plaintext passwords for older accounts', asyn
 });
 
 test('signup creates an unverified user with an OTP for email verification', async () => {
-  mongoose.useMock();
+  
 
   delete require.cache[emailServicePath];
   const emailService = require('../utils/emailService');
@@ -85,7 +85,7 @@ test('signup creates an unverified user with an OTP for email verification', asy
 });
 
 test('requestPasswordReset generates a reset token for existing users', async () => {
-  mongoose.useMock();
+  
 
   delete require.cache[emailServicePath];
   const emailService = require('../utils/emailService');

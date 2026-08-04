@@ -1,4 +1,4 @@
-const mongoose = require('../mongoose');
+const mongoose = require('mongoose');
 
 const emailLogSchema = new mongoose.Schema({
   recipient: { type: String, required: true },

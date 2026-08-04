@@ -1,4 +1,4 @@
-const mongoose = require('../mongoose');
+const mongoose = require('mongoose');
 
 const returnRequestSchema = new mongoose.Schema({
   returnId: { type: String, required: true, unique: true },

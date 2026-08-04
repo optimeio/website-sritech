@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const mongoose = require('../mongoose');
+const mongoose = require('mongoose');
 const Order = require('../models/Order');
 const User = require('../models/User');
 const ActivityLog = require('../models/ActivityLog');
@@ -325,9 +325,7 @@ exports.downloadInvoice = asyncHandler(async (req, res) => {
   let order = null;
 
   try {
-    if (mongoose.isMock && mongoose.isMock()) {
-      order = await Order.findById(id).catch(() => null);
-    } else if (mongoose.Types && mongoose.Types.ObjectId && mongoose.Types.ObjectId.isValid(id)) {
+    if (mongoose.Types && mongoose.Types.ObjectId && mongoose.Types.ObjectId.isValid(id)) {
       order = await Order.findById(id).catch(() => null);
     }
   } catch (e) {

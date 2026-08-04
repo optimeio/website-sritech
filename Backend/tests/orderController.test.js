@@ -13,7 +13,7 @@ const resetEmailStub = () => {
 };
 
 test('updateOrderStatus sends a customer email when the status changes', async () => {
-  mongoose.useMock();
+  
   resetEmailStub();
 
   delete require.cache[require.resolve('../controllers/orderController')];
@@ -59,7 +59,7 @@ test('updateOrderStatus sends a customer email when the status changes', async (
 });
 
 test('updateOrderStatus sends a customer email for status variants like out for delivery', async () => {
-  mongoose.useMock();
+  
   resetEmailStub();
 
   delete require.cache[require.resolve('../controllers/orderController')];

@@ -5,7 +5,7 @@ const Product = require('../models/Product');
 const mongoose = require('../mongoose');
 
 test('getProducts returns mock-backed products when the mock database is active', async () => {
-  mongoose.useMock();
+  
 
   const seededProduct = await new Product({
     name: 'Mock Stove',

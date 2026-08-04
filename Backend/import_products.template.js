@@ -59,7 +59,7 @@ const run = async () => {
   try {
     await connectDatabase();
     const Product = require('./models/Product');
-    const dbMode = mongoose.isMock() ? 'Mock' : 'MongoDB';
+    const dbMode = 
 
     const products = normalizeProducts();
     if (!Array.isArray(products) || products.length === 0) {

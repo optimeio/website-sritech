@@ -1,4 +1,4 @@
-const mongoose = require('../mongoose');
+const mongoose = require('mongoose');
 
 const heroBannerSchema = new mongoose.Schema({
   image: { type: String, required: true }, // Base64 or URL
