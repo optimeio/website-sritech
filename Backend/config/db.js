@@ -1,4 +1,5 @@
-const mongoose = require('../mongoose');
+const mongooseProxy = require('../mongoose');
+const realMongoose = require('mongoose');
 
 const DEFAULT_URI = process.env.MONGODB_URI || process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/sri_tech_db';
 const CONNECT_TIMEOUT_MS = Number(process.env.DB_CONNECT_TIMEOUT || 10000);
@@ -18,9 +19,10 @@ const connectDatabase = async () => {
   try {
     console.log(`🔌 Attempting to connect to MongoDB at ${uri}...`);
     
-    mongoose.set && mongoose.set('strictQuery', true);
+    // Bypass the proxy to ensure we connect the real mongoose instance
+    realMongoose.set && realMongoose.set('strictQuery', true);
 
-    const connectPromise = mongoose.connect(uri, {
+    const connectPromise = realMongoose.connect(uri, {
       serverSelectionTimeoutMS: SERVER_SELECTION_TIMEOUT_MS,
       socketTimeoutMS: SOCKET_TIMEOUT_MS,
       connectTimeoutMS: CONNECT_TIMEOUT_MS,
@@ -34,9 +36,12 @@ const connectDatabase = async () => {
 
     await Promise.race([connectPromise, timeoutPromise]);
 
-    if (mongoose.connection && typeof mongoose.connection.db?.command === 'function') {
-      await mongoose.connection.db.command({ ping: 1 });
+    if (realMongoose.connection && typeof realMongoose.connection.db?.command === 'function') {
+      await realMongoose.connection.db.command({ ping: 1 });
     }
+
+    // Switch proxy to real mode so verifyMongoOperations uses the real DB
+    mongooseProxy.useReal && mongooseProxy.useReal();
 
     const verifyPromise = verifyMongoOperations();
     const verifyTimeout = new Promise((resolve) => 
@@ -49,7 +54,7 @@ const connectDatabase = async () => {
     }
 
     console.log(`✅ MongoDB connected successfully to ${uri}`);
-    mongoose.useReal && mongoose.useReal();
+    // Proxy is already switched to real above
     return { mode: 'MongoDB', connected: true };
   } catch (err) {
     console.error(`❌ MongoDB connection failed: ${err.message}`);
@@ -59,7 +64,7 @@ const connectDatabase = async () => {
     }
 
     console.warn('⚠️ Falling back to mock database mode using Backend/db.json');
-    mongoose.useMock();
+    mongooseProxy.useMock && mongooseProxy.useMock();
 
     return { mode: 'Mock', connected: false };
   }
@@ -136,7 +141,7 @@ const monitorMongoAvailability = async () => {
   console.log(`🧪 MongoDB monitor enabled: checking every ${MONITOR_INTERVAL_MS / 1000}s for up to ${MONITOR_MAX_ATTEMPTS} attempts`);
 
   let attempts = 0;
-  while (attempts < MONITOR_MAX_ATTEMPTS && mongoose.isMock && mongoose.isMock()) {
+  while (attempts < MONITOR_MAX_ATTEMPTS && mongooseProxy.isMock && mongooseProxy.isMock()) {
     attempts += 1;
     console.log(`🧪 MongoDB monitor attempt ${attempts}/${MONITOR_MAX_ATTEMPTS}`);
 
@@ -150,7 +155,7 @@ const monitorMongoAvailability = async () => {
           break;
         }
         console.warn('⚠️ MongoDB connection is available but verification failed. Retrying later.');
-        mongoose.useMock();
+        mongooseProxy.useMock && mongooseProxy.useMock();
       }
     } catch (err) {
       console.warn(`⚠️ MongoDB monitor error: ${err.message}`);
@@ -159,7 +164,7 @@ const monitorMongoAvailability = async () => {
     await sleep(MONITOR_INTERVAL_MS);
   }
 
-  if (mongoose.isMock && mongoose.isMock()) {
+  if (mongooseProxy.isMock && mongooseProxy.isMock()) {
     console.warn('⚠️ MongoDB monitor completed without successful verification. Continuing with mock mode.');
   }
 };
