@@ -137,7 +137,8 @@ exports.getProducts = asyncHandler(async (req, res) => {
         console.log(`[getProducts] Serving ${list.length} products from fallback file.`);
         return res.json(list.map((item, idx) => serializeProduct({
           _id: item._id || item.sku || `fallback-${idx + 1}`,
-          ...item
+          ...item,
+          images: Array.isArray(item.images) ? item.images.filter(img => typeof img === 'string' && (img.startsWith('http') || img.length < 100000)) : []
         })));
       }
     }
