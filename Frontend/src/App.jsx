@@ -4957,30 +4957,49 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
                   c.linkedProduct === (product._id || product.id) &&
                   (!c.expiryDate || new Date(c.expiryDate) > new Date())
                 );
-                let discountedPrice = priceNum;
+                let discountedPrice = null;
                 let discountText = '';
+                let originalPrice = null;
 
-                if (activeOffer) {
+                const prodDiscountPercent = Number(product.discountPercent || product.discount) || 0;
+
+                if (prodDiscountPercent > 0) {
+                  originalPrice = priceNum;
+                  discountedPrice = Math.round(priceNum * (1 - prodDiscountPercent / 100));
+                  discountText = `${prodDiscountPercent}% off`;
+                } else if (activeOffer) {
                   if (activeOffer.discountType === 'fixed') {
+                    originalPrice = priceNum;
                     discountedPrice = Math.max(0, priceNum - (Number(activeOffer.discountValue) || 0));
                     discountText = `₹${Number(activeOffer.discountValue) || 0} off`;
                   } else if (activeOffer.discountType === 'percentage') {
-                    discountedPrice = Math.round(priceNum * (1 - (Number(activeOffer.discountValue) || 0) / 100));
-                    discountText = `${Number(activeOffer.discountValue) || 0}% off`;
+                    const dVal = Number(activeOffer.discountValue) || 0;
+                    originalPrice = priceNum;
+                    discountedPrice = Math.round(priceNum * (1 - dVal / 100));
+                    discountText = `${dVal}% off`;
                   } else if (activeOffer.discountType === 'free-shipping') {
                     discountText = 'Free shipping';
                   }
                 } else if (activeCoupon) {
                   const discountVal = parseFloat(activeCoupon.discountValue) || 0;
                   if (activeCoupon.discountType === 'Fixed') {
+                    originalPrice = priceNum;
                     discountedPrice = Math.max(0, priceNum - discountVal);
                     discountText = `₹${discountVal} off`;
                   } else {
+                    originalPrice = priceNum;
                     discountedPrice = Math.round(priceNum * (1 - discountVal / 100));
                     discountText = `${discountVal}% off`;
                   }
+                } else if (Number(product.originalPrice || product.mrp) > priceNum) {
+                  originalPrice = Number(product.originalPrice || product.mrp);
+                  discountedPrice = priceNum;
+                  const pct = Math.round(((originalPrice - priceNum) / originalPrice) * 100);
+                  if (pct > 0) discountText = `${pct}% off`;
                 }
-                const displayPrice = discountedPrice || priceNum;
+
+                const displayPrice = discountedPrice !== null ? discountedPrice : priceNum;
+                const showDiscount = originalPrice !== null && originalPrice > displayPrice && Boolean(discountText);
 
                 return (
                   <article key={product.id || product._id} className="product-card">
@@ -5024,8 +5043,12 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
 
                       <div className="price-row">
                         <span className="price">₹{displayPrice.toLocaleString('en-IN')}</span>
-                        <span className="original-price">₹{priceNum.toLocaleString('en-IN')}</span>
-                        <span className="discount">{discountText || '20% off'}</span>
+                        {showDiscount && (
+                          <>
+                            <span className="original-price">₹{originalPrice.toLocaleString('en-IN')}</span>
+                            <span className="discount">{discountText}</span>
+                          </>
+                        )}
                       </div>
 
 
