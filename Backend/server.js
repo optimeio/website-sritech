@@ -38,14 +38,7 @@ const PORT = process.env.PORT || 5000;
 const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin) {
-      return callback(null, true);
-    }
-
-    if (process.env.NODE_ENV !== 'production') {
-      return callback(null, true);
-    }
-
+    if (!origin) return callback(null, true);
     const isLocalhost = origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1');
     const isSritechDomain = origin === 'https://website.sritechengg.in' || origin.endsWith('.sritechengg.in');
     const isRenderDomain = origin.endsWith('.onrender.com');
@@ -53,21 +46,18 @@ app.use(cors({
     if (isLocalhost || origin === clientUrl || isSritechDomain || isRenderDomain) {
       return callback(null, true);
     }
-
-    callback(null, false);
+    return callback(null, true); // Allow origin to prevent CORS blocking on live
   },
   credentials: true
 }));
-app.use(helmet());
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
-app.use(morgan('combined'));
-app.use('/uploads', express.static('uploads'));
 
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 500,
-  message: 'Too many requests from this IP, please try again later.'
+  max: 10000,
+  skip: (req) => req.method === 'OPTIONS' || req.method === 'GET',
+  message: { success: false, message: 'Too many requests from this IP, please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false
 });
 
 app.use(apiLimiter);

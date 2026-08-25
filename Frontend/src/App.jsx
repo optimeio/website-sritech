@@ -767,7 +767,7 @@ function App() {
 
     const pollInterval = setInterval(() => {
       refreshProducts();
-    }, 5000);
+    }, 60000);
 
     return () => clearInterval(pollInterval);
   }, []);
