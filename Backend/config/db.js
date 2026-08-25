@@ -17,7 +17,6 @@ const connectDatabase = async () => {
       serverSelectionTimeoutMS: SERVER_SELECTION_TIMEOUT_MS,
       socketTimeoutMS: SOCKET_TIMEOUT_MS,
       connectTimeoutMS: CONNECT_TIMEOUT_MS,
-      family: 4,
       autoIndex: process.env.NODE_ENV !== 'production'
     });
 
