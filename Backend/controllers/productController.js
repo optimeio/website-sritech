@@ -113,7 +113,7 @@ const serializeProduct = (product) => {
 };
 
 exports.getProducts = asyncHandler(async (req, res) => {
-  const products = await Product.find().select(PRODUCT_SELECT_FIELDS).sort({ createdAt: -1 }).allowDiskUse(true);
+  const products = await Product.find().select(PRODUCT_SELECT_FIELDS).sort({ createdAt: -1 }).lean();
   res.json(products.map(serializeProduct));
 });
 

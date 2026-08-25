@@ -15,7 +15,7 @@ try {
   if (fs.existsSync(dbPath)) {
     const stats = fs.statSync(dbPath);
     if (stats.size > 5 * 1024 * 1024) { // 5MB limit
-      console.warn(`⚠️ Warning: db.json is too large (${Math.round(stats.size/1024/1024)}MB). Deleting to prevent OOM crash.`);
+      console.warn(`⚠️ Warning: db.json is too large (${Math.round(stats.size / 1024 / 1024)}MB). Deleting to prevent OOM crash.`);
       fs.unlinkSync(dbPath);
     }
   }
@@ -302,4 +302,4 @@ const startServer = async () => {
 startServer();
 
 // Prevent clean exit behavior during local development
-setInterval(() => {}, 1000 * 60 * 60);
+setInterval(() => { }, 1000 * 60 * 60);

@@ -51,7 +51,7 @@ const AuthPage = () => {
       console.error(err);
       if (/already verified/i.test(err.message)) {
         setMessage('Your account is already verified! Please sign in.');
-        setMessageType('success');
+                                                                                     setMessageType('success');
         setAuthMode('login');
       } else {
         setMessage(err.message || 'OTP verification failed.');
