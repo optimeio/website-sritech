@@ -51,16 +51,7 @@ app.use(cors({
   credentials: true
 }));
 
-const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10000,
-  skip: (req) => req.method === 'OPTIONS' || req.method === 'GET',
-  message: { success: false, message: 'Too many requests from this IP, please try again later.' },
-  standardHeaders: true,
-  legacyHeaders: false
-});
-
-app.use(apiLimiter);
+// Global rate limiting removed to prevent false positive 429 Too Many Requests errors on live
 
 const swaggerOptions = {
   definition: {
