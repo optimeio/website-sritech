@@ -113,8 +113,39 @@ const serializeProduct = (product) => {
 };
 
 exports.getProducts = asyncHandler(async (req, res) => {
-  const products = await Product.find().select(PRODUCT_SELECT_FIELDS).sort({ createdAt: -1 }).lean();
-  res.json(products.map(serializeProduct));
+  let products = [];
+  try {
+    products = await Product.find().select(PRODUCT_SELECT_FIELDS).sort({ createdAt: -1 }).lean();
+  } catch (err) {
+    console.error('[getProducts] MongoDB error, falling back to local dataset:', err.message);
+  }
+
+  if (Array.isArray(products) && products.length > 0) {
+    return res.json(products.map(serializeProduct));
+  }
+
+  // Fallback to local products_normalized.json if DB is empty or unreachable
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const normPath = path.join(__dirname, '..', 'products_normalized.json');
+    if (fs.existsSync(normPath)) {
+      const raw = fs.readFileSync(normPath, 'utf8');
+      const parsed = JSON.parse(raw);
+      const list = Array.isArray(parsed) ? parsed : (Array.isArray(parsed?.products) ? parsed.products : []);
+      if (list.length > 0) {
+        console.log(`[getProducts] Serving ${list.length} products from fallback file.`);
+        return res.json(list.map((item, idx) => serializeProduct({
+          _id: item._id || item.sku || `fallback-${idx + 1}`,
+          ...item
+        })));
+      }
+    }
+  } catch (fallbackErr) {
+    console.error('[getProducts] Fallback file read error:', fallbackErr.message);
+  }
+
+  res.json([]);
 });
 
 exports.getProductById = asyncHandler(async (req, res) => {
