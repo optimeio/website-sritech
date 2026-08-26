@@ -124,27 +124,7 @@ exports.getProducts = asyncHandler(async (req, res) => {
     return res.json(products.map(serializeProduct));
   }
 
-  // Fallback to local products_normalized.json if DB is empty or unreachable
-  try {
-    const fs = require('fs');
-    const path = require('path');
-    const normPath = path.join(__dirname, '..', 'products_normalized.json');
-    if (fs.existsSync(normPath)) {
-      const raw = fs.readFileSync(normPath, 'utf8');
-      const parsed = JSON.parse(raw);
-      const list = Array.isArray(parsed) ? parsed : (Array.isArray(parsed?.products) ? parsed.products : []);
-      if (list.length > 0) {
-        console.log(`[getProducts] Serving ${list.length} products from fallback file.`);
-        return res.json(list.map((item, idx) => serializeProduct({
-          _id: item._id || item.sku || `fallback-${idx + 1}`,
-          ...item,
-          images: Array.isArray(item.images) ? item.images.filter(img => typeof img === 'string' && (img.startsWith('http') || img.length < 100000)) : []
-        })));
-      }
-    }
-  } catch (fallbackErr) {
-    console.error('[getProducts] Fallback file read error:', fallbackErr.message);
-  }
+    // Fallback file read removed to prevent OOM crash on Render
 
   res.json([]);
 });
