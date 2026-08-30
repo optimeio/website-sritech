@@ -4,6 +4,7 @@ const generateToken = require('../utils/token');
 exports.verifyAdmin = asyncHandler(async (req, res) => {
   res.json({
     success: true,
+    isAdmin: true,
     message: 'Admin authenticated.',
     admin: {
       username: req.admin?.username || req.admin?.email || 'admin'
@@ -24,7 +25,7 @@ exports.adminLogin = asyncHandler(async (req, res) => {
   const isAdminUser = 
     normalizedUsername === adminUsername.toLowerCase().trim() || 
     normalizedUsername === 'thesmgroups@gmail.com' || 
-    normalizedUsername === 'thesmgroups@gmail.com';
+    normalizedUsername === 'thesmgroups@gamil.com';
   const isPasswordMatch = password === adminPassword;
 
   console.log('[AdminLogin Debug]', {

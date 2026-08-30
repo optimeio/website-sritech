@@ -10,7 +10,7 @@ const isValidObjectId = (id) => {
 const PRODUCT_IMAGE_LIMIT = Number(process.env.PRODUCT_IMAGE_LIMIT || 2);
 const MAX_DESCRIPTION_LENGTH = Number(process.env.PRODUCT_DESCRIPTION_MAX_LENGTH || 400);
 const MAX_SPECIFICATIONS_LENGTH = Number(process.env.PRODUCT_SPECIFICATIONS_MAX_LENGTH || 600);
-const PRODUCT_SELECT_FIELDS = 'name price category description specifications howToUse stock shippingCharge icon isNewArrival images video createdAt sku slug';
+const PRODUCT_SELECT_FIELDS = 'name price category description specifications howToUse burnerSize stoveWeight dimensions material stock shippingCharge gstPercent discountPercent courierOptions icon isNewArrival createdAt sku slug images video';
 
 const uploadToCloudinary = async (base64Str, resourceType = 'auto') => {
   if (!process.env.CLOUDINARY_CLOUD_NAME || typeof base64Str !== 'string' || !base64Str.startsWith('data:')) {
@@ -81,8 +81,9 @@ const serializeProduct = (product) => {
   const courierOptions = Array.isArray(plainProduct.courierOptions) && plainProduct.courierOptions.length > 0
     ? plainProduct.courierOptions.map(c => ({ name: String(c.name || ''), price: Number(c.price || 0) }))
     : [
-        { name: 'rathimeena parcel service', price: 100 },
-        { name: 'ST Couriers', price: 150 }
+        { name: 'Rathimeena Parcel Service', price: 150 },
+        { name: 'ST Couriers', price: 250 },
+        { name: 'MML Express', price: 150 }
       ];
 
   const sanitized = {
@@ -90,10 +91,14 @@ const serializeProduct = (product) => {
     _id: plainProduct._id,
     name: plainProduct.name,
     price: plainProduct.price,
-    category: plainProduct.category,
+    category: Array.isArray(plainProduct.category) ? plainProduct.category[0] || '' : String(plainProduct.category || ''),
     description,
     specifications,
     howToUse: plainProduct.howToUse || '',
+    burnerSize: plainProduct.burnerSize || '',
+    stoveWeight: plainProduct.stoveWeight || '',
+    dimensions: plainProduct.dimensions || '',
+    material: plainProduct.material || '',
     stock: typeof plainProduct.stock === 'number' ? plainProduct.stock : Number(plainProduct.stock) || 0,
     shippingCharge: typeof plainProduct.shippingCharge === 'number' ? plainProduct.shippingCharge : Number(plainProduct.shippingCharge) || 0,
     gstPercent: typeof plainProduct.gstPercent === 'number' ? plainProduct.gstPercent : Number(plainProduct.gstPercent) || 0,
@@ -113,18 +118,32 @@ const serializeProduct = (product) => {
 };
 
 exports.getProducts = asyncHandler(async (req, res) => {
+  // If MongoDB is not yet connected (e.g. server just started), return empty array gracefully
+  if (mongoose.connection.readyState !== 1) {
+    return res.json([]);
+  }
+
   let products = [];
   try {
-    products = await Product.find().select(PRODUCT_SELECT_FIELDS).sort({ createdAt: -1 }).lean();
+    const selectObj = PRODUCT_SELECT_FIELDS.split(' ').reduce((acc, field) => ({ ...acc, [field]: 1 }), {});
+    selectObj.images = { $slice: 1 };
+
+    // Hard 25-second timeout to accommodate MongoDB Atlas high latency
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Query timeout after 25s')), 25000)
+    );
+    const queryPromise = Product.find().select(selectObj).maxTimeMS(25000).lean();
+    products = await Promise.race([queryPromise, timeoutPromise]);
   } catch (err) {
-    console.error('[getProducts] MongoDB error, falling back to local dataset:', err.message);
+    console.error('[getProducts] MongoDB error:', err.message);
+    // Return empty array instead of hanging — frontend will retry via poll interval
+    return res.json([]);
   }
 
-  if (Array.isArray(products) && products.length > 0) {
+  if (Array.isArray(products)) {
+    products.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
     return res.json(products.map(serializeProduct));
   }
-
-    // Fallback file read removed to prevent OOM crash on Render
 
   res.json([]);
 });
@@ -133,16 +152,16 @@ exports.getProductById = asyncHandler(async (req, res) => {
   let product = null;
   const target = req.params.id;
   
-  if (isValidObjectId(target)) {
-    product = await Product.findById(target).select(PRODUCT_SELECT_FIELDS);
-  }
-  
-  if (!product) {
-    product = await Product.findOne({ $or: [{ slug: target }, { _id: target }] }).select(PRODUCT_SELECT_FIELDS);
+  try {
+    const queryPromise = isValidObjectId(target) ? Product.findById(target) : Product.findOne({ slug: target });
+    product = await queryPromise;
+  } catch (err) {
+    console.error('[getProductById] MongoDB error:', err.message);
   }
 
-  if (!product) return res.status(404).json({ message: 'Product not found.' });
-  res.json(serializeProduct(product));
+  if (product) return res.json(serializeProduct(product));
+
+  res.status(404).json({ message: 'Product not found.' });
 });
 
 exports.createProduct = asyncHandler(async (req, res) => {

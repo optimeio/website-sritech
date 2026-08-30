@@ -51,6 +51,9 @@ app.use(cors({
   credentials: true
 }));
 
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
 // Global rate limiting removed to prevent false positive 429 Too Many Requests errors on live
 
 const swaggerOptions = {

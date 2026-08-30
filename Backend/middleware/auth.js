@@ -35,6 +35,15 @@ const protect = async (req, res, next) => {
 
   try {
     const decoded = verifyToken(token);
+    if (decoded.role === 'admin') {
+      req.user = {
+        _id: 'admin_id_placeholder',
+        role: 'admin',
+        username: decoded.username || 'admin',
+        email: decoded.username || 'admin'
+      };
+      return next();
+    }
     const user = await User.findById(decoded.id).select('-password');
     if (!user) {
       return res.status(401).json({ message: 'Invalid token. User not found.' });

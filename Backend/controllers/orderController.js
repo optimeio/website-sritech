@@ -398,6 +398,7 @@ exports.downloadInvoice = asyncHandler(async (req, res) => {
       const invoicePayload = buildInvoicePayload(order);
       pdfPath = await createInvoicePdf(invoicePayload, order.customerName || 'Customer');
       if (typeof order.save === 'function') {
+        order.invoicePdfPath = pdfPath;
         await order.save().catch(() => {});
       }
       absPath = path.resolve(__dirname, '..', pdfPath.replace(/^\//, ''));

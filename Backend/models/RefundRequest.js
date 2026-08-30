@@ -17,6 +17,7 @@ const refundRequestSchema = new mongoose.Schema({
   timelineHistory: { type: [refundTimelineSchema], default: [] },
   transactionReference: { type: String, default: '' },
   images: { type: [String], default: [] },
+  description: { type: String, default: '' },
   adminNotes: { type: String, default: '' },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }

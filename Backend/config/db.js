@@ -1,9 +1,9 @@
 const mongoose = require('mongoose');
 
 const DEFAULT_URI = process.env.MONGODB_URI || process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/sri_tech_db';
-const CONNECT_TIMEOUT_MS = Number(process.env.DB_CONNECT_TIMEOUT || 10000);
-const SERVER_SELECTION_TIMEOUT_MS = Number(process.env.DB_SERVER_SELECTION_TIMEOUT || 10000);
-const SOCKET_TIMEOUT_MS = Number(process.env.DB_SOCKET_TIMEOUT_MS || 15000);
+const CONNECT_TIMEOUT_MS = Number(process.env.DB_CONNECT_TIMEOUT || 30000);
+const SERVER_SELECTION_TIMEOUT_MS = Number(process.env.DB_SERVER_SELECTION_TIMEOUT || 30000);
+const SOCKET_TIMEOUT_MS = Number(process.env.DB_SOCKET_TIMEOUT_MS || 45000);
 
 const connectDatabase = async () => {
   const uri = DEFAULT_URI;

@@ -1,12 +1,44 @@
 import React, { useState, useEffect } from 'react';
 import './index.css';
 
+const compressImageBase64 = (base64Str, maxWidth = 600, maxHeight = 600, quality = 0.6) => {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.src = base64Str;
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      let width = img.width;
+      let height = img.height;
+
+      if (width > height) {
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+      } else {
+        if (height > maxHeight) {
+          width = Math.round((width * maxHeight) / height);
+          height = maxHeight;
+        }
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = () => resolve(base64Str);
+  });
+};
+
 const AdminDashboard = ({ 
   onLogout, 
   products, 
   onAddProduct, 
   onDeleteProduct,
   onUpdateProduct,
+  fetchProductDetails,
   navigate,
   offers = [],
   offerData, 
@@ -79,6 +111,35 @@ const AdminDashboard = ({
   const [newHeroBanner, setNewHeroBanner] = useState({ image: '', caption: '' });
   const [supportReplies, setSupportReplies] = useState({});
   const [inventoryStockDrafts, setInventoryStockDrafts] = useState({});
+
+  const [expandedUserId, setExpandedUserId] = useState(null);
+
+  const getWishlistItems = (user) => {
+    const wishlistIds = [...(user?.wishlist || []), ...(user?.waitlist || [])].map(id => String(id));
+    return Array.isArray(products) ? products.filter(p => {
+      const pid = (p._id || p.id)?.toString();
+      return pid && wishlistIds.includes(pid);
+    }) : [];
+  };
+
+  const getCartItems = (user) => {
+    const cartIds = (user?.cart || []).map(id => String(id));
+    return Array.isArray(products) ? products.filter(p => {
+      const pid = (p._id || p.id)?.toString();
+      return pid && cartIds.includes(pid);
+    }) : [];
+  };
+
+  const getUserOrders = (user) => {
+    const userIdStr = (user?._id || user?.id)?.toString();
+    const userEmailStr = user?.email?.toLowerCase();
+    return Array.isArray(orders) ? orders.filter(o => {
+      const orderUserId = o.user?.toString() || o.userId?.toString();
+      const orderEmail = o.customerEmail?.toLowerCase() || o.email?.toLowerCase();
+      return (orderUserId && userIdStr && orderUserId === userIdStr) || 
+             (orderEmail && userEmailStr && orderEmail === userEmailStr);
+    }) : [];
+  };
 
   const [selectedOrderId, setSelectedOrderId] = useState(null);
   const [orderShippingForm, setOrderShippingForm] = useState({
@@ -233,13 +294,18 @@ const AdminDashboard = ({
     description: '',
     specifications: '',
     howToUse: '',
+    burnerSize: '',
+    stoveWeight: '',
+    dimensions: '',
+    material: '',
     stock: 0,
     shippingCharge: 0,
     gstPercent: 0,
     discountPercent: 0,
     courierOptions: [
-      { name: 'rathimeena parcel service', price: 100 },
-      { name: 'ST Couriers', price: 150 }
+      { name: 'Rathimeena Parcel Service', price: 150 },
+      { name: 'ST Couriers', price: 250 },
+      { name: 'MML Express', price: 150 }
     ],
     category: categories[0]?.slug || categories[0]?.name || 'engraining-products', 
     icon: 'fa-box',
@@ -251,25 +317,36 @@ const AdminDashboard = ({
   // --- Edit Product State ---
   const [editingProductId, setEditingProductId] = useState(null);
   const [editProduct, setEditProduct] = useState({
-    name: '', price: '', description: '', specifications: '', howToUse: '', stock: 0, shippingCharge: 0, gstPercent: 0, discountPercent: 0, courierOptions: [], category: '', isNewArrival: false, images: [], video: ''
+    name: '', price: '', description: '', specifications: '', howToUse: '', burnerSize: '', stoveWeight: '', dimensions: '', material: '', stock: 0, shippingCharge: 0, gstPercent: 0, discountPercent: 0, courierOptions: [], category: '', isNewArrival: false, images: [], video: ''
   });
   const [replaceEditImages, setReplaceEditImages] = useState(false);
 
-  const startEditProduct = (p) => {
-    setEditingProductId(p._id || p.id);
+  const startEditProduct = async (listProduct) => {
+    setEditingProductId(listProduct._id || listProduct.id);
+    let p = listProduct;
+    if (fetchProductDetails) {
+      const full = await fetchProductDetails(listProduct._id || listProduct.id);
+      if (full) p = full;
+    }
+    
     setEditProduct({
       name: p.name || '',
       price: p.price ? p.price.toString().replace(/[₹,]/g, '') : '',
       description: p.description || '',
       specifications: p.specifications || '',
       howToUse: p.howToUse || '',
+      burnerSize: p.burnerSize || '',
+      stoveWeight: p.stoveWeight || '',
+      dimensions: p.dimensions || '',
+      material: p.material || '',
       stock: typeof p.stock === 'number' ? p.stock : 0,
       shippingCharge: typeof p.shippingCharge === 'number' ? p.shippingCharge : 0,
       gstPercent: typeof p.gstPercent === 'number' ? p.gstPercent : 0,
       discountPercent: typeof p.discountPercent === 'number' ? p.discountPercent : 0,
       courierOptions: Array.isArray(p.courierOptions) && p.courierOptions.length > 0 ? p.courierOptions : [
-        { name: 'rathimeena parcel service', price: 100 },
-        { name: 'ST Couriers', price: 150 }
+        { name: 'Rathimeena Parcel Service', price: 150 },
+        { name: 'ST Couriers', price: 250 },
+        { name: 'MML Express', price: 150 }
       ],
       category: p.category || categories[0]?.slug || categories[0]?.name || '',
       isNewArrival: p.isNewArrival || false,
@@ -304,7 +381,9 @@ const AdminDashboard = ({
     setIsImageProcessing(true);
     const fileReaders = files.map(file => new Promise((resolve) => {
       const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result);
+      reader.onloadend = () => {
+        compressImageBase64(reader.result).then(resolve);
+      };
       reader.readAsDataURL(file);
     }));
 
@@ -387,7 +466,6 @@ const AdminDashboard = ({
     { name: 'Categories', icon: 'fa-list-ul' },
     { name: 'Inventory', icon: 'fa-warehouse' },
     { name: 'Customers', icon: 'fa-users' },
-    { name: 'View Product', icon: 'fa-eye' },
     { name: 'Orders', icon: 'fa-cart-shopping' },
     { name: 'Coupons', icon: 'fa-ticket' },
     { name: 'Support', icon: 'fa-headset' },
@@ -514,11 +592,7 @@ const AdminDashboard = ({
       if (savedProduct) {
         alert('Product added successfully!');
         setNewProduct({ name: '', price: '', description: '', specifications: '', howToUse: '', stock: 0, shippingCharge: 0, gstPercent: 0, discountPercent: 0, category: categories[0]?.slug || categories[0]?.name || 'stoves', icon: 'fa-box', isNewArrival: false, images: [], video: '' });
-        if (navigate && savedProduct.slug) {
-          if (window.confirm('Do you want to view the new product page?')) {
-            navigate(`/product/${savedProduct.slug}`);
-          }
-        }
+
       } else {
         alert('Failed to add product. Please try again.');
       }
@@ -537,18 +611,20 @@ const AdminDashboard = ({
     }
 
     setIsImageProcessing(true);
-    files.forEach(file => {
+    const fileReaders = files.map(file => new Promise((resolve) => {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setNewProduct(prev => ({
-          ...prev,
-          images: [...prev.images, reader.result]
-        }));
+        compressImageBase64(reader.result).then(resolve);
       };
       reader.readAsDataURL(file);
-    });
+    }));
 
-    setTimeout(() => setIsImageProcessing(false), 500);
+    Promise.all(fileReaders).then(results => {
+      setNewProduct(prev => ({
+        ...prev,
+        images: [...prev.images, ...results]
+      }));
+    }).finally(() => setIsImageProcessing(false));
   };
 
   const removeImage = (index) => {
@@ -1027,8 +1103,23 @@ const AdminDashboard = ({
                           placeholder="Instructions on how to use the product"
                           value={editProduct.howToUse}
                           onChange={(e) => setEditProduct({ ...editProduct, howToUse: e.target.value })}
-                          style={{ minHeight: '100px' }}
-                        />
+                        ></textarea>
+                      </div>
+                      <div className="admin-form-group">
+                        <label htmlFor="editProductBurnerSize">Burner Size</label>
+                        <input id="editProductBurnerSize" type="text" placeholder="e.g. 12 Inches" value={editProduct.burnerSize} onChange={(e) => setEditProduct({ ...editProduct, burnerSize: e.target.value })} />
+                      </div>
+                      <div className="admin-form-group">
+                        <label htmlFor="editProductStoveWeight">Stove Weight</label>
+                        <input id="editProductStoveWeight" type="text" placeholder="e.g. 35 to 38 kg" value={editProduct.stoveWeight} onChange={(e) => setEditProduct({ ...editProduct, stoveWeight: e.target.value })} />
+                      </div>
+                      <div className="admin-form-group">
+                        <label htmlFor="editProductDimensions">Dimensions</label>
+                        <input id="editProductDimensions" type="text" placeholder="e.g. 18 × 18 × 19 Inches" value={editProduct.dimensions} onChange={(e) => setEditProduct({ ...editProduct, dimensions: e.target.value })} />
+                      </div>
+                      <div className="admin-form-group">
+                        <label htmlFor="editProductMaterial">Material</label>
+                        <input id="editProductMaterial" type="text" placeholder="e.g. Mild Steel (MS)" value={editProduct.material} onChange={(e) => setEditProduct({ ...editProduct, material: e.target.value })} />
                       </div>
                       <div className="admin-form-group">
                         <label htmlFor="editProductStock">Stock</label>
@@ -1206,6 +1297,62 @@ const AdminDashboard = ({
                       </div>
                     </div>
 
+                    <div className="admin-form-group" style={{ gridColumn: '1 / -1', background: '#f8fafc', padding: '1rem', borderRadius: '12px', border: '1px solid #e2e8f0', marginBottom: '1.5rem' }}>
+                      <label style={{ fontWeight: '700', fontSize: '0.95rem', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                        <i className="fa-solid fa-truck-fast" style={{ color: '#ff7a00' }} />
+                        Courier Partner Options & Shipping Charges
+                      </label>
+                      <span style={{ fontSize: '0.8rem', color: '#64748b', display: 'block', marginBottom: '0.75rem' }}>
+                        Define available courier services and rates selectable by customers during checkout.
+                      </span>
+                      {(editProduct.courierOptions || []).map((courier, idx) => (
+                        <div key={idx} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
+                          <input
+                            type="text"
+                            placeholder="Courier Name (e.g. ST Couriers)"
+                            value={courier.name}
+                            onChange={(e) => {
+                              const updated = (editProduct.courierOptions || []).map((c, i) => i === idx ? { ...c, name: e.target.value } : c);
+                              setEditProduct({ ...editProduct, courierOptions: updated });
+                            }}
+                            style={{ flex: 2, padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a' }}
+                          />
+                          <input
+                            type="number"
+                            placeholder="Price (₹)"
+                            value={courier.price}
+                            onChange={(e) => {
+                              const updated = (editProduct.courierOptions || []).map((c, i) => i === idx ? { ...c, price: Number(e.target.value) } : c);
+                              setEditProduct({ ...editProduct, courierOptions: updated });
+                            }}
+                            style={{ flex: 1, padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a' }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updated = (editProduct.courierOptions || []).filter((_, i) => i !== idx);
+                              setEditProduct({ ...editProduct, courierOptions: updated });
+                            }}
+                            style={{ background: '#ef4444', color: 'white', border: 'none', borderRadius: '6px', padding: '0.5rem 0.75rem', cursor: 'pointer' }}
+                          >
+                            <i className="fa-solid fa-trash" />
+                          </button>
+                        </div>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditProduct({
+                            ...editProduct,
+                            courierOptions: [...(editProduct.courierOptions || []), { name: '', price: 0 }]
+                          });
+                        }}
+                        style={{ background: '#e2e8f0', color: '#0f172a', border: 'none', borderRadius: '6px', padding: '0.4rem 0.8rem', fontSize: '0.82rem', fontWeight: '600', cursor: 'pointer', marginTop: '0.25rem' }}
+                      >
+                        + Add Courier Partner Option
+                      </button>
+                    </div>
+
                     <button type="submit" className="admin-btn admin-btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '0.8rem' }}>
                       <i className="fa-solid fa-floppy-disk" style={{ marginRight: '6px' }}></i>
                       Save Changes
@@ -1273,8 +1420,23 @@ const AdminDashboard = ({
                         placeholder="Instructions on how to use the product"
                         value={newProduct.howToUse}
                         onChange={(e) => setNewProduct({...newProduct, howToUse: e.target.value})}
-                        style={{ minHeight: '100px' }}
-                      />
+                      ></textarea>
+                    </div>
+                    <div className="admin-form-group">
+                      <label htmlFor="newProductBurnerSize">Burner Size</label>
+                      <input id="newProductBurnerSize" type="text" placeholder="e.g. 12 Inches" value={newProduct.burnerSize} onChange={(e) => setNewProduct({ ...newProduct, burnerSize: e.target.value })} />
+                    </div>
+                    <div className="admin-form-group">
+                      <label htmlFor="newProductStoveWeight">Stove Weight</label>
+                      <input id="newProductStoveWeight" type="text" placeholder="e.g. 35 to 38 kg" value={newProduct.stoveWeight} onChange={(e) => setNewProduct({ ...newProduct, stoveWeight: e.target.value })} />
+                    </div>
+                    <div className="admin-form-group">
+                      <label htmlFor="newProductDimensions">Dimensions</label>
+                      <input id="newProductDimensions" type="text" placeholder="e.g. 18 × 18 × 19 Inches" value={newProduct.dimensions} onChange={(e) => setNewProduct({ ...newProduct, dimensions: e.target.value })} />
+                    </div>
+                    <div className="admin-form-group">
+                      <label htmlFor="newProductMaterial">Material</label>
+                      <input id="newProductMaterial" type="text" placeholder="e.g. Mild Steel (MS)" value={newProduct.material} onChange={(e) => setNewProduct({ ...newProduct, material: e.target.value })} />
                     </div>
                     <div className="admin-form-group">
                       <label htmlFor="newProductStock">Stock</label>
@@ -1339,8 +1501,7 @@ const AdminDashboard = ({
                             placeholder="Courier Name (e.g. ST Couriers)"
                             value={courier.name}
                             onChange={(e) => {
-                              const updated = [...(newProduct.courierOptions || [])];
-                              updated[idx].name = e.target.value;
+                              const updated = (newProduct.courierOptions || []).map((c, i) => i === idx ? { ...c, name: e.target.value } : c);
                               setNewProduct({ ...newProduct, courierOptions: updated });
                             }}
                             style={{ flex: 2, padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1' }}
@@ -1350,8 +1511,7 @@ const AdminDashboard = ({
                             placeholder="Price (₹)"
                             value={courier.price}
                             onChange={(e) => {
-                              const updated = [...(newProduct.courierOptions || [])];
-                              updated[idx].price = Number(e.target.value);
+                              const updated = (newProduct.courierOptions || []).map((c, i) => i === idx ? { ...c, price: Number(e.target.value) } : c);
                               setNewProduct({ ...newProduct, courierOptions: updated });
                             }}
                             style={{ flex: 1, padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1' }}
@@ -1359,7 +1519,7 @@ const AdminDashboard = ({
                           <button
                             type="button"
                             onClick={() => {
-                              const updated = newProduct.courierOptions.filter((_, i) => i !== idx);
+                              const updated = (newProduct.courierOptions || []).filter((_, i) => i !== idx);
                               setNewProduct({ ...newProduct, courierOptions: updated });
                             }}
                             style={{ background: '#ef4444', color: 'white', border: 'none', borderRadius: '6px', padding: '0.5rem 0.75rem', cursor: 'pointer' }}
@@ -1535,7 +1695,7 @@ const AdminDashboard = ({
                               </div>
                             </td>
                             <td style={{ fontWeight: 600 }}>{p.name}</td>
-                            <td>{(p.category || '').replace(/-/g, ' ')}</td>
+                            <td>{String(p.category || '').replace(/-/g, ' ')}</td>
                             <td style={{ fontWeight: 'bold', color: 'var(--primary-dark)' }}>
                               {p.price.toString().startsWith('₹') ? p.price : `₹${p.price}`}
                             </td>
@@ -1619,7 +1779,7 @@ const AdminDashboard = ({
                     <tbody>
                       {categories.map(cat => {
                         const categoryProducts = (Array.isArray(products) ? products : []).filter(product => {
-                          const productCategory = (product.category || '').toString().toLowerCase();
+                          const productCategory = (typeof product.category === 'object' ? (product.category.name || product.category.slug || '') : (product.category || '')).toString().toLowerCase();
                           const categoryName = (cat.name || cat.slug || '').toString().toLowerCase();
                           return productCategory === categoryName || productCategory.includes(categoryName) || categoryName.includes(productCategory);
                         });
@@ -2410,38 +2570,135 @@ const AdminDashboard = ({
                         <tr>
                           <th>Customer</th>
                           <th>Contact</th>
+                          <th>Activity Details</th>
                           <th>Delivery Address</th>
                           <th>Joined</th>
                           <th>Action</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {users.map(user => (
-                          <tr key={user._id || user.id}>
-                            <td style={{ fontWeight: '600', color: '#0f172a' }}>{user.name}</td>
-                            <td style={{ color: '#334155' }}>{getCustomerContact(user)}</td>
-                            <td style={{ color: '#334155', minWidth: '220px' }}>{getCustomerAddress(user)}</td>
-                            <td style={{ color: '#64748b' }}>{new Date(user.createdAt).toLocaleDateString()}</td>
-                            <td>
-                              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                <button 
-                                  onClick={() => onToggleBlockUser(user._id || user.id)}
-                                  className={`admin-btn ${user.status === 'blocked' ? 'admin-btn-success' : 'admin-btn-danger'}`}
-                                  style={{ padding: '0.35rem 0.75rem', fontSize: '0.75rem' }}
-                                >
-                                  {user.status === 'blocked' ? 'Unblock' : 'Block'}
-                                </button>
-                                <button 
-                                  onClick={() => onDeleteUser(user._id || user.id)}
-                                  className="admin-btn admin-btn-danger"
-                                  style={{ padding: '0.35rem 0.75rem', fontSize: '0.75rem' }}
-                                >
-                                  Delete
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
+                        {users.map(user => {
+                          const userWishlist = getWishlistItems(user);
+                          const userCart = getCartItems(user);
+                          const userOrdersList = getUserOrders(user);
+                          const isExpanded = expandedUserId === (user._id || user.id);
+
+                          return (
+                            <React.Fragment key={user._id || user.id}>
+                              <tr 
+                                style={{ cursor: 'pointer', background: isExpanded ? '#f1f5f9' : 'transparent' }}
+                                onClick={() => setExpandedUserId(isExpanded ? null : (user._id || user.id))}
+                              >
+                                <td style={{ fontWeight: '600', color: '#0f172a' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <i className={`fa-solid ${isExpanded ? 'fa-chevron-down' : 'fa-chevron-right'}`} style={{ fontSize: '0.75rem', color: '#64748b' }}></i>
+                                    {user.name}
+                                  </div>
+                                </td>
+                                <td style={{ color: '#334155' }}>{getCustomerContact(user)}</td>
+                                <td onClick={(e) => e.stopPropagation()}>
+                                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', background: '#fef2f2', color: '#ef4444', padding: '2px 8px', borderRadius: '12px', fontWeight: 600 }}>
+                                      <i className="fa-solid fa-heart"></i> {userWishlist.length} Wishlist
+                                    </span>
+                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', background: '#eff6ff', color: '#3b82f6', padding: '2px 8px', borderRadius: '12px', fontWeight: 600 }}>
+                                      <i className="fa-solid fa-cart-shopping"></i> {userCart.length} Cart
+                                    </span>
+                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', background: '#ecfdf5', color: '#10b981', padding: '2px 8px', borderRadius: '12px', fontWeight: 600 }}>
+                                      <i className="fa-solid fa-box"></i> {userOrdersList.length} Orders
+                                    </span>
+                                  </div>
+                                </td>
+                                <td style={{ color: '#334155', minWidth: '220px' }}>{getCustomerAddress(user)}</td>
+                                <td style={{ color: '#64748b' }}>{new Date(user.createdAt).toLocaleDateString()}</td>
+                                <td onClick={(e) => e.stopPropagation()}>
+                                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                    <button 
+                                      onClick={() => setExpandedUserId(isExpanded ? null : (user._id || user.id))}
+                                      className="admin-btn"
+                                      style={{ padding: '0.35rem 0.75rem', fontSize: '0.75rem', background: '#f1f5f9', color: '#1e293b', border: '1px solid #cbd5e1', borderRadius: '6px', cursor: 'pointer', fontWeight: 600 }}
+                                    >
+                                      {isExpanded ? 'Hide Details' : 'View Details'}
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                              {isExpanded && (
+                                <tr onClick={(e) => e.stopPropagation()}>
+                                  <td colSpan="6" style={{ background: '#f8fafc', padding: '1.25rem' }}>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.25rem' }}>
+                                      {/* Wishlist */}
+                                      <div style={{ background: 'white', padding: '1rem', borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+                                        <h4 style={{ margin: '0 0 0.75rem 0', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem', fontWeight: 600 }}>
+                                          <i className="fa-solid fa-heart" style={{ color: '#ef4444' }}></i>
+                                          Wishlist Products ({userWishlist.length})
+                                        </h4>
+                                        {userWishlist.length > 0 ? (
+                                          <ul style={{ paddingLeft: '1.25rem', margin: 0, fontSize: '0.8rem', color: '#475569' }}>
+                                            {userWishlist.map(p => (
+                                              <li key={p._id || p.id} style={{ marginBottom: '4px' }}>
+                                                {p.name} - <span style={{ fontWeight: 600, color: '#0f172a' }}>₹{p.price}</span>
+                                              </li>
+                                            ))}
+                                          </ul>
+                                        ) : (
+                                          <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>No items in wishlist</span>
+                                        )}
+                                      </div>
+
+                                      {/* Cart */}
+                                      <div style={{ background: 'white', padding: '1rem', borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+                                        <h4 style={{ margin: '0 0 0.75rem 0', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem', fontWeight: 600 }}>
+                                          <i className="fa-solid fa-cart-shopping" style={{ color: '#3b82f6' }}></i>
+                                          Active Cart Products ({userCart.length})
+                                        </h4>
+                                        {userCart.length > 0 ? (
+                                          <ul style={{ paddingLeft: '1.25rem', margin: 0, fontSize: '0.8rem', color: '#475569' }}>
+                                            {userCart.map(p => (
+                                              <li key={p._id || p.id} style={{ marginBottom: '4px' }}>
+                                                {p.name} - <span style={{ fontWeight: 600, color: '#0f172a' }}>₹{p.price}</span>
+                                              </li>
+                                            ))}
+                                          </ul>
+                                        ) : (
+                                          <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Cart is empty</span>
+                                        )}
+                                      </div>
+
+                                      {/* Order History */}
+                                      <div style={{ background: 'white', padding: '1rem', borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+                                        <h4 style={{ margin: '0 0 0.75rem 0', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem', fontWeight: 600 }}>
+                                          <i className="fa-solid fa-box" style={{ color: '#10b981' }}></i>
+                                          Order History ({userOrdersList.length})
+                                        </h4>
+                                        {userOrdersList.length > 0 ? (
+                                          <div style={{ maxHeight: '180px', overflowY: 'auto' }}>
+                                            {userOrdersList.map(o => (
+                                              <div key={o._id || o.id} style={{ fontSize: '0.8rem', borderBottom: '1px solid #f1f5f9', padding: '6px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <div>
+                                                  <span style={{ fontWeight: 600, color: '#334155' }}>{o.orderId || 'ORD'}</span>
+                                                  <span style={{ fontSize: '0.75rem', color: '#64748b', marginLeft: '6px' }}>{new Date(o.createdAt).toLocaleDateString()}</span>
+                                                </div>
+                                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                                  <span style={{ fontWeight: 700, color: '#0f172a' }}>₹{o.grandTotal || o.totalAmount || o.total}</span>
+                                                  <span className={`status-pill ${String(o.status).toLowerCase() === 'delivered' ? 'active' : 'processing'}`} style={{ fontSize: '0.7rem', padding: '2px 6px' }}>
+                                                    {o.status}
+                                                  </span>
+                                                </div>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        ) : (
+                                          <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>No order history</span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </td>
+                                </tr>
+                              )}
+                            </React.Fragment>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>

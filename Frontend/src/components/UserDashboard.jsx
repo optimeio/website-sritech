@@ -35,11 +35,7 @@ const orderStatusSteps = [
   'Delivered'
 ];
 
-const defaultNotifications = [
-  { id: 1, title: 'Order Update', body: 'Your order is packed and ready for dispatch.', unread: true, time: '2h ago' },
-  { id: 2, title: 'Payment Success', body: 'Razorpay payment for your latest order was received.', unread: false, time: 'Yesterday' },
-  { id: 3, title: 'New Offer', body: 'You have a 15% off coupon waiting for your next purchase.', unread: true, time: '3 days ago' }
-];
+const defaultNotifications = [];
 
 function UserDashboard({
   isOpen,
@@ -69,9 +65,24 @@ function UserDashboard({
   getProductFinalPrice,
   totalCartAmount,
   currency = '₹',
-  onViewProduct
+  onViewProduct,
+  activeTab: propActiveTab,
+  onTabChange
 }) {
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, _setActiveTab] = useState(propActiveTab || 'overview');
+
+  useEffect(() => {
+    if (propActiveTab) {
+      _setActiveTab(propActiveTab);
+    }
+  }, [propActiveTab]);
+
+  const setActiveTab = (tabKey) => {
+    _setActiveTab(tabKey);
+    if (onTabChange) {
+      onTabChange(tabKey);
+    }
+  };
   const [selectedOrderId, setSelectedOrderId] = useState(null);
   const selectedOrder = useMemo(() => {
     if (!selectedOrderId || !Array.isArray(orders)) return null;
@@ -134,8 +145,8 @@ function UserDashboard({
   const stats = useMemo(() => {
     const delivered = orders.filter(order => getOrderStatusLabel(order.status) === 'Delivered').length;
     const pending = orders.filter(order => !['Delivered', 'Cancelled', 'Returned'].includes(getOrderStatusLabel(order.status))).length;
-    const rewardPoints = activeUser?.rewardPoints || 1250;
-    const walletBalance = activeUser?.walletBalance || 3200;
+    const rewardPoints = activeUser?.rewardPoints || 0;
+    const walletBalance = activeUser?.walletBalance || 0;
 
     return {
       totalOrders: orders.length,
@@ -318,9 +329,35 @@ function UserDashboard({
 
   if (!isOpen) return null;
 
+  const toggleSidebar = () => {
+    const sidebar = document.querySelector('.user-dashboard-sidebar');
+    const overlay = document.querySelector('.ud-mobile-overlay');
+    if (sidebar) sidebar.classList.toggle('mobile-open');
+    if (overlay) overlay.classList.toggle('visible');
+  };
+
+  const closeSidebar = () => {
+    const sidebar = document.querySelector('.user-dashboard-sidebar');
+    const overlay = document.querySelector('.ud-mobile-overlay');
+    if (sidebar) sidebar.classList.remove('mobile-open');
+    if (overlay) overlay.classList.remove('visible');
+  };
+
   return (
-    <div className="user-dashboard-overlay" role="dialog" aria-modal="true">
+    <div className="user-dashboard-page">
       <div className="user-dashboard-shell">
+        {/* Mobile Hamburger Menu Toggle - inside shell so position:absolute works */}
+        <button
+          className="mobile-hamburger-btn"
+          onClick={toggleSidebar}
+          aria-label="Toggle menu"
+        >
+          <i className="fa-solid fa-bars"></i>
+        </button>
+
+        {/* Mobile overlay backdrop */}
+        <div className="ud-mobile-overlay" onClick={closeSidebar} aria-hidden="true" />
+
         <button className="user-dashboard-close" onClick={onClose} aria-label="Close dashboard">×</button>
 
         <aside className="user-dashboard-sidebar">
@@ -339,6 +376,7 @@ function UserDashboard({
                 type="button"
                 className={`user-dashboard-nav-item ${activeTab === item.key ? 'active' : ''}`}
                 onClick={() => {
+                  closeSidebar();
                   if (item.key === 'logout') {
                     handleLogoutClick();
                     return;
@@ -357,7 +395,7 @@ function UserDashboard({
           <header className="user-dashboard-header">
             <div>
               <p className="user-dashboard-eyebrow">Welcome back</p>
-              <h2>{activeUser?.name || 'John'} 👋</h2>
+              <h2>{activeUser?.name || 'Customer'} 👋</h2>
               <p>Track orders, manage your account, and enjoy a premium shopping experience.</p>
             </div>
             <div className="user-dashboard-header-actions">
@@ -554,8 +592,12 @@ function UserDashboard({
                 <div className="user-dashboard-card user-dashboard-empty-state">No saved items yet.</div>
               ) : wishlistItems.map(item => (
                 <div key={item._id || item.id} className="user-dashboard-card user-dashboard-product-card">
-                  <div className="user-dashboard-product-image">
-                    {item.images?.[0] ? <img src={item.images[0]} alt={item.name} loading="lazy" /> : <i className="fa-solid fa-box" />}
+                                    <div className="user-dashboard-product-image">
+                    {item.images?.[0] ? (
+                      <img src={item.images[0]} alt={item.name} loading="lazy" />
+                    ) : (
+                      <i className="fa-solid fa-fire" style={{ fontSize: '2.5rem', color: 'var(--accent-color)' }} />
+                    )}
                   </div>
                   <h4>{item.name}</h4>
                   <p>{currency}{getProductFinalPrice(item).toLocaleString('en-IN')}</p>

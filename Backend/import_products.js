@@ -1,6 +1,7 @@
+require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
-const mongoose = require('./mongoose');
+const mongoose = require('mongoose');
 const connectDatabase = require('./config/db');
 const { normalizeProducts } = require('./normalize_products');
 
@@ -37,18 +38,23 @@ const buildCategory = categoryValue => {
     .join(' ');
 };
 
-const buildProductPayload = product => ({
-  _id: product._id || null,
-  sku: product.sku || null,
-  slug: product.slug || null,
-  name: product.name,
-  price: product.price,
-  category: buildCategory(product.category),
-  icon: product.icon || 'fa-box',
-  isNewArrival: !!product.isNewArrival,
-  images: Array.isArray(product.images) ? product.images : [],
-  createdAt: product.createdAt ? new Date(product.createdAt) : new Date()
-});
+const buildProductPayload = product => {
+  const payload = {
+    sku: product.sku || null,
+    slug: product.slug || null,
+    name: product.name,
+    price: product.price,
+    category: buildCategory(product.category),
+    icon: product.icon || 'fa-box',
+    isNewArrival: !!product.isNewArrival,
+    images: Array.isArray(product.images) ? product.images : [],
+    createdAt: product.createdAt ? new Date(product.createdAt) : new Date()
+  };
+  if (product._id) {
+    payload._id = product._id;
+  }
+  return payload;
+};
 
 const isSameProduct = (existing, payload) => {
   return existing.name === payload.name &&
@@ -166,13 +172,14 @@ const directDbImport = products => {
 const run = async () => {
   try {
     await connectDatabase();
-    const products = normalizeProducts();
+    let parsed = JSON.parse(fs.readFileSync(path.join(__dirname, 'products_normalized.json'), 'utf8'));
+    const products = Array.isArray(parsed) ? parsed : (parsed.products || parsed.Product || Object.values(parsed)[0]);
     if (!Array.isArray(products) || products.length === 0) {
       console.error('No products found to import.');
       process.exit(1);
     }
 
-    const dbMode = 
+    const dbMode = 'MongoDB';
     let summary = {
       imported: 0,
       updated: 0,

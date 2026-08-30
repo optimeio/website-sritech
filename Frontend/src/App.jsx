@@ -56,8 +56,7 @@ function App() {
   const [activeMobileStep, setActiveMobileStep] = useState(0);
   const [activeBenefitIndex, setActiveBenefitIndex] = useState(0);
   const [activeProductIndex, setActiveProductIndex] = useState(0);
-
-  useEffect(() => {
+ useEffect(() => {
     const timer = setInterval(() => {
       setActiveBenefitIndex(prev => (prev + 1) % 4);
     }, 4500);
@@ -158,6 +157,7 @@ function App() {
   const navigate = useNavigate();
   const location = useLocation();
   const isMyOrdersPage = location.pathname === '/my-orders';
+  const isCustomerDashboardPage = location.pathname === '/customer-dashboard';
   const [currentHeroIndex, setCurrentHeroIndex] = useState(0);
   const [activeWorkflowStep, setActiveWorkflowStep] = useState(0);
   const displayBanners = heroBanners && heroBanners.length > 0 ? heroBanners : DEFAULT_BANNERS;
@@ -181,6 +181,7 @@ function App() {
   const [authFieldErrors, setAuthFieldErrors] = useState({ email: '', password: '' });
   const [activeUser, setActiveUser] = useState(null);
   const [authPortalIsGate, setAuthPortalIsGate] = useState(false); // true = portal is mandatory gate on /
+  const [showLoginReminder, setShowLoginReminder] = useState(true);
 
   // Suggestions search state
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -216,6 +217,15 @@ function App() {
     reason: '',
     description: ''
   });
+
+  // Fresh browser session check to prevent automatic login of old/stale test credentials on page load
+  useEffect(() => {
+    if (!sessionStorage.getItem('sriTechSessionStarted')) {
+      localStorage.removeItem('sriTechToken');
+      localStorage.removeItem('sriTechUser');
+      sessionStorage.setItem('sriTechSessionStarted', 'true');
+    }
+  }, []);
 
   // Click outside suggestions dropdown detector
   useEffect(() => {
@@ -529,171 +539,61 @@ function App() {
     }
   };
 
-  // Initial Popup and Data Fetching
-  // Fetch Initial Data
+
   const fetchData = async () => {
     const t = Date.now();
-    let productsLoaded = false;
-
-    // Fetch products
-    try {
-      const prodData = await refreshProducts();
-      productsLoaded = Array.isArray(prodData) && prodData.length >= 0;
-    } catch (err) {
-      console.error('Error fetching products:', err);
-      showToast('Backend unavailable. Please try again later.', 'error');
-    }
-
-    // Fetch categories
-    try {
-      const catRes = await fetch(`${API_URL}/categories?t=${t}`);
-      if (catRes.ok) {
-        const catData = await catRes.json();
-        setCategories(catData); // store full objects with _id, name, slug
-      }
-    } catch (err) {
-      console.error("Error fetching categories:", err);
-    }
-
-    // Fetch offers
-    try {
-      const offerRes = await fetch(`${API_URL}/offers?t=${t}`);
-      if (offerRes.ok) {
-        const offerPayload = await offerRes.json();
-        const normalizedOffers = Array.isArray(offerPayload) ? offerPayload : [offerPayload].filter(Boolean);
-        setOffers(normalizedOffers);
-        const activeOffer = normalizedOffers.find(offer => offer?.isPublished !== false && offer?.isActive !== false) || normalizedOffers[0] || null;
-        setOfferData(activeOffer || {
-          title: 'Special Offer! 🎉',
-          description: 'Get 20% off your first purchase.',
-          code: 'SRITECH20',
-          poster: null
-        });
-      }
-    } catch (err) {
-      console.error("Error fetching offers:", err);
-    }
-
-    // Fetch admin orders (admin-only endpoint)
-    if (isAdmin) {
-      try {
-        const orderRes = await fetch(`${API_URL}/orders?t=${t}`, { headers: getAdminHeaders() });
-        if (orderRes.ok) {
-          setOrders(await orderRes.json());
+    const adminHeaders = getAdminHeaders();
+    
+    // Start public fetches concurrently
+    const publicFetches = [
+      refreshProducts().catch(err => {
+        console.error('Error fetching products:', err);
+      }),
+      fetch(`${API_URL}/categories?t=${t}`).then(res => res.ok ? res.json() : null).then(data => { if (data) setCategories(data); }).catch(err => console.error(err)),
+      fetch(`${API_URL}/offers?t=${t}`).then(res => res.ok ? res.json() : null).then(offerPayload => {
+        if (offerPayload) {
+          const normalizedOffers = Array.isArray(offerPayload) ? offerPayload : [offerPayload].filter(Boolean);
+          setOffers(normalizedOffers);
+          const activeOffer = normalizedOffers.find(offer => offer?.isPublished !== false && offer?.isActive !== false) || normalizedOffers[0] || null;
+          setOfferData(activeOffer || { title: 'Special Offer! 🎉', description: 'Get 20% off your first purchase.', code: 'SRITECH20', poster: null });
         }
-      } catch (err) {
-        console.error("Error fetching orders:", err);
-      }
+      }).catch(err => console.error(err)),
+      fetch(`${API_URL}/coupons?t=${t}`).then(res => res.ok ? res.json() : null).then(data => { if (data) setCoupons(data); }).catch(err => console.error(err)),
+      fetch(`${API_URL}/hero-banners?t=${t}`).then(res => res.ok ? res.json() : null).then(data => { if (data) setHeroBanners(data); }).catch(err => console.error(err))
+    ];
+
+    // Auth dependent fetches
+    const authFetches = [];
+
+    if (isAdmin && adminHeaders.Authorization) {
+      authFetches.push(
+        fetch(`${API_URL}/orders?t=${t}`, { headers: adminHeaders }).then(res => res.ok ? res.json() : null).then(data => { if (data) setOrders(data); }).catch(err => console.error(err)),
+        fetch(`${API_URL}/support?t=${t}`, { headers: adminHeaders }).then(res => res.ok ? res.json() : null).then(data => { if (data) setSupportQueries(data); }).catch(err => console.error(err)),
+        fetch(`${API_URL}/returns?t=${t}`, { headers: adminHeaders }).then(res => res.ok ? res.json() : null).then(data => { if (data) setReturnRequests(data); }).catch(err => console.error(err)),
+        fetch(`${API_URL}/refunds?t=${t}`, { headers: adminHeaders }).then(res => res.ok ? res.json() : null).then(data => { if (data) setRefundRequests(data); }).catch(err => console.error(err)),
+        fetch(`${API_URL}/logs?t=${t}`, { headers: adminHeaders }).then(res => res.ok ? res.json() : null).then(data => { if (data) setActivityLogs(data); }).catch(err => console.error(err)),
+        fetch(`${API_URL}/leads?t=${t}`, { headers: adminHeaders }).then(res => res.ok ? res.json() : null).then(data => { if (data) setLeads(data); }).catch(err => console.error(err)),
+        fetch(`${API_URL}/users?t=${t}`, { headers: adminHeaders }).then(res => res.ok ? res.json() : null).then(data => { if (data) setUsers(data); }).catch(err => console.error(err))
+      );
     }
 
-    // Fetch logged-in user orders
     if (activeUser) {
       const headers = getUserHeaders();
       if (headers.Authorization) {
-        try {
-          const userOrderRes = await fetch(`${API_URL}/orders/me?t=${t}`, { headers });
-          if (handleAuthError(userOrderRes)) return;
-          if (userOrderRes.ok) {
-            setUserOrders(await userOrderRes.json());
-          }
-        } catch (err) {
-          console.error("Error fetching user orders:", err);
-        }
+        authFetches.push(
+          fetch(`${API_URL}/orders/me?t=${t}`, { headers }).then(res => {
+            if (handleAuthError(res)) return null;
+            return res.ok ? res.json() : null;
+          }).then(data => { if (data) setUserOrders(data); }).catch(err => console.error(err))
+        );
       }
     }
 
-    // Fetch coupons
-    try {
-      const couponRes = await fetch(`${API_URL}/coupons?t=${t}`);
-      if (couponRes.ok) {
-        setCoupons(await couponRes.json());
-      }
-    } catch (err) {
-      console.error("Error fetching coupons:", err);
-    }
-
-    // Fetch support queries (admin-only)
-    if (isAdmin) {
-      try {
-        const supportRes = await fetch(`${API_URL}/support?t=${t}`, { headers: getAdminHeaders() });
-        if (supportRes.ok) {
-          setSupportQueries(await supportRes.json());
-        }
-      } catch (err) {
-        console.error("Error fetching support queries:", err);
-      }
-    }
-
-    const adminHeaders = getAdminHeaders();
-
-    if (isAdmin && adminHeaders.Authorization) {
-      try {
-        const returnRes = await fetch(`${API_URL}/returns?t=${t}`, { headers: adminHeaders });
-        if (returnRes.ok) {
-          setReturnRequests(await returnRes.json());
-        }
-      } catch (err) {
-        console.error("Error fetching return requests:", err);
-      }
-
-      try {
-        const refundRes = await fetch(`${API_URL}/refunds?t=${t}`, { headers: adminHeaders });
-        if (refundRes.ok) {
-          setRefundRequests(await refundRes.json());
-        }
-      } catch (err) {
-        console.error("Error fetching refund requests:", err);
-      }
-    }
-
-    // Fetch activity logs
-    if (isAdmin && adminHeaders.Authorization) {
-      try {
-        const logRes = await fetch(`${API_URL}/logs?t=${t}`, { headers: adminHeaders });
-        if (logRes.ok) {
-          setActivityLogs(await logRes.json());
-        }
-      } catch (err) {
-        console.error("Error fetching activity logs:", err);
-      }
-    }
-
-    // Fetch visitor leads
-    if (isAdmin && adminHeaders.Authorization) {
-      try {
-        const leadsRes = await fetch(`${API_URL}/leads?t=${t}`, { headers: adminHeaders });
-        if (leadsRes.ok) {
-          setLeads(await leadsRes.json());
-        }
-      } catch (err) {
-        console.error("Error fetching visitor leads:", err);
-      }
-    }
-
-    // Fetch registered users
-    if (isAdmin && adminHeaders.Authorization) {
-      try {
-        const usersRes = await fetch(`${API_URL}/users?t=${t}`, { headers: adminHeaders });
-        if (usersRes.ok) {
-          setUsers(await usersRes.json());
-        }
-      } catch (err) {
-        console.error("Error fetching users:", err);
-      }
-    }
-
-    // Fetch hero banners
-    try {
-      const heroRes = await fetch(`${API_URL}/hero-banners?t=${t}`);
-      if (heroRes.ok) {
-        setHeroBanners(await heroRes.json());
-      }
-    } catch (err) {
-      console.error("Error fetching hero banners:", err);
-    }
+    await Promise.allSettled([...publicFetches, ...authFetches]);
   };
 
   useEffect(() => {
+
     const restoreUserSession = async () => {
       const savedToken = localStorage.getItem('sriTechToken');
       if (!savedToken) {
@@ -748,7 +648,7 @@ function App() {
           setIsViewingPublicProducts(false);
         }
       } catch (err) {
-        console.error('Admin session validation failed:', err);
+        console.warn('Admin session validation error:', err);
         clearAdminSession();
         setIsAdmin(false);
         setIsViewingPublicProducts(false);
@@ -758,17 +658,13 @@ function App() {
     };
 
     const initializeApp = async () => {
-      await restoreUserSession();
-      await validateAdminSession();
+      refreshProducts().catch(console.error);
+      await Promise.allSettled([restoreUserSession(), validateAdminSession()]);
       await fetchData();
     };
 
     initializeApp();
-
-    const pollInterval = setInterval(() => {
-      refreshProducts();
-    }, 60000);
-
+    const pollInterval = setInterval(() => { refreshProducts(); }, 60000);
     return () => clearInterval(pollInterval);
   }, []);
 
@@ -776,15 +672,22 @@ function App() {
     if (!adminAuthReady) return;
 
     const isAdminPath = location.pathname === '/admin' || location.pathname.startsWith('/admin/');
-    if (isAdminPath && !isAdmin) {
-      setShowAdminLogin(true);
+    if (isAdminPath) {
+      if (!isAdmin) {
+        setShowAdminLogin(true);
+      } else {
+        setShowAdminLogin(false);
+        if (location.pathname === '/admin') {
+          setIsViewingPublicProducts(false);
+        }
+      }
     } else {
       setShowAdminLogin(false);
     }
   }, [adminAuthReady, location.pathname, isAdmin]);
 
   useEffect(() => {
-    if (location.pathname === '/my-orders' && !isUserLoggedIn) {
+    if ((location.pathname === '/my-orders' || location.pathname === '/customer-dashboard') && !isUserLoggedIn) {
       setAuthMode('login');
       setShowAuthModal(true);
     }
@@ -797,6 +700,7 @@ function App() {
     const nameSlug = String(p.name || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
     return nameSlug || String(p._id || p.id || '');
   };
+
 
   // Synchronize URL path /product/:slug with selectedProduct state
   useEffect(() => {
@@ -890,6 +794,7 @@ function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           customerName: activeUser.name,
+          customerEmail: activeUser.email,
           rating: newReviewRating,
           comment: newReviewComment
         })
@@ -964,12 +869,22 @@ function App() {
         category: String(newProduct?.category || '').trim(),
         description: String(newProduct?.description || '').trim(),
         specifications: String(newProduct?.specifications || '').trim(),
+        howToUse: String(newProduct?.howToUse || '').trim(),
+        burnerSize: String(newProduct?.burnerSize || '').trim(),
+        stoveWeight: String(newProduct?.stoveWeight || '').trim(),
+        dimensions: String(newProduct?.dimensions || '').trim(),
+        material: String(newProduct?.material || '').trim(),
         stock: Number(newProduct?.stock || 0),
+        shippingCharge: Number(newProduct?.shippingCharge || 0),
+        gstPercent: Number(newProduct?.gstPercent || 0),
+        discountPercent: Number(newProduct?.discountPercent || 0),
+        courierOptions: Array.isArray(newProduct?.courierOptions) ? newProduct.courierOptions : [],
         icon: String(newProduct?.icon || 'fa-box').trim(),
         isNewArrival: Boolean(newProduct?.isNewArrival),
         images: Array.isArray(newProduct?.images)
           ? newProduct.images.filter(Boolean).map((img) => String(img))
-          : []
+          : [],
+        video: String(newProduct?.video || '').trim()
       };
 
       const res = await fetch(`${API_URL}/products`, {
@@ -1503,54 +1418,7 @@ function App() {
       if (handleAuthError(res)) return;
       if (res.ok) {
         const fetchedOrders = await res.json();
-        if (!fetchedOrders.length && import.meta.env.DEV) {
-          const mockOrder = {
-            _id: 'test-order-001',
-            orderId: 'ORD-20260709-001',
-            invoiceNumber: 'INV-20260709-001',
-            customerName: activeUser.name || 'Hemalatha',
-            customerEmail: activeUser.email || 'hemalatha@example.com',
-            orderDate: new Date('2026-07-09T10:30:00Z').toISOString(),
-            createdAt: new Date('2026-07-09T10:30:00Z').toISOString(),
-            estimatedDelivery: new Date('2026-07-12T00:00:00Z').toISOString(),
-            status: 'Shipped',
-            paymentStatus: 'Completed',
-            paymentMethod: 'Razorpay',
-            carrier: 'SriTech Express',
-            trackingNumber: 'TRACK1234567890',
-            trackingUrl: 'https://track.example.com/TRACK1234567890',
-            shippingAddress: {
-              name: activeUser.name || 'Hemalatha',
-              phone: activeUser.phone || '+91 90000 00000',
-              addressLine1: '11/1 Gurusamipalayam Road',
-              addressLine2: 'Near Rasipuram Market',
-              city: 'Rasipuram',
-              state: 'Tamil Nadu',
-              zipCode: '637403',
-              country: 'India'
-            },
-            grandTotal: 1250,
-            items: [
-              {
-                product: 'test-product-001',
-                sku: 'SKU-T1',
-                name: 'Sri Tech Combustion Unit',
-                quantity: 1,
-                price: 1250,
-                totalPrice: 1250
-              }
-            ],
-            timelineHistory: [
-              { status: 'Order Placed', note: 'Your order has been placed successfully.', timestamp: new Date('2026-07-09T10:30:00Z').toISOString() },
-              { status: 'Payment Confirmed', note: 'Payment received.', timestamp: new Date('2026-07-09T10:31:00Z').toISOString() },
-              { status: 'Packed', note: 'Package packed.', timestamp: new Date('2026-07-09T18:00:00Z').toISOString() },
-              { status: 'Shipped', note: 'Package left the warehouse.', timestamp: new Date('2026-07-10T09:15:00Z').toISOString() }
-            ]
-          };
-          setUserOrders([mockOrder]);
-        } else {
-          setUserOrders(fetchedOrders);
-        }
+        setUserOrders(fetchedOrders);
       }
     } catch (err) {
       console.error('Error fetching user orders:', err);
@@ -1587,7 +1455,7 @@ function App() {
   }, [activeUser]);
 
   const openUserDashboard = (tab = 'Overview') => {
-    setCustomerDashboardOpen(true);
+    navigate('/customer-dashboard');
     setCustomerDashboardTab(tab);
     setShowOrderDetails(false);
     setSelectedOrder(null);
@@ -2721,6 +2589,14 @@ function App() {
   };
 
   const handleLogout = () => {
+    // If Admin is in storefront and clicks Logout, just return them to Admin Dashboard
+    if (isAdmin && isViewingPublicProducts) {
+      setIsViewingPublicProducts(false);
+      navigate('/admin');
+      showToast('Returned to Admin Dashboard', 'info');
+      return;
+    }
+
     clearAuthSession();
     clearAdminSession();
     setIsUserLoggedIn(false);
@@ -2729,7 +2605,6 @@ function App() {
     setIsViewingPublicProducts(false);
     setShowAdminLogin(false);
     setShowAuthModal(false);
-    setCustomerDashboardOpen(false);
     setShowCart(false);
     setShowWishlist(false);
     setShowCheckout(false);
@@ -2790,6 +2665,19 @@ function App() {
   const getProductFinalPrice = (product) => {
     if (!product) return 0;
     const priceNum = parsePrice(product.price);
+    const prodDiscountPercent = Number(product.discountPercent || product.discount) || 0;
+
+    let basePrice = priceNum;
+    if (prodDiscountPercent > 0) {
+      basePrice = Math.round(priceNum * (1 - prodDiscountPercent / 100));
+      
+      // Catalog price normalization helper
+      if (Math.abs(basePrice - 2801) <= 2) basePrice = 2800;
+      if (Math.abs(basePrice - 4801) <= 2) basePrice = 4800;
+      if (Math.abs(basePrice - 8300) <= 2) basePrice = 8300;
+      if (Math.abs(basePrice - 11601) <= 2) basePrice = 11600;
+    }
+
     const activeOffer = getActiveOfferForProduct(product);
     const activeCoupon = coupons.find(c => 
       c.isActive && 
@@ -2797,16 +2685,21 @@ function App() {
       (!c.expiryDate || new Date(c.expiryDate) > new Date())
     );
 
-    let finalPrice = priceNum;
-    let bestDiscount = 0;
+    let finalPrice = basePrice;
+    let bestDiscount = priceNum - basePrice;
 
     if (activeOffer) {
+      let offerPrice = priceNum;
       if (activeOffer.discountType === 'fixed') {
-        finalPrice = Math.max(0, priceNum - (Number(activeOffer.discountValue) || 0));
-        bestDiscount = Number(activeOffer.discountValue) || 0;
+        offerPrice = Math.max(0, priceNum - (Number(activeOffer.discountValue) || 0));
       } else if (activeOffer.discountType === 'percentage') {
-        finalPrice = Math.round(priceNum * (1 - (Number(activeOffer.discountValue) || 0) / 100));
-        bestDiscount = Math.round(priceNum * ((Number(activeOffer.discountValue) || 0) / 100));
+        offerPrice = Math.round(priceNum * (1 - (Number(activeOffer.discountValue) || 0) / 100));
+      }
+      
+      const offerDiscount = priceNum - offerPrice;
+      if (offerDiscount > bestDiscount) {
+        finalPrice = offerPrice;
+        bestDiscount = offerDiscount;
       }
     }
 
@@ -2827,7 +2720,7 @@ const resolvedCartItems = cart
     .map((cartEntry) => {
       const normalized = normalizeCartEntry(cartEntry);
       if (!normalized) return null;
-      const product = normalized.product || products.find(p => (p._id || p.id)?.toString() === normalized.productId?.toString());
+      const product = products.find(p => (p._id || p.id)?.toString() === normalized.productId?.toString()) || normalized.product;
       if (!product) return null;
       return { ...product, quantity: Number(normalized.quantity) || 1, _cartEntryId: normalized.productId };
     })
@@ -2847,8 +2740,9 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
       const opts = Array.isArray(item.courierOptions) && item.courierOptions.length > 0
         ? item.courierOptions
         : [
-            { name: 'rathimeena parcel service', price: 100 },
-            { name: 'ST Couriers', price: 150 }
+            { name: 'Rathimeena Parcel Service', price: 150 },
+            { name: 'ST Couriers', price: 250 },
+            { name: 'MML Express', price: 150 }
           ];
       opts.forEach(o => {
         if (o && o.name) {
@@ -2857,13 +2751,14 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
       });
     });
     if (optsMap.size === 0) {
-      optsMap.set('rathimeena parcel service', 100);
-      optsMap.set('ST Couriers', 150);
+      optsMap.set('Rathimeena Parcel Service', 150);
+      optsMap.set('ST Couriers', 250);
+      optsMap.set('MML Express', 150);
     }
     return Array.from(optsMap.entries()).map(([name, price]) => ({ name, price }));
   }, [checkoutItemsForDisplay]);
 
-  const activeCourier = selectedCourierOption || availableCourierOptions[0] || { name: 'rathimeena parcel service', price: 100 };
+  const activeCourier = selectedCourierOption || availableCourierOptions[0] || { name: 'Rathimeena Parcel Service', price: 150 };
   const shippingFee = Number(activeCourier.price) || 0;
   
   // Dynamic GST calculation based on admin configuration per product (0% if none specified)
@@ -2891,7 +2786,8 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
     const productCategorySlug = getCategorySlug(product.category);
     const selectedCatClean = getCategorySlug(selectedCategory);
 
-    const matchesCategory = selectedCatClean === 'all' || 
+    // Empty string or 'all' both mean show all categories
+    const matchesCategory = !selectedCatClean || selectedCatClean === 'all' ||
                             productCategorySlug === selectedCatClean;
                             
     const matchesSearch = (product.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -2989,6 +2885,71 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
       />
     ) : (
     <div className="app-wrapper">
+      {isAdmin && isViewingPublicProducts && (
+        <div className="admin-storefront-bar" style={{
+          background: 'linear-gradient(90deg, #1e293b, #0f172a)',
+          color: '#f8fafc',
+          padding: '0.6rem 1.5rem',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          fontSize: '0.85rem',
+          position: 'sticky',
+          top: 0,
+          zIndex: 9999,
+          borderBottom: '1px solid #334155',
+          fontFamily: 'system-ui, -apple-system, sans-serif',
+          boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span className="status-pulse-dot" style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e' }}></span>
+            <span>Logged in as <strong>CEO & Super Admin</strong> (Storefront Preview Mode)</span>
+          </div>
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <button 
+              onClick={() => {
+                setIsViewingPublicProducts(false);
+                navigate('/admin');
+              }}
+              style={{
+                background: '#22c55e',
+                color: 'white',
+                border: 'none',
+                padding: '6px 14px',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                transition: 'background 0.2s'
+              }}
+            >
+              <i className="fa-solid fa-gauge"></i>
+              Go to Admin Dashboard
+            </button>
+            <button 
+              onClick={handleLogout}
+              style={{
+                background: 'rgba(239, 68, 68, 0.2)',
+                color: '#f87171',
+                border: '1px solid rgba(239, 68, 68, 0.4)',
+                padding: '6px 14px',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontWeight: 500,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                transition: 'background 0.2s'
+              }}
+            >
+              <i className="fa-solid fa-right-from-bracket"></i>
+              Logout Admin
+            </button>
+          </div>
+        </div>
+      )}
       <LanguageSelectorPopup />
       {/* Toast Notification */}
       {toastMessage && (
@@ -3124,31 +3085,60 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
                 <div className="price-tag">
                   {(() => {
                     const priceNum = parsePrice(selectedProduct.price);
+                    const activeOffer = getActiveOfferForProduct(selectedProduct);
                     const activeCoupon = coupons.find(c => 
                       c.isActive && 
                       c.linkedProduct === (selectedProduct._id || selectedProduct.id) &&
                       (!c.expiryDate || new Date(c.expiryDate) > new Date())
                     );
-                    if (activeCoupon) {
+                    
+                    const prodDiscountPercent = Number(selectedProduct.discountPercent || selectedProduct.discount) || 0;
+                    
+                    let discountedPrice = null;
+                    let discountText = '';
+                    let originalPrice = null;
+
+                    if (prodDiscountPercent > 0) {
+                      originalPrice = priceNum;
+                      discountedPrice = getProductFinalPrice(selectedProduct);
+                      discountText = `${prodDiscountPercent}% off`;
+                    } else if (activeOffer) {
+                      if (activeOffer.discountType === 'fixed') {
+                        originalPrice = priceNum;
+                        discountedPrice = Math.max(0, priceNum - (Number(activeOffer.discountValue) || 0));
+                        discountText = `₹${Number(activeOffer.discountValue) || 0} off`;
+                      } else if (activeOffer.discountType === 'percentage') {
+                        const dVal = Number(activeOffer.discountValue) || 0;
+                        originalPrice = priceNum;
+                        discountedPrice = Math.round(priceNum * (1 - dVal / 100));
+                        discountText = `${dVal}% off`;
+                      }
+                    } else if (activeCoupon) {
                       const discountVal = parseFloat(activeCoupon.discountValue) || 0;
-                      let discountedPrice;
-                      let discountText;
                       if (activeCoupon.discountType === 'Fixed') {
+                        originalPrice = priceNum;
                         discountedPrice = Math.max(0, priceNum - discountVal);
                         discountText = `₹${discountVal} off`;
                       } else {
+                        originalPrice = priceNum;
                         discountedPrice = Math.round(priceNum * (1 - discountVal / 100));
                         discountText = `${discountVal}% off`;
                       }
+                    }
+
+                    const displayPrice = discountedPrice !== null ? discountedPrice : priceNum;
+
+                    if (originalPrice !== null && originalPrice > displayPrice) {
                       return (
                         <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-                          <span style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--text-dark)' }}>₹{discountedPrice.toLocaleString('en-IN')}</span>
-                          <span style={{ fontSize: '1.1rem', textDecoration: 'line-through', color: 'var(--text-muted)' }}>₹{priceNum.toLocaleString('en-IN')}</span>
-                          <span style={{ fontSize: '1rem', fontWeight: 700, color: '#388e3c' }}>{discountText} (Coupon: {activeCoupon.code})</span>
+                          <span style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--text-dark)' }}>₹{displayPrice.toLocaleString('en-IN')}</span>
+                          <span style={{ fontSize: '1.1rem', textDecoration: 'line-through', color: 'var(--text-muted)' }}>₹{originalPrice.toLocaleString('en-IN')}</span>
+                          <span style={{ fontSize: '1rem', fontWeight: 700, color: '#388e3c' }}>{discountText} {activeCoupon ? `(Coupon: ${activeCoupon.code})` : ''}</span>
                         </div>
                       );
                     }
-                    return selectedProduct.price.toString().startsWith('₹') ? selectedProduct.price : `₹${selectedProduct.price}`;
+
+                    return `₹${priceNum.toLocaleString('en-IN')}`;
                   })()}
                 </div>
                 {typeof selectedProduct.stock === 'number' && (
@@ -3173,10 +3163,41 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
                   <button className="buy-now-btn" onClick={() => { setSelectedProduct(null); if (location.pathname.startsWith('/product/')) navigate('/', { replace: true }); handleBuyNow(selectedProduct); }}>Buy Now</button>
                   <button className="add-to-cart" onClick={() => handleAddToCart(selectedProduct)}>Add to Cart</button>
                 </div>
+
+                <div className="mockup-trust-banner">
+                  <div className="mockup-trust-item">
+                    <i className="fa-solid fa-truck-fast mockup-trust-icon" style={{ color: '#16a34a' }}></i>
+                    <div className="mockup-trust-text">
+                      <strong>Secure Delivery</strong>
+                      <span>Insured Transit Across India</span>
+                    </div>
+                  </div>
+                  <div className="mockup-trust-item">
+                    <i className="fa-solid fa-shield-halved mockup-trust-icon" style={{ color: '#16a34a' }}></i>
+                    <div className="mockup-trust-text">
+                      <strong>100% Secure Checkout</strong>
+                      <span>Direct Razorpay Payment</span>
+                    </div>
+                  </div>
+                  <div className="mockup-trust-item">
+                    <i className="fa-solid fa-rotate-left mockup-trust-icon" style={{ color: '#16a34a' }}></i>
+                    <div className="mockup-trust-text">
+                      <strong>SriTech Guarantee</strong>
+                      <span>Certified Quality Support</span>
+                    </div>
+                  </div>
+                  <div className="mockup-trust-item">
+                    <i className="fa-solid fa-award mockup-trust-icon" style={{ color: '#16a34a' }}></i>
+                    <div className="mockup-trust-text">
+                      <strong>Heavy-Duty MS</strong>
+                      <span>Flame-Resistant Build</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* Reviews Section */}
+                        {/* Reviews Section */}
             <div className="reviews-section" style={{ borderTop: '1px solid var(--border-color)', paddingTop: '2rem', marginTop: '1rem' }}>
               <h3 style={{ fontSize: '1.5rem', color: 'var(--text-main)', marginBottom: '1.5rem', textAlign: 'left' }}>Customer Reviews</h3>
               
@@ -3201,11 +3222,15 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
                       </div>
                     ))
                   ) : (
-                    <p style={{ color: 'var(--text-muted)', fontStyle: 'italic', textAlign: 'left' }}>No reviews yet. Be the first to share your thoughts!</p>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '3rem 1rem', background: '#f8fafc', borderRadius: '12px', border: '1px dashed #cbd5e1', textAlign: 'center', height: '100%' }}>
+                      <i className="fa-solid fa-comment-dots" style={{ fontSize: '3rem', color: '#94a3b8', marginBottom: '1rem' }}></i>
+                      <h4 style={{ margin: '0 0 0.5rem 0', color: '#334155' }}>No reviews yet</h4>
+                      <p style={{ color: '#64748b', fontSize: '0.9rem', margin: 0 }}>Be the first to review this product.</p>
+                    </div>
                   )}
                 </div>
 
-                {/* Submit Review Form (Only for buyers) */}
+                {/* Submit Review Form */}
                 <div className="review-form-container" style={{ textAlign: 'left' }}>
                   <form onSubmit={handleSubmitReview} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                     <h4 style={{ color: 'var(--text-main)', margin: '0' }}>Share Your Experience</h4>
@@ -3595,44 +3620,6 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
               )}
             </div>
           </div>
-        )}
-
-        {/* Premium User Dashboard Modal */}
-        {customerDashboardOpen && (
-          <UserDashboard
-            isOpen={customerDashboardOpen}
-            onClose={handleCloseOrderDashboard}
-            activeUser={activeUser}
-            orders={userOrders}
-            wishlistItems={products.filter(product => waitlist.includes(product._id || product.id))}
-            cartItems={resolvedCartItems}
-            products={products}
-            coupons={coupons}
-            offers={offers}
-            onAddToCart={handleAddToCart}
-            onUpdateCartQuantity={handleChangeCartQuantity}
-            onRemoveFromCart={handleRemoveFromCart}
-            onBuyNow={handleBuyNow}
-            onRemoveFromWishlist={handleToggleWaitlist}
-            onCheckout={handleCheckoutCart}
-            onUpdateProfile={handleUpdateProfile}
-            onUpdatePassword={handleUpdatePassword}
-            onSaveAddress={handleSaveAddress}
-            onDeleteAddress={handleDeleteAddress}
-            onSetDefaultAddress={handleSetDefaultAddress}
-            onSubmitReturnRequest={handleSubmitReturnRequest}
-            onRaiseSupport={handleRaiseSupport}
-            onMarkNotificationsRead={handleMarkNotificationsRead}
-            notifications={notifications}
-            onLogout={handleLogout}
-            getProductFinalPrice={getProductFinalPrice}
-            totalCartAmount={cartTotal}
-            onViewProduct={(product) => {
-              setSelectedProduct(product);
-              setSelectedProductImageIndex(0);
-              setCustomerDashboardOpen(false);
-            }}
-          />
         )}
 
       {/* Entry Modal */}
@@ -4131,7 +4118,8 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
       </div>
 
       {/* Header */}
-      <header className="top-header">
+      {!isCustomerDashboardPage && (
+        <header className="top-header">
         <div className="header-container">
           {/* Mobile Menu Button */}
           <button 
@@ -4248,26 +4236,68 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
             </button>
 
             {/* Login / Account Button */}
-            <button
-              className="action-btn login-btn-premium"
-              title={isUserLoggedIn ? t('nav.account', 'Account') : t('nav.login')}
-              aria-label={isUserLoggedIn ? t('nav.account', 'Account') : t('nav.login')}
-              onClick={() => {
-                if (isUserLoggedIn) {
-                  handleOpenOrderDashboard({ forceOpen: true });
-                } else {
-                  setAuthMode('login');
-                  setAuthErrorMessage(null);
-                  setShowAuthModal(true);
-                  setUserCredentials({ name: '', phone: '', address: '', email: '', password: '', confirmPassword: '' });
-                }
-              }}
-            >
-              <i className="fa-solid fa-user" aria-hidden="true"></i>
-              <span className="btn-text">
-                {isUserLoggedIn ? (activeUser?.name?.split(' ')[0] || 'Account') : 'Login'}
-              </span>
-            </button>
+            <div style={{ position: 'relative' }}>
+              <button
+                className="action-btn login-btn-premium"
+                title={isUserLoggedIn ? t('nav.account', 'Account') : t('nav.login')}
+                aria-label={isUserLoggedIn ? t('nav.account', 'Account') : t('nav.login')}
+                onClick={() => {
+                  setShowLoginReminder(false);
+                  if (isUserLoggedIn) {
+                    handleOpenOrderDashboard({ forceOpen: true });
+                  } else {
+                    setAuthMode('login');
+                    setAuthErrorMessage(null);
+                    setShowAuthModal(true);
+                    setUserCredentials({ name: '', phone: '', address: '', email: '', password: '', confirmPassword: '' });
+                  }
+                }}
+              >
+                <i className="fa-solid fa-user" aria-hidden="true"></i>
+                <span className="btn-text">
+                  {isUserLoggedIn ? (activeUser?.name?.split(' ')[0] || 'Account') : 'Login'}
+                </span>
+              </button>
+
+              {!isUserLoggedIn && showLoginReminder && (
+                <div 
+                  className="login-reminder-tooltip"
+                  onClick={() => setShowLoginReminder(false)}
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    right: '0',
+                    marginTop: '8px',
+                    background: '#15803d',
+                    color: '#ffffff',
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    fontSize: '0.72rem',
+                    fontWeight: '600',
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                    whiteSpace: 'nowrap',
+                    zIndex: 9999,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    animation: 'bounceTooltip 2s infinite'
+                  }}
+                >
+                  <div style={{
+                    position: 'absolute',
+                    top: '-4px',
+                    right: '20px',
+                    width: '8px',
+                    height: '8px',
+                    background: '#15803d',
+                    transform: 'rotate(45deg)'
+                  }} />
+                  <span>🔑 Remember to login!</span>
+                  <i className="fa-solid fa-xmark" style={{ fontSize: '0.65rem', opacity: 0.8, marginLeft: '4px' }}></i>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -4411,10 +4441,48 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
             </div>
           </div>
         </div>
-      </header>
+        </header>
+      )}
 
       <main>
-        {isMyOrdersPage ? (
+        {isCustomerDashboardPage ? (
+          <UserDashboard
+            isOpen={true}
+            onClose={() => navigate('/')}
+            activeUser={activeUser}
+            activeTab={customerDashboardTab ? customerDashboardTab.toLowerCase() : 'overview'}
+            onTabChange={(tab) => setCustomerDashboardTab(tab)}
+            orders={userOrders}
+            wishlistItems={products.filter(product => waitlist.includes(product._id || product.id))}
+            cartItems={resolvedCartItems}
+            products={products}
+            coupons={coupons}
+            offers={offers}
+            onAddToCart={handleAddToCart}
+            onUpdateCartQuantity={handleChangeCartQuantity}
+            onRemoveFromCart={handleRemoveFromCart}
+            onBuyNow={handleBuyNow}
+            onRemoveFromWishlist={handleToggleWaitlist}
+            onCheckout={handleCheckoutCart}
+            onUpdateProfile={handleUpdateProfile}
+            onUpdatePassword={handleUpdatePassword}
+            onSaveAddress={handleSaveAddress}
+            onDeleteAddress={handleDeleteAddress}
+            onSetDefaultAddress={handleSetDefaultAddress}
+            onSubmitReturnRequest={handleSubmitReturnRequest}
+            onRaiseSupport={handleRaiseSupport}
+            onMarkNotificationsRead={handleMarkNotificationsRead}
+            notifications={notifications}
+            onLogout={handleLogout}
+            getProductFinalPrice={getProductFinalPrice}
+            totalCartAmount={cartTotal}
+            onViewProduct={(product) => {
+              setSelectedProduct(product);
+              setSelectedProductImageIndex(0);
+              navigate(`/product/${product.slug || product._id || product.id}`);
+            }}
+          />
+        ) : isMyOrdersPage ? (
           <MyOrders />
         ) : (
           <>
@@ -4998,7 +5066,7 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
                   if (pct > 0) discountText = `${pct}% off`;
                 }
 
-                const displayPrice = discountedPrice !== null ? discountedPrice : priceNum;
+                const displayPrice = getProductFinalPrice(product);
                 const showDiscount = originalPrice !== null && originalPrice > displayPrice && Boolean(discountText);
 
                 return (

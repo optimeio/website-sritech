@@ -9,12 +9,19 @@ exports.getReviewsForProduct = asyncHandler(async (req, res) => {
 });
 
 exports.createReview = asyncHandler(async (req, res) => {
-  const { customerName, rating, comment } = req.body;
+  const { customerName, customerEmail, rating, comment } = req.body;
   const productId = req.params.productId;
 
-  const orders = await Order.find({ customerName });
+  const query = {};
+  if (customerEmail) {
+    query.customerEmail = customerEmail;
+  } else {
+    query.customerName = customerName;
+  }
+
+  const orders = await Order.find(query);
   const hasPurchased = orders.some(order =>
-    order.items.some(item => item.product.toString() === productId)
+    order.items.some(item => item.product && item.product.toString() === productId)
   );
 
   if (!hasPurchased) {

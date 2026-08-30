@@ -66,7 +66,7 @@ exports.respondToSupportQuery = asyncHandler(async (req, res) => {
   sendEmail(
     saved.email,
     `Response to your support request: ${saved.subject}`,
-    templates.supportResponse(saved.customerName, saved.subject, response),
+    templates.supportResponse({ name: saved.customerName, subject: saved.subject, response }),
     {
       template: 'supportResponse',
       payload: { supportQueryId: saved._id }
