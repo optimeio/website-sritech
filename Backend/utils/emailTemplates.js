@@ -1,9 +1,9 @@
 const company = {
   name: 'SriTech Engineering',
-  logoUrl: 'https://website.sritechengg.in/sri-tech-logo-final.png',
+  logoUrl: 'https://sritechengg.in/sri-tech-logo-final.png',
   supportEmail: process.env.SUPPORT_EMAIL || 'thesmgroups@gmail.com',
   supportPhone: process.env.SUPPORT_PHONE || '+91 98765 43210',
-  websiteUrl: process.env.CLIENT_URL || 'https://website.sritechengg.in',
+  websiteUrl: process.env.CLIENT_URL || 'https://sritechengg.in',
   address: '12 Sustainable Avenue, Green Industrial Park, India'
 };
 

@@ -108,6 +108,8 @@ const AdminDashboard = ({
   const [offerStatusFilter, setOfferStatusFilter] = useState('all');
   const [offerSort, setOfferSort] = useState('priority');
   const [offerImageUrl, setOfferImageUrl] = useState('');
+  const [newProductImageUrl, setNewProductImageUrl] = useState('');
+  const [editProductImageUrl, setEditProductImageUrl] = useState('');
   const [newHeroBanner, setNewHeroBanner] = useState({ image: '', caption: '' });
   const [supportReplies, setSupportReplies] = useState({});
   const [inventoryStockDrafts, setInventoryStockDrafts] = useState({});
@@ -321,6 +323,57 @@ const AdminDashboard = ({
   });
   const [replaceEditImages, setReplaceEditImages] = useState(false);
 
+  const extractProductDefaults = (p) => {
+    if (!p) return { burnerSize: '', stoveWeight: '', dimensions: '', material: '', howToUse: '' };
+    const name = p.name || '';
+    const desc = p.description || '';
+    const specs = p.specifications || '';
+
+    let burnerSize = p.burnerSize || '';
+    let stoveWeight = p.stoveWeight || '';
+    let dimensions = p.dimensions || '';
+    let material = p.material || '';
+    let howToUse = p.howToUse || '';
+
+    if (!burnerSize) {
+      const match = (desc + ' ' + specs + ' ' + name).match(/(?:burner size|burner)\s*:\s*([^,\.\n;]+)/i);
+      if (match) burnerSize = match[1].trim();
+      else if (/6"/i.test(name) || /6 inch/i.test(name)) burnerSize = '6 Inches';
+      else if (/double layer/i.test(name)) burnerSize = '6 Inches';
+      else if (/single layer/i.test(name)) burnerSize = '5 Inches';
+      else burnerSize = '6 Inches';
+    }
+
+    if (!stoveWeight) {
+      const match = (desc + ' ' + specs).match(/(?:stove weight|weight|wt)\s*:\s*([^,\.\n;]+)/i);
+      if (match) stoveWeight = match[1].trim();
+      else if (/m5/i.test(name)) stoveWeight = '18 to 20 kg';
+      else if (/m4/i.test(name)) stoveWeight = '8.5 kg';
+      else stoveWeight = '8.5 kg';
+    }
+
+    if (!dimensions) {
+      const match = (desc + ' ' + specs).match(/(?:dimensions|dim)\s*:\s*([^,\.\n;]+)/i);
+      if (match) dimensions = match[1].trim();
+      else if (/m5/i.test(name)) dimensions = '18" × 18" × 19"';
+      else if (/m4/i.test(name)) dimensions = '12" × 10" × 14"';
+      else dimensions = '12" × 10" × 14"';
+    }
+
+    if (!material) {
+      const match = (desc + ' ' + specs).match(/material\s*:\s*([^,\.\n;]+)/i);
+      if (match) material = match[1].trim();
+      else if (/ss|stainless steel/i.test(desc + ' ' + specs + ' ' + name)) material = 'Premium Stainless Steel (SS)';
+      else material = 'Mild Steel (MS)';
+    }
+
+    if (!howToUse) {
+      howToUse = `1. Place stove on a stable, non-combustible surface.\n2. Fill combustion chamber with fuel (wood, coconut shell, husk or biomass).\n3. Connect & switch on air regulator blower for clean combustion.\n4. Light fuel from top/side port and adjust fan speed for flame intensity.`;
+    }
+
+    return { burnerSize, stoveWeight, dimensions, material, howToUse };
+  };
+
   const startEditProduct = async (listProduct) => {
     setEditingProductId(listProduct._id || listProduct.id);
     let p = listProduct;
@@ -328,17 +381,19 @@ const AdminDashboard = ({
       const full = await fetchProductDetails(listProduct._id || listProduct.id);
       if (full) p = full;
     }
+
+    const defaults = extractProductDefaults(p);
     
     setEditProduct({
       name: p.name || '',
       price: p.price ? p.price.toString().replace(/[₹,]/g, '') : '',
       description: p.description || '',
       specifications: p.specifications || '',
-      howToUse: p.howToUse || '',
-      burnerSize: p.burnerSize || '',
-      stoveWeight: p.stoveWeight || '',
-      dimensions: p.dimensions || '',
-      material: p.material || '',
+      howToUse: p.howToUse || defaults.howToUse,
+      burnerSize: p.burnerSize || defaults.burnerSize,
+      stoveWeight: p.stoveWeight || defaults.stoveWeight,
+      dimensions: p.dimensions || defaults.dimensions,
+      material: p.material || defaults.material,
       stock: typeof p.stock === 'number' ? p.stock : 0,
       shippingCharge: typeof p.shippingCharge === 'number' ? p.shippingCharge : 0,
       gstPercent: typeof p.gstPercent === 'number' ? p.gstPercent : 0,
@@ -367,14 +422,14 @@ const AdminDashboard = ({
   const handleEditFileChange = (e) => {
     const files = Array.from(e.target.files);
     if (!files.length) return;
-    if (files.length > 5) {
-      alert('Maximum 5 images allowed per product.');
+    if (files.length > 10) {
+      alert('Maximum 10 images allowed per product.');
       return;
     }
 
-    const maxAllowed = replaceEditImages ? 5 : 5 - editProduct.images.length;
+    const maxAllowed = replaceEditImages ? 10 : 10 - editProduct.images.length;
     if (files.length > maxAllowed) {
-      alert('Maximum 5 images allowed per product.');
+      alert('Maximum 10 images allowed per product.');
       return;
     }
 
@@ -393,6 +448,20 @@ const AdminDashboard = ({
         images: replaceEditImages ? results : [...prev.images, ...results]
       }));
     }).finally(() => setIsImageProcessing(false));
+  };
+
+  const handleAddUrlToEditProduct = () => {
+    const url = editProductImageUrl.trim();
+    if (!url) return;
+    if (editProduct.images.length >= 10 && !replaceEditImages) {
+      alert('Maximum 10 images allowed per product.');
+      return;
+    }
+    setEditProduct(prev => ({
+      ...prev,
+      images: replaceEditImages ? [url] : [...prev.images, url]
+    }));
+    setEditProductImageUrl('');
   };
 
   const removeEditImage = (index) => {
@@ -572,6 +641,11 @@ const AdminDashboard = ({
       category: String(newProduct.category || '').trim(),
       description: String(newProduct.description || '').trim(),
       specifications: String(newProduct.specifications || '').trim(),
+      howToUse: String(newProduct.howToUse || '').trim(),
+      burnerSize: String(newProduct.burnerSize || '').trim(),
+      stoveWeight: String(newProduct.stoveWeight || '').trim(),
+      dimensions: String(newProduct.dimensions || '').trim(),
+      material: String(newProduct.material || '').trim(),
       stock: Number(newProduct.stock || 0),
       shippingCharge: Number(newProduct.shippingCharge || 0),
       gstPercent: Number(newProduct.gstPercent || 0),
@@ -591,7 +665,7 @@ const AdminDashboard = ({
       const savedProduct = await onAddProduct(payload);
       if (savedProduct) {
         alert('Product added successfully!');
-        setNewProduct({ name: '', price: '', description: '', specifications: '', howToUse: '', stock: 0, shippingCharge: 0, gstPercent: 0, discountPercent: 0, category: categories[0]?.slug || categories[0]?.name || 'stoves', icon: 'fa-box', isNewArrival: false, images: [], video: '' });
+        setNewProduct({ name: '', price: '', description: '', specifications: '', howToUse: '', burnerSize: '', stoveWeight: '', dimensions: '', material: '', stock: 0, shippingCharge: 0, gstPercent: 0, discountPercent: 0, category: categories[0]?.slug || categories[0]?.name || 'stoves', icon: 'fa-box', isNewArrival: false, images: [], video: '' });
 
       } else {
         alert('Failed to add product. Please try again.');
@@ -605,8 +679,8 @@ const AdminDashboard = ({
   const handleFileChange = (e) => {
     const files = Array.from(e.target.files);
     if (!files.length) return;
-    if (files.length + newProduct.images.length > 5) {
-      alert('Maximum 5 images allowed per product.');
+    if (files.length + newProduct.images.length > 10) {
+      alert('Maximum 10 images allowed per product.');
       return;
     }
 
@@ -625,6 +699,20 @@ const AdminDashboard = ({
         images: [...prev.images, ...results]
       }));
     }).finally(() => setIsImageProcessing(false));
+  };
+
+  const handleAddUrlToNewProduct = () => {
+    const url = newProductImageUrl.trim();
+    if (!url) return;
+    if (newProduct.images.length >= 10) {
+      alert('Maximum 10 images allowed per product.');
+      return;
+    }
+    setNewProduct(prev => ({
+      ...prev,
+      images: [...prev.images, url]
+    }));
+    setNewProductImageUrl('');
   };
 
   const removeImage = (index) => {
@@ -1198,8 +1286,21 @@ const AdminDashboard = ({
                     </div>
 
                     <div className="admin-form-group" style={{ marginBottom: '1.5rem' }}>
-                      <div>Product Images (Max 5)</div>
+                      <div>Product Images (Max 10 - Upload Files or Paste URLs)</div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.5rem' }}>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <input
+                            type="url"
+                            value={editProductImageUrl}
+                            onChange={(e) => setEditProductImageUrl(e.target.value)}
+                            placeholder="Paste direct image URL (https://...)"
+                            className="admin-form-control"
+                            style={{ flex: 1 }}
+                          />
+                          <button type="button" className="admin-btn admin-btn-small" onClick={handleAddUrlToEditProduct}>
+                            Add URL
+                          </button>
+                        </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                           <input
                             type="checkbox"
@@ -1209,7 +1310,7 @@ const AdminDashboard = ({
                             style={{ width: '18px', height: '18px', cursor: 'pointer' }}
                           />
                           <label htmlFor="replaceEditImages" style={{ cursor: 'pointer', fontSize: '0.95rem' }}>
-                            Replace existing images with uploaded files
+                            Replace existing images with uploaded files/URLs
                           </label>
                         </div>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
@@ -1225,10 +1326,10 @@ const AdminDashboard = ({
                               </button>
                             </div>
                           ))}
-                          {(replaceEditImages || editProduct.images.length < 5) && (
+                          {(replaceEditImages || editProduct.images.length < 10) && (
                             <label htmlFor="editProductImageUpload" style={{ width: '80px', height: '80px', borderRadius: '8px', border: '2px dashed var(--primary-light)', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', cursor: 'pointer' }}>
                               <i className="fa-solid fa-plus" style={{ color: 'var(--primary-color)', fontSize: '1.2rem' }}></i>
-                              <span style={{ fontSize: '0.65rem', color: 'var(--primary-color)', marginTop: '4px' }}>Upload Images</span>
+                              <span style={{ fontSize: '0.65rem', color: 'var(--primary-color)', marginTop: '4px' }}>Upload Files</span>
                               <input id="editProductImageUpload" name="editProductImageUpload" type="file" accept="image/*" multiple onChange={handleEditFileChange} style={{ display: 'none' }} />
                             </label>
                           )}
@@ -1572,31 +1673,46 @@ const AdminDashboard = ({
                   </div>
 
                   <div className="admin-form-group" style={{ marginBottom: '1.5rem' }}>
-                    <div>Product Images (Upload - Max 5)</div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', marginTop: '0.5rem' }}>
-                      {newProduct.images.map((base64, index) => (
-                        <div key={index} style={{ position: 'relative', width: '80px', height: '80px', borderRadius: '8px', overflow: 'hidden', border: '2px solid #818cf8' }}>
-                          <img src={base64} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                          <button 
-                            type="button" 
-                            onClick={() => removeImage(index)}
-                            style={{ position: 'absolute', top: '2px', right: '2px', background: '#ef4444', color: 'white', border: 'none', borderRadius: '50%', width: '18px', height: '18px', fontSize: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                          >
-                            &times;
-                          </button>
-                        </div>
-                      ))}
-                      {newProduct.images.length < 5 && (
-                        <label htmlFor="newProductImageUpload" style={{ 
-                          width: '80px', height: '80px', borderRadius: '8px', border: '2px dashed rgba(0,0,0,0.1)', 
-                          display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', 
-                          cursor: 'pointer', transition: 'var(--transition)' 
-                        }} className="upload-btn">
-                          <i className="fa-solid fa-plus" style={{ color: '#64748b', fontSize: '1.2rem' }}></i>
-                          <span style={{ fontSize: '0.65rem', color: '#64748b', marginTop: '4px' }}>Add Image</span>
-                          <input id="newProductImageUpload" name="newProductImageUpload" type="file" accept="image/*" multiple onChange={handleFileChange} style={{ display: 'none' }} />
-                        </label>
-                      )}
+                    <div>Product Images (Max 10 - Upload Files or Paste URLs)</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.5rem' }}>
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <input
+                          type="url"
+                          value={newProductImageUrl}
+                          onChange={(e) => setNewProductImageUrl(e.target.value)}
+                          placeholder="Paste direct image URL (https://...)"
+                          className="admin-form-control"
+                          style={{ flex: 1 }}
+                        />
+                        <button type="button" className="admin-btn admin-btn-small" onClick={handleAddUrlToNewProduct}>
+                          Add URL
+                        </button>
+                      </div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
+                        {newProduct.images.map((base64, index) => (
+                          <div key={index} style={{ position: 'relative', width: '80px', height: '80px', borderRadius: '8px', overflow: 'hidden', border: '2px solid #818cf8' }}>
+                            <img src={base64} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            <button 
+                              type="button" 
+                              onClick={() => removeImage(index)}
+                              style={{ position: 'absolute', top: '2px', right: '2px', background: '#ef4444', color: 'white', border: 'none', borderRadius: '50%', width: '18px', height: '18px', fontSize: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                            >
+                              &times;
+                            </button>
+                          </div>
+                        ))}
+                        {newProduct.images.length < 10 && (
+                          <label htmlFor="newProductImageUpload" style={{ 
+                            width: '80px', height: '80px', borderRadius: '8px', border: '2px dashed rgba(0,0,0,0.1)', 
+                            display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', 
+                            cursor: 'pointer', transition: 'var(--transition)' 
+                          }} className="upload-btn">
+                            <i className="fa-solid fa-plus" style={{ color: '#64748b', fontSize: '1.2rem' }}></i>
+                            <span style={{ fontSize: '0.65rem', color: '#64748b', marginTop: '4px' }}>Upload Files</span>
+                            <input id="newProductImageUpload" name="newProductImageUpload" type="file" accept="image/*" multiple onChange={handleFileChange} style={{ display: 'none' }} />
+                          </label>
+                        )}
+                      </div>
                     </div>
                   </div>
 

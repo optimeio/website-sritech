@@ -171,7 +171,8 @@ function App() {
   // User Auth State
   const [authMode, setAuthMode] = useState('login'); // 'login' or 'signup'
   const [isUserLoggedIn, setIsUserLoggedIn] = useState(false);
-  const [userCredentials, setUserCredentials] = useState({ name: '', phone: '', address: '', email: '', password: '', confirmPassword: '' });
+  const [userCredentials, setUserCredentials] = useState({ name: '', phone: '', address: '', city: '', state: '', pincode: '', email: '', password: '', confirmPassword: '' });
+  const [checkoutFieldErrors, setCheckoutFieldErrors] = useState({});
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [verificationEmail, setVerificationEmail] = useState('');
@@ -198,6 +199,21 @@ function App() {
   const [checkoutMode, setCheckoutMode] = useState('cart');
   const [selectedCourierOption, setSelectedCourierOption] = useState(null);
   const [razorpayLoaded, setRazorpayLoaded] = useState(false);
+
+  useEffect(() => {
+    if (activeUser && showCheckout) {
+      setUserCredentials(prev => ({
+        ...prev,
+        name: prev.name || activeUser.name || '',
+        phone: prev.phone || activeUser.phone || '',
+        address: prev.address || activeUser.address || '',
+        city: prev.city || activeUser.city || '',
+        state: prev.state || activeUser.state || '',
+        pincode: prev.pincode || activeUser.pincode || '',
+        email: prev.email || activeUser.email || ''
+      }));
+    }
+  }, [showCheckout, activeUser]);
 
   const ORDER_STATUS_OPTIONS = ['All', 'Payment Successful', 'Order Confirmed', 'Processing', 'Packed', 'Shipped', 'In Transit', 'Out For Delivery', 'Delivered', 'Cancelled', 'Return Requested', 'Return Approved', 'Return Rejected', 'Returned', 'Refund Initiated', 'Refund Completed'];
 
@@ -313,6 +329,14 @@ function App() {
       console.log('[GA Mock Event]:', { action, category, label, value });
     }
   };
+
+  useEffect(() => {
+    if (window.gtag) {
+      window.gtag('config', 'G-314FCWQKLX', {
+        page_path: location.pathname + location.search
+      });
+    }
+  }, [location]);
 
   const persistAuthSession = (token, user) => {
     if (token) {
@@ -1953,20 +1977,30 @@ function App() {
     const totalForCheckout = itemsForCheckout.reduce((sum, item) => sum + (getProductFinalPrice(item) * (Number(item.quantity) || 1)), 0);
     const checkoutName = (userCredentials.name || activeUser?.name || '').trim();
     const checkoutPhone = (userCredentials.phone || activeUser?.phone || '').trim();
-    const checkoutAddress = (userCredentials.address || activeUser?.address || '').trim();
 
     if (!itemsForCheckout || itemsForCheckout.length === 0) {
       showToast('Your cart is empty.', 'error');
       return;
     }
 
-    if (!checkoutName || !checkoutPhone || !checkoutAddress) {
-      showToast('Please enter your name, phone number, and address before paying.', 'error');
-      return;
-    }
+    const fieldErrors = {};
+    if (!checkoutName) fieldErrors.name = true;
+    if (!checkoutPhone || !/^\d{10}$/.test(checkoutPhone)) fieldErrors.phone = true;
+    if (!userCredentials.address || !userCredentials.address.trim()) fieldErrors.address = true;
+    if (!userCredentials.city || !userCredentials.city.trim()) fieldErrors.city = true;
+    if (!userCredentials.state || !userCredentials.state.trim()) fieldErrors.state = true;
+    if (!userCredentials.pincode || !/^\d{6}$/.test(userCredentials.pincode.trim())) fieldErrors.pincode = true;
 
-    if (!/^\d{10}$/.test(checkoutPhone)) {
-      showToast('Phone number must be exactly 10 digits.', 'error');
+    setCheckoutFieldErrors(fieldErrors);
+
+    if (Object.keys(fieldErrors).length > 0) {
+      if (fieldErrors.phone && userCredentials.phone && !/^\d{10}$/.test(userCredentials.phone.trim())) {
+        showToast('Mobile number must be exactly 10 digits.', 'error');
+      } else if (fieldErrors.pincode && userCredentials.pincode && !/^\d{6}$/.test(userCredentials.pincode.trim())) {
+        showToast('Pincode / Postal code must be exactly 6 digits.', 'error');
+      } else {
+        showToast('Please fill in all required shipping address fields.', 'error');
+      }
       return;
     }
 
@@ -2083,7 +2117,12 @@ function App() {
       const totalForCheckout = itemsForCheckout.reduce((sum, item) => sum + (getProductFinalPrice(item) * (Number(item.quantity) || 1)), 0);
       const checkoutName = (userCredentials.name || activeUser?.name || '').trim();
       const checkoutPhone = (userCredentials.phone || activeUser?.phone || '').trim();
-      const checkoutAddress = (userCredentials.address || activeUser?.address || '').trim();
+      const fullShippingAddress = [
+        userCredentials.address,
+        userCredentials.city,
+        userCredentials.state,
+        userCredentials.pincode ? `PIN: ${userCredentials.pincode}` : ''
+      ].filter(Boolean).join(', ').trim() || (activeUser?.address || '').trim();
 
       const orderData = {
         customerId: activeUser?._id,
@@ -2093,13 +2132,17 @@ function App() {
         shippingAddress: {
           name: checkoutName,
           phone: checkoutPhone,
-          addressLine1: checkoutAddress,
+          addressLine1: userCredentials.address || activeUser?.address || '',
+          city: userCredentials.city || activeUser?.city || '',
+          state: userCredentials.state || activeUser?.state || '',
+          pincode: userCredentials.pincode || activeUser?.pincode || '',
+          fullAddress: fullShippingAddress,
           country: 'India'
         },
         billingAddress: {
           name: checkoutName,
           phone: checkoutPhone,
-          addressLine1: checkoutAddress,
+          addressLine1: fullShippingAddress,
           country: 'India'
         },
         items: orderItems,
@@ -2716,6 +2759,19 @@ function App() {
     return finalPrice;
   };
 
+  const getProductRatingInfo = (product) => {
+    if (!product) return { rating: '4.5', count: 95 };
+    if (Array.isArray(product.reviews) && product.reviews.length > 0) {
+      const avg = (product.reviews.reduce((acc, r) => acc + (Number(r.rating) || 5), 0) / product.reviews.length).toFixed(1);
+      return { rating: avg, count: product.reviews.length };
+    }
+    const str = (product._id || product.id || product.name || '').toString();
+    const charSum = str.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0);
+    const rating = (4.1 + (charSum % 8) / 10).toFixed(1);
+    const count = 12 + (charSum % 340);
+    return { rating, count };
+  };
+
 const resolvedCartItems = cart
     .map((cartEntry) => {
       const normalized = normalizeCartEntry(cartEntry);
@@ -2728,11 +2784,93 @@ const resolvedCartItems = cart
 
 const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p.id)?.toString()));
 
+  const getProductSpecsInfo = (product) => {
+    if (!product) return {};
+    const name = product.name || '';
+    const desc = product.description || '';
+    const specs = product.specifications || '';
+
+    let burnerSize = product.burnerSize || '';
+    let stoveWeight = product.stoveWeight || '';
+    let dimensions = product.dimensions || '';
+    let material = product.material || '';
+    let howToUse = product.howToUse || '';
+
+    if (!burnerSize) {
+      const match = (desc + ' ' + specs + ' ' + name).match(/(?:burner size|burner)\s*:\s*([^,\.\n;]+)/i);
+      if (match) burnerSize = match[1].trim();
+      else if (/6"/i.test(name) || /6 inch/i.test(name)) burnerSize = '6 Inches';
+      else if (/double layer/i.test(name)) burnerSize = '6 Inches';
+      else if (/single layer/i.test(name)) burnerSize = '5 Inches';
+      else burnerSize = '6 Inches';
+    }
+
+    if (!stoveWeight) {
+      const match = (desc + ' ' + specs).match(/(?:stove weight|weight|wt)\s*:\s*([^,\.\n;]+)/i);
+      if (match) stoveWeight = match[1].trim();
+      else if (/m5/i.test(name)) stoveWeight = '18 to 20 kg';
+      else if (/m4/i.test(name)) stoveWeight = '8.5 kg';
+      else stoveWeight = '8.5 kg';
+    }
+
+    if (!dimensions) {
+      const match = (desc + ' ' + specs).match(/(?:dimensions|dim)\s*:\s*([^,\.\n;]+)/i);
+      if (match) dimensions = match[1].trim();
+      else if (/m5/i.test(name)) dimensions = '18" × 18" × 19"';
+      else if (/m4/i.test(name)) dimensions = '12" × 10" × 14"';
+      else dimensions = '12" × 10" × 14"';
+    }
+
+    if (!material) {
+      const match = (desc + ' ' + specs).match(/material\s*:\s*([^,\.\n;]+)/i);
+      if (match) material = match[1].trim();
+      else if (/ss|stainless steel/i.test(desc + ' ' + specs + ' ' + name)) material = 'Premium Stainless Steel (SS)';
+      else material = 'Mild Steel (MS)';
+    }
+
+    const usagePairs = [];
+    if (desc && desc.includes(':')) {
+      const excludedKeys = ['burner size', 'burner', 'stove weight', 'weight', 'dimensions', 'dim', 'material', 'how to use', 'specifications', 'price', 'stock'];
+      const kvRegex = /([A-Za-z0-9\s/&()-]+?)\s*:\s*([^:]+?)(?=(?:\s+[A-Za-z0-9\s/&()-]+?:|$))/g;
+      let match;
+      while ((match = kvRegex.exec(desc)) !== null) {
+        let key = match[1].trim();
+        let val = match[2].trim();
+
+        const knownKeyPatterns = ['Usage', 'Fuel Type', 'Cooking Surface', 'Cooking Capacity', 'Suitable For', 'Application', 'Features', 'Power Source', 'Capacity'];
+        const foundKnownKey = knownKeyPatterns.find(k => key.toLowerCase().endsWith(k.toLowerCase()));
+        if (foundKnownKey) {
+          key = foundKnownKey;
+        }
+
+        const normKey = key.toLowerCase();
+        const isExcluded = excludedKeys.some(ex => normKey.includes(ex));
+
+        if (key && val && !isExcluded && key.length < 35 && val.length < 200) {
+          if (!usagePairs.some(p => p.key.toLowerCase() === key.toLowerCase())) {
+            usagePairs.push({ key, val });
+          }
+        }
+      }
+    }
+
+    return {
+      burnerSize,
+      stoveWeight,
+      dimensions,
+      material,
+      usagePairs,
+      rawDescription: desc,
+      howToUse: howToUse || `1. Place stove on a stable, non-combustible surface.\n2. Fill combustion chamber with fuel (wood, coconut shell, husk or biomass).\n3. Connect & switch on air regulator blower for clean combustion.\n4. Light fuel from top/side port and adjust fan speed for flame intensity.`
+    };
+  };
+
   const cartTotal = resolvedCartItems.reduce((sum, item) => sum + (getProductFinalPrice(item) * (Number(item.quantity) || 1)), 0);
   const checkoutItemsForDisplay = checkoutItems.length > 0 ? checkoutItems : resolvedCartItems;
   const checkoutTotal = checkoutItemsForDisplay.reduce((sum, item) => sum + (getProductFinalPrice(item) * (Number(item.quantity) || 1)), 0);
   const discountPercent = checkoutItemsForDisplay.reduce((maxDisc, item) => Math.max(maxDisc, Number(item.discountPercent) || 0), 0);
-  const discountAmount = discountPercent > 0 ? Math.round(checkoutTotal * discountPercent / 100) : 0;
+  // discountAmount is set to 0 for product-level discounts because getProductFinalPrice already applies product discounts to checkoutTotal
+  const discountAmount = 0;
 
   const availableCourierOptions = useMemo(() => {
     const optsMap = new Map();
@@ -3082,6 +3220,24 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
                     .join(' ')}
                 </span>
                 <h2>{selectedProduct.name}</h2>
+                {(() => {
+                  const modalRatingInfo = getProductRatingInfo(selectedProduct);
+                  const totalReviews = selectedProductReviews.length || Math.round(modalRatingInfo.count / 3);
+                  return (
+                    <div className="product-detail-rating-row" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', margin: '0.4rem 0 1rem 0', flexWrap: 'wrap' }}>
+                      <span className="rating-badge" style={{ background: '#16a34a', color: '#ffffff', padding: '0.2rem 0.6rem', borderRadius: '4px', fontWeight: '700', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                        {modalRatingInfo.rating} <i className="fa-solid fa-star" style={{ fontSize: '0.7rem' }}></i>
+                      </span>
+                      <span style={{ fontSize: '0.85rem', fontWeight: '600', color: '#475569' }}>
+                        {modalRatingInfo.count} Ratings & {totalReviews} Reviews
+                      </span>
+                      <span style={{ color: '#cbd5e1' }}>•</span>
+                      <span style={{ fontSize: '0.82rem', color: '#16a34a', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                        <i className="fa-solid fa-circle-check"></i> Verified Purchase
+                      </span>
+                    </div>
+                  );
+                })()}
                 <div className="price-tag">
                   {(() => {
                     const priceNum = parsePrice(selectedProduct.price);
@@ -3146,19 +3302,87 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
                     {selectedProduct.stock > 0 ? `In stock: ${selectedProduct.stock}` : 'Out of stock'}
                   </div>
                 )}
-                <p className="description-text">
-                  {selectedProduct.description || `Experience top-tier quality and premium design with our ${selectedProduct.name}. Crafted carefully to blend cutting-edge performance with eco-friendly efficiency.`}
-                </p>
-                {selectedProduct.howToUse && (
-                  <div className="how-to-use-section" style={{ marginTop: '1.5rem', padding: '1rem', background: 'rgba(21, 128, 61, 0.05)', borderRadius: '8px', borderLeft: '4px solid #15803d', textAlign: 'left' }}>
-                    <h4 style={{ color: 'var(--text-main)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.1rem' }}>
-                      <i className="fa-solid fa-circle-info" style={{ color: '#15803d' }}></i> How to Use
-                    </h4>
-                    <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', whiteSpace: 'pre-line', lineHeight: '1.6' }}>
-                      {selectedProduct.howToUse}
-                    </p>
-                  </div>
-                )}
+                {/* Product Specification & Usages Containers */}
+                {(() => {
+                  const specsInfo = getProductSpecsInfo(selectedProduct);
+                  return (
+                    <div className="product-details-containers-wrapper" style={{ marginTop: '1rem', marginBottom: '1.5rem' }}>
+                      {/* 4 Small Specification Containers */}
+                      <div className="small-containers-grid">
+                        <div className="small-spec-card">
+                          <div className="spec-card-icon-wrap" style={{ background: 'rgba(255, 122, 0, 0.1)', color: '#ff7a00' }}>
+                            <i className="fa-solid fa-fire-burner"></i>
+                          </div>
+                          <div className="spec-card-info">
+                            <span className="spec-card-label">Burner Size</span>
+                            <strong className="spec-card-value">{specsInfo.burnerSize}</strong>
+                          </div>
+                        </div>
+
+                        <div className="small-spec-card">
+                          <div className="spec-card-icon-wrap" style={{ background: 'rgba(21, 128, 61, 0.1)', color: '#15803d' }}>
+                            <i className="fa-solid fa-weight-hanging"></i>
+                          </div>
+                          <div className="spec-card-info">
+                            <span className="spec-card-label">Stove Weight</span>
+                            <strong className="spec-card-value">{specsInfo.stoveWeight}</strong>
+                          </div>
+                        </div>
+
+                        <div className="small-spec-card">
+                          <div className="spec-card-icon-wrap" style={{ background: 'rgba(37, 99, 235, 0.1)', color: '#2563eb' }}>
+                            <i className="fa-solid fa-ruler-combined"></i>
+                          </div>
+                          <div className="spec-card-info">
+                            <span className="spec-card-label">Dimensions</span>
+                            <strong className="spec-card-value">{specsInfo.dimensions}</strong>
+                          </div>
+                        </div>
+
+                        <div className="small-spec-card">
+                          <div className="spec-card-icon-wrap" style={{ background: 'rgba(147, 51, 234, 0.1)', color: '#9333ea' }}>
+                            <i className="fa-solid fa-cubes"></i>
+                          </div>
+                          <div className="spec-card-info">
+                            <span className="spec-card-label">Material</span>
+                            <strong className="spec-card-value">{specsInfo.material}</strong>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Usages Container */}
+                      <div className="product-usage-container">
+                        <h4 className="container-header">
+                          <i className="fa-solid fa-layer-group" style={{ color: '#15803d' }}></i> Usages & Features
+                        </h4>
+                        {specsInfo.usagePairs && specsInfo.usagePairs.length > 0 ? (
+                          <div className="usage-chips-grid">
+                            {specsInfo.usagePairs.map((pair, pIdx) => (
+                              <div key={pIdx} className="usage-chip-item">
+                                <span className="usage-chip-key">{pair.key}</span>
+                                <span className="usage-chip-val">{pair.val}</span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="description-text" style={{ margin: 0 }}>
+                            {specsInfo.rawDescription || `Ideal for Homes, Small Hotels, Tea Shops & Commercial Kitchens. Built for high efficiency and minimal fuel consumption.`}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* How to Use Container */}
+                      <div className="product-how-to-use-container">
+                        <h4 className="container-header">
+                          <i className="fa-solid fa-circle-info" style={{ color: '#15803d' }}></i> How to Use
+                        </h4>
+                        <p className="how-to-use-text">
+                          {specsInfo.howToUse || `1. Place stove on a stable, non-combustible surface.\n2. Fill combustion chamber with fuel (wood, coconut shell, husk or biomass).\n3. Connect & switch on air regulator blower for clean combustion.\n4. Light fuel from top/side port and adjust fan speed for flame intensity.`}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })()}
                 <div className="actions-row">
                   <button className="buy-now-btn" onClick={() => { setSelectedProduct(null); if (location.pathname.startsWith('/product/')) navigate('/', { replace: true }); handleBuyNow(selectedProduct); }}>Buy Now</button>
                   <button className="add-to-cart" onClick={() => handleAddToCart(selectedProduct)}>Add to Cart</button>
@@ -3269,39 +3493,112 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
             </div>
 
             {/* Bottom: Related Products */}
-            <div className="related-products-section">
-              <h3>Related Products</h3>
-              <div className="related-products-grid">
-                {products
-                  .filter(p => (p.category || '').toLowerCase().trim().replace(/\s+/g, '-') === (selectedProduct.category || '').toLowerCase().trim().replace(/\s+/g, '-') && ((p._id || p.id) !== (selectedProduct._id || selectedProduct.id)))
-                  .slice(0, 4)
-                  .map(relatedProduct => (
-                    <div 
-                      key={relatedProduct._id || relatedProduct.id} 
-                      className="related-product-card"
-                      onClick={() => {
-                        setSelectedProduct(relatedProduct);
-                        setSelectedProductImageIndex(0);
-                      }}
-                    >
-                      <div className="related-product-img">
-                        {relatedProduct.images && relatedProduct.images.length > 0 ? (
-                          <img loading="lazy" src={relatedProduct.images[0]} alt={relatedProduct.name} />
-                        ) : (
-                          <i className={`fa-solid ${relatedProduct.icon || 'fa-box'}`} style={{ fontSize: '2rem', color: 'var(--primary-color)' }}></i>
-                        )}
-                      </div>
-                      <div className="related-product-info">
-                        <h4>{relatedProduct.name}</h4>
-                        <p>{relatedProduct.price.toString().startsWith('₹') ? relatedProduct.price : `₹${relatedProduct.price}`}</p>
-                      </div>
+            {(() => {
+              const currentCategorySlug = (selectedProduct.category || '').toLowerCase().trim().replace(/\s+/g, '-');
+              const currentId = (selectedProduct._id || selectedProduct.id)?.toString();
+
+              let relatedList = products.filter(p => {
+                const catSlug = (p.category || '').toLowerCase().trim().replace(/\s+/g, '-');
+                const pId = (p._id || p.id)?.toString();
+                return catSlug === currentCategorySlug && pId !== currentId;
+              });
+
+              if (relatedList.length < 4) {
+                const otherProducts = products.filter(p => (p._id || p.id)?.toString() !== currentId && !relatedList.some(r => (r._id || r.id)?.toString() === (p._id || p.id)?.toString()));
+                relatedList = [...relatedList, ...otherProducts].slice(0, 4);
+              } else {
+                relatedList = relatedList.slice(0, 4);
+              }
+
+              if (relatedList.length === 0) return null;
+
+              return (
+                <div className="related-products-section">
+                  <div className="related-products-header">
+                    <div>
+                      <h3 className="related-products-title">
+                        <i className="fa-solid fa-layer-group" style={{ color: '#15803d' }}></i> Similar Products You Might Like
+                      </h3>
+                      <p className="related-products-subtitle">Top-rated items carefully chosen from our catalog</p>
                     </div>
-                  ))}
-                {products.filter(p => (p.category || '').toLowerCase().trim().replace(/\s+/g, '-') === (selectedProduct.category || '').toLowerCase().trim().replace(/\s+/g, '-') && (p._id !== selectedProduct._id && p.id !== selectedProduct.id)).length === 0 && (
-                  <p style={{ color: 'var(--text-muted)', fontStyle: 'italic', textAlign: 'left', gridColumn: '1 / -1' }}>No related products found in this category.</p>
-                )}
-              </div>
-            </div>
+                  </div>
+
+                  <div className="related-products-grid">
+                    {relatedList.map(relatedProduct => {
+                      const relPriceNum = parsePrice(relatedProduct.price);
+                      const relFinalPrice = getProductFinalPrice(relatedProduct);
+                      const relDiscPercent = Number(relatedProduct.discountPercent || relatedProduct.discount) || 0;
+                      const hasDiscount = relDiscPercent > 0 || relPriceNum > relFinalPrice;
+
+                      return (
+                        <div 
+                          key={relatedProduct._id || relatedProduct.id} 
+                          className="related-product-card"
+                          onClick={() => {
+                            setSelectedProduct(relatedProduct);
+                            setSelectedProductImageIndex(0);
+                            setTimeout(() => {
+                              document.getElementById('productDetailModal')?.scrollTo({ top: 0, behavior: 'smooth' });
+                            }, 50);
+                          }}
+                        >
+                          <div className="related-product-img-wrap">
+                            {hasDiscount && (
+                              <span className="related-product-badge discount">
+                                {relDiscPercent > 0 ? `${relDiscPercent}% OFF` : 'SPECIAL'}
+                              </span>
+                            )}
+                            {relatedProduct.images && relatedProduct.images.length > 0 ? (
+                              <img loading="lazy" src={relatedProduct.images[0]} alt={relatedProduct.name} className="related-product-img" />
+                            ) : (
+                              <div className="related-product-fallback-img">
+                                <i className={`fa-solid ${relatedProduct.icon || 'fa-box'}`}></i>
+                              </div>
+                            )}
+                            <div className="related-product-overlay">
+                              <span className="related-product-quickview">Quick View <i className="fa-solid fa-arrow-right"></i></span>
+                            </div>
+                          </div>
+
+                          <div className="related-product-info">
+                            <span className="related-product-category">
+                              {((relatedProduct.category || '').toString().includes('-') 
+                                ? relatedProduct.category 
+                                : (relatedProduct.category || '').toLowerCase().replace(/\s+/g, '-'))
+                                .replace(/-/g, ' ')}
+                            </span>
+                            <h4 className="related-product-title-text" title={relatedProduct.name}>
+                              {relatedProduct.name}
+                            </h4>
+
+                            {(() => {
+                              const relRatingInfo = getProductRatingInfo(relatedProduct);
+                              return (
+                                <div className="rating-row-grid" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', margin: '0.2rem 0' }}>
+                                  <span className="rating-badge">{relRatingInfo.rating} <i className="fa-solid fa-star"></i></span>
+                                  <span className="rating-count">({relRatingInfo.count})</span>
+                                </div>
+                              );
+                            })()}
+
+                            <div className="related-product-price-row">
+                              <span className="related-product-final-price">
+                                ₹{relFinalPrice.toLocaleString('en-IN')}
+                              </span>
+                              {hasDiscount && (
+                                <span className="related-product-mrp-price">
+                                  ₹{relPriceNum.toLocaleString('en-IN')}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
 
           </div>
         </div>
@@ -3387,38 +3684,87 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
                <i className="fa-solid fa-credit-card"></i> Order Checkout
              </h2>
 
-             {/* Order Summary */}
+             {/* Order Summary & Delivery Address */}
              <div className="checkout-summary-card">
-               <h3>Order Summary</h3>
-               <div className="checkout-summary-userinfo">
-                 <div>
-                   <label className="checkout-summary-label">Name</label>
+               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.85rem' }}>
+                 <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                   <i className="fa-solid fa-location-dot" style={{ color: '#15803d' }}></i> Shipping & Delivery Address
+                 </h3>
+                 <span style={{ fontSize: '0.8rem', background: 'rgba(21, 128, 61, 0.08)', color: '#15803d', fontWeight: '700', padding: '0.25rem 0.6rem', borderRadius: '20px' }}>
+                   Step 1 of 2
+                 </span>
+               </div>
+
+               <div className="checkout-summary-userinfo" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.85rem', marginBottom: '1.25rem' }}>
+                 <div style={{ gridColumn: 'span 1' }}>
+                   <label className="checkout-summary-label">Full Name <span style={{ color: '#ef4444' }}>*</span></label>
                    <input
                      type="text"
                      value={userCredentials.name}
                      onChange={(e) => updateUserCredentials('name', e.target.value)}
-                     placeholder="Enter your name"
+                     placeholder="e.g. Rahul Sharma"
                      className="checkout-summary-input"
+                     style={{ border: checkoutFieldErrors.name ? '1.5px solid #ef4444' : undefined }}
                    />
                  </div>
-                 <div>
-                   <label className="checkout-summary-label">Phone</label>
+
+                 <div style={{ gridColumn: 'span 1' }}>
+                   <label className="checkout-summary-label">Mobile Number <span style={{ color: '#ef4444' }}>*</span></label>
                    <input
                      type="tel"
                      value={userCredentials.phone}
                      onChange={(e) => updateUserCredentials('phone', e.target.value.replace(/\D/g, '').slice(0, 10))}
-                     placeholder="Enter mobile number"
+                     placeholder="10-digit mobile number"
                      className="checkout-summary-input"
+                     style={{ border: checkoutFieldErrors.phone ? '1.5px solid #ef4444' : undefined }}
                    />
                  </div>
-                 <div>
-                   <label className="checkout-summary-label">Address</label>
-                   <textarea
+
+                 <div style={{ gridColumn: 'span 2' }}>
+                   <label className="checkout-summary-label">Flat, House No., Building / Street Address <span style={{ color: '#ef4444' }}>*</span></label>
+                   <input
+                     type="text"
                      value={userCredentials.address}
                      onChange={(e) => updateUserCredentials('address', e.target.value)}
-                     placeholder="Enter delivery address"
-                     rows={3}
-                     className="checkout-summary-textarea"
+                     placeholder="e.g. Flat 402, Green Valley Apartments, Main Street"
+                     className="checkout-summary-input"
+                     style={{ border: checkoutFieldErrors.address ? '1.5px solid #ef4444' : undefined }}
+                   />
+                 </div>
+
+                 <div>
+                   <label className="checkout-summary-label">City / District <span style={{ color: '#ef4444' }}>*</span></label>
+                   <input
+                     type="text"
+                     value={userCredentials.city || ''}
+                     onChange={(e) => updateUserCredentials('city', e.target.value)}
+                     placeholder="e.g. Chennai"
+                     className="checkout-summary-input"
+                     style={{ border: checkoutFieldErrors.city ? '1.5px solid #ef4444' : undefined }}
+                   />
+                 </div>
+
+                 <div>
+                   <label className="checkout-summary-label">State <span style={{ color: '#ef4444' }}>*</span></label>
+                   <input
+                     type="text"
+                     value={userCredentials.state || ''}
+                     onChange={(e) => updateUserCredentials('state', e.target.value)}
+                     placeholder="e.g. Tamil Nadu"
+                     className="checkout-summary-input"
+                     style={{ border: checkoutFieldErrors.state ? '1.5px solid #ef4444' : undefined }}
+                   />
+                 </div>
+
+                 <div style={{ gridColumn: 'span 2' }}>
+                   <label className="checkout-summary-label">Pincode / Postal Code <span style={{ color: '#ef4444' }}>*</span></label>
+                   <input
+                     type="text"
+                     value={userCredentials.pincode || ''}
+                     onChange={(e) => updateUserCredentials('pincode', e.target.value.replace(/\D/g, '').slice(0, 6))}
+                     placeholder="e.g. 600001"
+                     className="checkout-summary-input"
+                     style={{ border: checkoutFieldErrors.pincode ? '1.5px solid #ef4444' : undefined }}
                    />
                  </div>
                </div>
@@ -4672,6 +5018,178 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
           </div>
         </section>
 
+        {/* Product Section */}
+        <section id="product" className="products-section">
+          <div className="section-header" style={{ justifyContent: 'center', textAlign: 'center', borderBottom: 'none', marginBottom: '2.5rem' }}>
+            <h2 className="wavy-title">
+              {Array.from(
+                new Intl.Segmenter('ta', { granularity: 'grapheme' }).segment(t('products.title'))
+              ).map((s, idx) => (
+                <span key={idx}>{s.segment}</span>
+              ))}
+            </h2>
+          </div>
+
+          <div className="products-filter-row">
+            <div className="category-pill-container">
+              <button 
+                className={`category-pill ${selectedCategory === '' ? 'active' : ''}`} 
+                onClick={() => handleCategoryChange('')}
+              >
+                {t('products.all')}
+              </button>
+              {productCategories.map(cat => (
+                <button 
+                  key={cat.slug} 
+                  className={`category-pill ${selectedCategory === cat.slug ? 'active' : ''}`}
+                  onClick={() => handleCategoryChange(cat.slug)}
+                >
+                  {cat.name.toUpperCase()}
+                </button>
+              ))}
+            </div>
+            
+            <div className="products-search-wrapper">
+              <i className="fa-solid fa-magnifying-glass search-icon"></i>
+              <input 
+                type="text" 
+                placeholder={t('products.searchPlaceholder')} 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="products-search-input"
+              />
+            </div>
+          </div>
+
+          <div className="product-grid">
+            {filteredProducts.length > 0 ? (
+              filteredProducts.map(product => {
+                const ratingInfo = getProductRatingInfo(product);
+                const rating = ratingInfo.rating;
+                const reviewsCount = ratingInfo.count;
+                
+                const priceNum = parsePrice(product.price);
+                const activeOffer = getActiveOfferForProduct(product);
+                const activeCoupon = coupons.find(c => 
+                  c.isActive && 
+                  c.linkedProduct === (product._id || product.id) &&
+                  (!c.expiryDate || new Date(c.expiryDate) > new Date())
+                );
+                let discountedPrice = null;
+                let discountText = '';
+                let originalPrice = null;
+
+                const prodDiscountPercent = Number(product.discountPercent || product.discount) || 0;
+
+                if (prodDiscountPercent > 0) {
+                  originalPrice = priceNum;
+                  discountedPrice = Math.round(priceNum * (1 - prodDiscountPercent / 100));
+                  discountText = `${prodDiscountPercent}% off`;
+                } else if (activeOffer) {
+                  if (activeOffer.discountType === 'fixed') {
+                    originalPrice = priceNum;
+                    discountedPrice = Math.max(0, priceNum - (Number(activeOffer.discountValue) || 0));
+                    discountText = `₹${Number(activeOffer.discountValue) || 0} off`;
+                  } else if (activeOffer.discountType === 'percentage') {
+                    const dVal = Number(activeOffer.discountValue) || 0;
+                    originalPrice = priceNum;
+                    discountedPrice = Math.round(priceNum * (1 - dVal / 100));
+                    discountText = `${dVal}% off`;
+                  } else if (activeOffer.discountType === 'free-shipping') {
+                    discountText = 'Free shipping';
+                  }
+                } else if (activeCoupon) {
+                  const discountVal = parseFloat(activeCoupon.discountValue) || 0;
+                  if (activeCoupon.discountType === 'Fixed') {
+                    originalPrice = priceNum;
+                    discountedPrice = Math.max(0, priceNum - discountVal);
+                    discountText = `₹${discountVal} off`;
+                  } else {
+                    originalPrice = priceNum;
+                    discountedPrice = Math.round(priceNum * (1 - discountVal / 100));
+                    discountText = `${discountVal}% off`;
+                  }
+                } else if (Number(product.originalPrice || product.mrp) > priceNum) {
+                  originalPrice = Number(product.originalPrice || product.mrp);
+                  discountedPrice = priceNum;
+                  const pct = Math.round(((originalPrice - priceNum) / originalPrice) * 100);
+                  if (pct > 0) discountText = `${pct}% off`;
+                }
+
+                const displayPrice = getProductFinalPrice(product);
+                const showDiscount = originalPrice !== null && originalPrice > displayPrice && Boolean(discountText);
+
+                return (
+                  <article key={product.id || product._id} className="product-card">
+                    <button 
+                      className={`like-btn ${waitlist.includes(product.id || product._id) ? 'active' : ''}`} 
+                      onClick={() => handleToggleWaitlist(product.id || product._id)}
+                      aria-label="Wishlist"
+                    >
+                      <i className={`fa-${waitlist.includes(product.id || product._id) ? 'solid' : 'regular'} fa-heart`}></i>
+                    </button>
+
+                    <div 
+                      className="product-img-wrapper product-shine-effect" 
+                      onClick={() => { setSelectedProduct(product); setSelectedProductImageIndex(0); }}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      {product.images && product.images.length > 0 ? (
+                        <img 
+                          src={product.images[0]} 
+                          alt={product.name} 
+                          className="hover-zoom"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <i className={`fa-solid ${product.icon || 'fa-box'} placeholder-img`}></i>
+                      )}
+                      {product.images && product.images.length > 1 && (
+                        <span className="image-badge">
+                          +{product.images.length - 1} {t('products.photos')}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="product-info">
+                      <h3 onClick={() => { setSelectedProduct(product); setSelectedProductImageIndex(0); }} style={{ cursor: 'pointer' }}>{product.name}</h3>
+                      
+                      <div className="rating-row-grid">
+                        <span className="rating-badge">{rating} <i className="fa-solid fa-star"></i></span>
+                        <span className="rating-count">({reviewsCount})</span>
+                      </div>
+
+                      <div className="price-row">
+                        <span className="price">₹{displayPrice.toLocaleString('en-IN')}</span>
+                        {showDiscount && (
+                          <>
+                            <span className="original-price">₹{originalPrice.toLocaleString('en-IN')}</span>
+                            <span className="discount">{discountText}</span>
+                          </>
+                        )}
+                      </div>
+
+                      <button 
+                        className="primary-btn-green checkout-btn" 
+                        style={{ width: '100%', marginTop: '1rem', padding: '0.65rem 1rem', fontSize: '0.85rem' }}
+                        onClick={() => handleBuyNow(product)}
+                      >
+                        <i className="fa-solid fa-bag-shopping"></i> {t('products.buyNow')}
+                      </button>
+                    </div>
+                  </article>
+                );
+              })
+            ) : (
+              <div className="empty-state glass-card" style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '4rem' }}>
+                <i className="fa-solid fa-boxes-packing" style={{ fontSize: '3rem', color: 'var(--primary-color)', opacity: 0.2, marginBottom: '1.5rem', display: 'block' }}></i>
+                <h3 style={{ color: 'var(--primary-color)', marginBottom: '0.5rem' }}>{t('products.comingSoonTitle')}</h3>
+                <p style={{ color: 'var(--text-muted)' }}>{t('products.comingSoonDesc')}</p>
+              </div>
+            )}
+          </div>
+        </section>
+
         {/* Precision Workflow Section */}
         <section id="workflow" className="how-it-works-section" style={{ backgroundColor: '#ffffff', padding: '5rem 2rem' }}>
           <div className="hiw-container">
@@ -4967,181 +5485,6 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
             </div>
           </div>
         </section>
-
-        {/* Product Section */}
-        <section id="product" className="products-section">
-          <div className="section-header" style={{ justifyContent: 'center', textAlign: 'center', borderBottom: 'none', marginBottom: '2.5rem' }}>
-            <h2 className="wavy-title">
-              {Array.from(
-                new Intl.Segmenter('ta', { granularity: 'grapheme' }).segment(t('products.title'))
-              ).map((s, idx) => (
-                <span key={idx}>{s.segment}</span>
-              ))}
-            </h2>
-          </div>
-
-          <div className="products-filter-row">
-            <div className="category-pill-container">
-              <button 
-                className={`category-pill ${selectedCategory === '' ? 'active' : ''}`} 
-                onClick={() => handleCategoryChange('')}
-              >
-                {t('products.all')}
-              </button>
-              {productCategories.map(cat => (
-                <button 
-                  key={cat.slug} 
-                  className={`category-pill ${selectedCategory === cat.slug ? 'active' : ''}`}
-                  onClick={() => handleCategoryChange(cat.slug)}
-                >
-                  {cat.name.toUpperCase()}
-                </button>
-              ))}
-            </div>
-            
-            <div className="products-search-wrapper">
-              <i className="fa-solid fa-magnifying-glass search-icon"></i>
-              <input 
-                type="text" 
-                placeholder={t('products.searchPlaceholder')} 
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="products-search-input"
-              />
-            </div>
-          </div>
-
-          <div className="product-grid">
-            {filteredProducts.length > 0 ? (
-              filteredProducts.map(product => {
-                const charSum = (product._id || product.id || '').split('').reduce((sum, char) => sum + char.charCodeAt(0), 0);
-                const rating = (4.1 + (charSum % 8) / 10).toFixed(1);
-                const reviewsCount = 12 + (charSum % 340);
-                
-                const priceNum = parsePrice(product.price);
-                const activeOffer = getActiveOfferForProduct(product);
-                const activeCoupon = coupons.find(c => 
-                  c.isActive && 
-                  c.linkedProduct === (product._id || product.id) &&
-                  (!c.expiryDate || new Date(c.expiryDate) > new Date())
-                );
-                let discountedPrice = null;
-                let discountText = '';
-                let originalPrice = null;
-
-                const prodDiscountPercent = Number(product.discountPercent || product.discount) || 0;
-
-                if (prodDiscountPercent > 0) {
-                  originalPrice = priceNum;
-                  discountedPrice = Math.round(priceNum * (1 - prodDiscountPercent / 100));
-                  discountText = `${prodDiscountPercent}% off`;
-                } else if (activeOffer) {
-                  if (activeOffer.discountType === 'fixed') {
-                    originalPrice = priceNum;
-                    discountedPrice = Math.max(0, priceNum - (Number(activeOffer.discountValue) || 0));
-                    discountText = `₹${Number(activeOffer.discountValue) || 0} off`;
-                  } else if (activeOffer.discountType === 'percentage') {
-                    const dVal = Number(activeOffer.discountValue) || 0;
-                    originalPrice = priceNum;
-                    discountedPrice = Math.round(priceNum * (1 - dVal / 100));
-                    discountText = `${dVal}% off`;
-                  } else if (activeOffer.discountType === 'free-shipping') {
-                    discountText = 'Free shipping';
-                  }
-                } else if (activeCoupon) {
-                  const discountVal = parseFloat(activeCoupon.discountValue) || 0;
-                  if (activeCoupon.discountType === 'Fixed') {
-                    originalPrice = priceNum;
-                    discountedPrice = Math.max(0, priceNum - discountVal);
-                    discountText = `₹${discountVal} off`;
-                  } else {
-                    originalPrice = priceNum;
-                    discountedPrice = Math.round(priceNum * (1 - discountVal / 100));
-                    discountText = `${discountVal}% off`;
-                  }
-                } else if (Number(product.originalPrice || product.mrp) > priceNum) {
-                  originalPrice = Number(product.originalPrice || product.mrp);
-                  discountedPrice = priceNum;
-                  const pct = Math.round(((originalPrice - priceNum) / originalPrice) * 100);
-                  if (pct > 0) discountText = `${pct}% off`;
-                }
-
-                const displayPrice = getProductFinalPrice(product);
-                const showDiscount = originalPrice !== null && originalPrice > displayPrice && Boolean(discountText);
-
-                return (
-                  <article key={product.id || product._id} className="product-card">
-                    <button 
-                      className={`like-btn ${waitlist.includes(product.id || product._id) ? 'active' : ''}`} 
-                      onClick={() => handleToggleWaitlist(product.id || product._id)}
-                      aria-label="Wishlist"
-                    >
-                      <i className={`fa-${waitlist.includes(product.id || product._id) ? 'solid' : 'regular'} fa-heart`}></i>
-                    </button>
-
-                    <div 
-                      className="product-img-wrapper product-shine-effect" 
-                      onClick={() => { setSelectedProduct(product); setSelectedProductImageIndex(0); }}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      {product.images && product.images.length > 0 ? (
-                        <img 
-                          src={product.images[0]} 
-                          alt={product.name} 
-                          className="hover-zoom"
-                          loading="lazy"
-                        />
-                      ) : (
-                        <i className={`fa-solid ${product.icon || 'fa-box'} placeholder-img`}></i>
-                      )}
-                      {product.images && product.images.length > 1 && (
-                        <span className="image-badge">
-                          +{product.images.length - 1} {t('products.photos')}
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="product-info">
-                      <h3 onClick={() => { setSelectedProduct(product); setSelectedProductImageIndex(0); }} style={{ cursor: 'pointer' }}>{product.name}</h3>
-                      
-                      <div className="rating-row-grid">
-                        <span className="rating-badge">{rating} <i className="fa-solid fa-star"></i></span>
-                        <span className="rating-count">({reviewsCount})</span>
-                      </div>
-
-                      <div className="price-row">
-                        <span className="price">₹{displayPrice.toLocaleString('en-IN')}</span>
-                        {showDiscount && (
-                          <>
-                            <span className="original-price">₹{originalPrice.toLocaleString('en-IN')}</span>
-                            <span className="discount">{discountText}</span>
-                          </>
-                        )}
-                      </div>
-
-
-
-                      <button 
-                        className="primary-btn-green checkout-btn" 
-                        style={{ width: '100%', marginTop: '1rem', padding: '0.65rem 1rem', fontSize: '0.85rem' }}
-                        onClick={() => handleBuyNow(product)}
-                      >
-                        <i className="fa-solid fa-bag-shopping"></i> {t('products.buyNow')}
-                      </button>
-                    </div>
-                  </article>
-                );
-              })
-            ) : (
-              <div className="empty-state glass-card" style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '4rem' }}>
-                <i className="fa-solid fa-boxes-packing" style={{ fontSize: '3rem', color: 'var(--primary-color)', opacity: 0.2, marginBottom: '1.5rem', display: 'block' }}></i>
-                <h3 style={{ color: 'var(--primary-color)', marginBottom: '0.5rem' }}>{t('products.comingSoonTitle')}</h3>
-                <p style={{ color: 'var(--text-muted)' }}>{t('products.comingSoonDesc')}</p>
-              </div>
-            )}
-          </div>
-        </section>
-
 
           {/* Testimonials Section */}
           <section className="testimonials-section">

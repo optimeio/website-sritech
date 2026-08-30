@@ -7,7 +7,7 @@ const isValidObjectId = (id) => {
   return /^[0-9a-fA-F]{24}$/.test(String(id));
 };
 
-const PRODUCT_IMAGE_LIMIT = Number(process.env.PRODUCT_IMAGE_LIMIT || 2);
+const PRODUCT_IMAGE_LIMIT = Number(process.env.PRODUCT_IMAGE_LIMIT || 10);
 const MAX_DESCRIPTION_LENGTH = Number(process.env.PRODUCT_DESCRIPTION_MAX_LENGTH || 400);
 const MAX_SPECIFICATIONS_LENGTH = Number(process.env.PRODUCT_SPECIFICATIONS_MAX_LENGTH || 600);
 const PRODUCT_SELECT_FIELDS = 'name price category description specifications howToUse burnerSize stoveWeight dimensions material stock shippingCharge gstPercent discountPercent courierOptions icon isNewArrival createdAt sku slug images video';
@@ -126,7 +126,6 @@ exports.getProducts = asyncHandler(async (req, res) => {
   let products = [];
   try {
     const selectObj = PRODUCT_SELECT_FIELDS.split(' ').reduce((acc, field) => ({ ...acc, [field]: 1 }), {});
-    selectObj.images = { $slice: 1 };
 
     // Hard 25-second timeout to accommodate MongoDB Atlas high latency
     const timeoutPromise = new Promise((_, reject) =>
