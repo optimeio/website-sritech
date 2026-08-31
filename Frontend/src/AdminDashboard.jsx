@@ -136,7 +136,7 @@ const AdminDashboard = ({
     const userIdStr = (user?._id || user?.id)?.toString();
     const userEmailStr = user?.email?.toLowerCase();
     return Array.isArray(orders) ? orders.filter(o => {
-      const orderUserId = o.user?.toString() || o.userId?.toString();
+      const orderUserId = o.user?.toString() || o.userId?.toString() || o.customerId?.toString();
       const orderEmail = o.customerEmail?.toLowerCase() || o.email?.toLowerCase();
       return (orderUserId && userIdStr && orderUserId === userIdStr) || 
              (orderEmail && userEmailStr && orderEmail === userEmailStr);

@@ -589,7 +589,8 @@ function App() {
     // Auth dependent fetches
     const authFetches = [];
 
-    if (isAdmin && adminHeaders.Authorization) {
+    const adminToken = localStorage.getItem('sriTechAdminToken');
+    if ((isAdmin || adminToken) && adminHeaders.Authorization) {
       authFetches.push(
         fetch(`${API_URL}/orders?t=${t}`, { headers: adminHeaders }).then(res => res.ok ? res.json() : null).then(data => { if (data) setOrders(data); }).catch(err => console.error(err)),
         fetch(`${API_URL}/support?t=${t}`, { headers: adminHeaders }).then(res => res.ok ? res.json() : null).then(data => { if (data) setSupportQueries(data); }).catch(err => console.error(err)),
@@ -711,6 +712,12 @@ function App() {
   }, [adminAuthReady, location.pathname, isAdmin]);
 
   useEffect(() => {
+    if (isAdmin) {
+      fetchData();
+    }
+  }, [isAdmin]);
+
+  useEffect(() => {
     if ((location.pathname === '/my-orders' || location.pathname === '/customer-dashboard') && !isUserLoggedIn) {
       setAuthMode('login');
       setShowAuthModal(true);
@@ -798,11 +805,15 @@ function App() {
     }
   }, [selectedProduct]);
 
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
     setIsRefreshing(true);
-    setTimeout(() => {
-      window.location.reload();
-    }, 100);
+    try {
+      await fetchData();
+    } catch (err) {
+      console.error("Error refreshing data:", err);
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   const handleSubmitReview = async (e) => {
