@@ -21,7 +21,7 @@ const companyDetails = {
   address: '12 Sustainable Avenue, Green Industrial Park, India',
   gstNumber: 'GSTIN: 29ABCDE1234F1Z5',
   email: process.env.EMAIL_USER || 'theoptime.io@gmail.com',
-  phone: '+91 98765 43210',
+  phone: process.env.SUPPORT_PHONE || '+91 94883 16728',
   website: 'https://thesritech.com',
   terms: 'Goods once sold cannot be returned without authorization. Please keep this invoice safe for warranty and service support.'
 };
@@ -153,7 +153,7 @@ const createInvoicePdf = async (invoice, customerName) => {
 
     doc.roundedRect(startX + colW3_1, grid3Y, colW3_2 - 4, rowH3, 4).stroke('#E5E7EB');
     doc.fillColor('#111827').fontSize(7).font('Helvetica-Bold').text('PHONE NUMBER', startX + colW3_1 + 6, grid3Y + 5);
-    doc.fillColor('#111827').fontSize(9).font('Helvetica').text(invoice.shippingAddress?.phone || invoice.billingAddress?.phone || '+91 98765 43210', startX + colW3_1 + 6, grid3Y + 16);
+    doc.fillColor('#111827').fontSize(9).font('Helvetica').text(invoice.shippingAddress?.phone || invoice.billingAddress?.phone || process.env.SUPPORT_PHONE || '+91 94883 16728', startX + colW3_1 + 6, grid3Y + 16);
 
     doc.roundedRect(startX + colW3_1 + colW3_2, grid3Y, colW3_3 - 4, rowH3, 4).stroke('#E5E7EB');
     doc.fillColor('#111827').fontSize(7).font('Helvetica-Bold').text('PAYMENT STATUS', startX + colW3_1 + colW3_2 + 6, grid3Y + 5);
