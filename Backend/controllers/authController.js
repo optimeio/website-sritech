@@ -74,18 +74,19 @@ exports.signup = asyncHandler(async (req, res) => {
   console.log('[signup] OTP generated and saved', { email: normalizedEmail, otp });
 
   let emailSent = false;
+  let emailError = null;
   try {
     console.log('[signup] sending verification email', { email: normalizedEmail });
     await sendOtpEmail(user, otp);
     console.log('[signup] verification email sent successfully', { email: normalizedEmail });
     emailSent = true;
   } catch (err) {
+    emailError = err.message || String(err);
     console.error('[signup] failed to send verification email', {
       email: normalizedEmail,
-      error: err.message || String(err)
+      error: emailError
     });
     // Don't delete the user – keep the OTP so verify-otp can still work.
-    // Log OTP to console so it can be used during development / testing.
     console.log(`[signup] ⚠️ Email delivery failed. OTP for ${normalizedEmail}: ${otp}`);
   }
 
@@ -93,9 +94,10 @@ exports.signup = asyncHandler(async (req, res) => {
     success: true,
     message: emailSent
       ? 'OTP sent successfully. Please check your email.'
-      : 'Account created. OTP email could not be delivered – check server console for the OTP.',
+      : `Account created. OTP email could not be delivered (${emailError || 'check configuration'}). Your OTP is: ${otp}`,
     requiresVerification: true,
-    email: normalizedEmail
+    email: normalizedEmail,
+    ...(emailSent ? {} : { otp })
   });
 });
 
@@ -172,11 +174,13 @@ exports.resendOtp = asyncHandler(async (req, res) => {
   await user.save();
 
   let emailSent = false;
+  let emailError = null;
   try {
     await sendOtpEmail(user, otp);
     emailSent = true;
   } catch (err) {
-    console.error('[resendOtp] failed to resend verification email', { email: normalizedEmail, error: err.message || String(err) });
+    emailError = err.message || String(err);
+    console.error('[resendOtp] failed to resend verification email', { email: normalizedEmail, error: emailError });
     console.log(`[resendOtp] ⚠️ Email delivery failed. OTP for ${normalizedEmail}: ${otp}`);
   }
 
@@ -184,9 +188,10 @@ exports.resendOtp = asyncHandler(async (req, res) => {
     success: true,
     message: emailSent
       ? 'OTP resent successfully.'
-      : 'New OTP generated. Email could not be delivered – check server console for the OTP.',
+      : `New OTP generated. Email could not be delivered (${emailError || 'check configuration'}). Your OTP is: ${otp}`,
     requiresVerification: true,
-    email: normalizedEmail
+    email: normalizedEmail,
+    ...(emailSent ? {} : { otp })
   });
 });
 

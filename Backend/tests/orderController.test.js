@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const emailService = require('../utils/emailService');
-const mongoose = require('../mongoose');
+const mongoose = require('mongoose');
 
 const originalSendEmail = emailService.sendEmail;
 

@@ -62,8 +62,13 @@ const MAX_RETRIES = Number(process.env.EMAIL_RETRY_MAX || 3);
 const SENDER_NAME = process.env.EMAIL_FROM_NAME || 'The Sri Tech';
 const SENDER_ADDRESS = process.env.EMAIL_FROM || process.env.EMAIL_USER;
 
+const mongoose = require('mongoose');
+
 const createEmailLog = async ({ recipient, subject, template, payload }) => {
   try {
+    if (!mongoose.connection || mongoose.connection.readyState !== 1) {
+      return null;
+    }
     return await EmailLog.create({
       recipient,
       subject,
@@ -137,7 +142,7 @@ const sendEmail = async (to, subject, html, options = {}) => {
 
   let lastError;
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt += 1) {
-    if (emailLog) {
+    if (emailLog && mongoose.connection.readyState === 1) {
       emailLog.attempts = attempt;
       emailLog.lastAttemptAt = new Date();
       emailLog.status = attempt === 1 ? 'pending' : 'retrying';
@@ -165,7 +170,7 @@ const sendEmail = async (to, subject, html, options = {}) => {
 
       console.log('[emailService] email sent response', info);
 
-      if (emailLog) {
+      if (emailLog && mongoose.connection.readyState === 1) {
         emailLog.status = 'sent';
         emailLog.messageId = info.messageId || '';
         emailLog.sentAt = new Date();
@@ -177,16 +182,20 @@ const sendEmail = async (to, subject, html, options = {}) => {
       return info;
     } catch (err) {
       lastError = err;
-      if (emailLog) {
+      if (emailLog && mongoose.connection.readyState === 1) {
         emailLog.status = attempt < MAX_RETRIES ? 'retrying' : 'failed';
         emailLog.error = String(err.message || err);
         await emailLog.save().catch(() => {});
       }
 
       console.error(`Email attempt ${attempt} failed for ${recipient}:`, err.message || err);
-      if (attempt < MAX_RETRIES) {
-        await new Promise(resolve => setTimeout(resolve, 2000));
+
+      const isPermanentError = err.message?.includes('403') || err.message?.includes('550') || err.message?.includes('not verified');
+      if (isPermanentError || attempt >= MAX_RETRIES) {
+        break;
       }
+
+      await new Promise(resolve => setTimeout(resolve, 1500));
     }
   }
 

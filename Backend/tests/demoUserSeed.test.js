@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const mongoose = require('../mongoose');
+const mongoose = require('mongoose');
 const User = require('../models/User');
 const { ensureDemoUser } = require('../utils/ensureDemoUser');
 
