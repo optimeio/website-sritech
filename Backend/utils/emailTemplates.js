@@ -1,6 +1,6 @@
 const company = {
   name: 'SriTech Engineering',
-  logoUrl: 'https://sritechengg.in/sri-tech-logo-final.png',
+  logoUrl: 'https://sritechengg.in/logo.png',
   supportEmail: process.env.SUPPORT_EMAIL || 'thesmgroups@gmail.com',
   supportPhone: process.env.SUPPORT_PHONE || '+91 98765 43210',
   websiteUrl: process.env.CLIENT_URL || 'https://sritechengg.in',
@@ -8,56 +8,70 @@ const company = {
 };
 
 const globalStyles = `
-  body { margin: 0; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8fafc; color: #0f172a; -webkit-font-smoothing: antialiased; }
-  .wrapper { width: 100%; background: #f8fafc; padding: 40px 0; }
-  .container { width: 100%; max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03); }
-  .header { background: #064e3b; color: #ffffff; text-align: center; padding: 32px 24px; }
-  .header img { max-height: 56px; margin-bottom: 14px; display: inline-block; }
-  .header h1 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.01em; }
-  .body { padding: 32px 32px 24px; text-align: justify; }
-  .body p { text-align: justify; line-height: 1.65; color: #334155; font-size: 15px; margin: 0 0 18px; }
-  .section { margin-bottom: 28px; }
-  .section h2 { margin: 0 0 16px; font-size: 14px; font-weight: 700; color: #0f172a; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; }
-  .button { display: inline-block; background: #1E7A3B; color: #ffffff !important; text-decoration: none; padding: 12px 28px; border-radius: 6px; font-weight: 600; font-size: 15px; text-align: center; box-shadow: 0 2px 4px rgba(30, 122, 59, 0.2); }
-  .muted { color: #64748b; font-size: 14px; line-height: 1.65; text-align: justify; margin: 16px 0; }
-  .order-summary, .details-table { width: 100%; border-collapse: collapse; margin: 16px 0; }
-  .details-table th, .details-table td { text-align: left; padding: 12px 14px; border-bottom: 1px solid #f1f5f9; font-size: 14px; }
+  body { margin: 0; padding: 0; background-color: #f1f5f9; font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif; color: #0f172a; -webkit-font-smoothing: antialiased; }
+  .email-wrapper { width: 100%; background-color: #f1f5f9; padding: 36px 12px; }
+  .email-container { max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05); }
+  .header-banner { background: linear-gradient(135deg, #064e3b 0%, #022c22 100%); padding: 32px 24px; text-align: center; color: #ffffff; }
+  .email-body { padding: 32px 28px; color: #1e293b; font-size: 15px; line-height: 1.65; }
+  .email-footer { background-color: #f8fafc; padding: 24px; text-align: center; font-size: 13px; color: #64748b; border-top: 1px solid #e2e8f0; line-height: 1.6; }
+  .button { display: inline-block; background-color: #059669; color: #ffffff !important; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 700; font-size: 15px; text-align: center; box-shadow: 0 4px 12px rgba(5, 150, 105, 0.25); }
+  .muted { color: #64748b; font-size: 14px; line-height: 1.65; margin: 16px 0; }
+  .details-table { width: 100%; border-collapse: collapse; margin: 18px 0; font-size: 14px; }
+  .details-table th, .details-table td { padding: 12px 14px; border-bottom: 1px solid #f1f5f9; text-align: left; }
   .details-table th { background: #f8fafc; font-weight: 600; color: #475569; width: 35%; }
   .details-table td { color: #0f172a; }
-  .footer { background: #f8fafc; color: #64748b; font-size: 12px; padding: 24px; text-align: center; border-top: 1px solid #e2e8f0; line-height: 1.6; }
-  .footer p { margin: 0 0 8px; }
-  .footer a { color: #1E7A3B; text-decoration: none; font-weight: 500; }
+  .section { margin-bottom: 24px; }
+  .section h2 { margin: 0 0 14px; font-size: 14px; font-weight: 700; color: #0f172a; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 2px solid #e2e8f0; padding-bottom: 6px; }
 `;
 
 const wrap = (subject, title, bodyHtml) => `
-  <!DOCTYPE html>
-  <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>${subject}</title>
-    <style>${globalStyles}</style>
-  </head>
-  <body>
-    <div class="wrapper">
-      <div class="container">
-        <div class="header">
-          <img src="${company.logoUrl}" alt="${company.name} Logo" />
-          <h1>${title}</h1>
-        </div>
-        <div class="body">${bodyHtml}</div>
-        <div class="footer">
-          <p>${company.name} | ${company.address}</p>
-          <p>Support: <a href="mailto:${company.supportEmail}" style="color: #0f172a; text-decoration: none;">${company.supportEmail}</a> | ${company.supportPhone}</p>
-          <p><a href="${company.websiteUrl}" style="color: #064e3b; text-decoration: none;">${company.websiteUrl}</a></p>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${subject}</title>
+  <style>${globalStyles}</style>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f1f5f9; font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;">
+  <div class="email-wrapper" style="width: 100%; background-color: #f1f5f9; padding: 36px 12px;">
+    <div class="email-container" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);">
+      <!-- Header Banner -->
+      <div class="header-banner" style="background: linear-gradient(135deg, #064e3b 0%, #022c22 100%); padding: 32px 24px; text-align: center; color: #ffffff;">
+        <a href="${company.websiteUrl}" target="_blank" style="text-decoration: none;">
+          <img src="${company.logoUrl}" alt="${company.name} Logo" style="max-height: 52px; max-width: 220px; width: auto; margin-bottom: 8px; display: inline-block; border: 0; outline: none;" />
+          <div style="font-size: 20px; font-weight: 800; color: #ffffff; letter-spacing: 1px; margin: 0; text-transform: uppercase;">${company.name}</div>
+          <div style="font-size: 12px; color: #a7f3d0; margin-top: 2px; font-weight: 500; letter-spacing: 0.5px;">HIGH-EFFICIENCY CLEAN ENERGY TECHNOLOGY</div>
+        </a>
+        <div style="margin-top: 18px; font-size: 20px; font-weight: 700; color: #ffffff; border-top: 1px solid rgba(255,255,255,0.15); padding-top: 14px;">
+          ${title}
         </div>
       </div>
+
+      <!-- Main Body Content -->
+      <div class="email-body" style="padding: 32px 28px; color: #1e293b; font-size: 15px; line-height: 1.65;">
+        ${bodyHtml}
+      </div>
+
+      <!-- Footer -->
+      <div class="email-footer" style="background-color: #f8fafc; padding: 24px; text-align: center; font-size: 13px; color: #64748b; border-top: 1px solid #e2e8f0; line-height: 1.6;">
+        <p style="margin: 0 0 6px; font-weight: 700; color: #0f172a; font-size: 14px;">${company.name}</p>
+        <p style="margin: 0 0 10px; font-size: 12px; color: #64748b;">${company.address}</p>
+        <p style="margin: 0 0 8px;">
+          Need assistance? <a href="mailto:${company.supportEmail}" style="color: #059669; text-decoration: none; font-weight: 600;">${company.supportEmail}</a> | ${company.supportPhone}
+        </p>
+        <p style="margin: 0;">
+          <a href="${company.websiteUrl}" style="color: #059669; text-decoration: none; font-weight: 600;">Visit Official Website</a>
+        </p>
+      </div>
     </div>
-  </body>
-  </html>
+  </div>
+</body>
+</html>
 `;
 
-const customerGreeting = (name) => `<p style="margin: 0 0 16px; font-size: 16px;">Hello ${name || 'Customer'},</p>`;
+const customerGreeting = (name) => `<p style="margin: 0 0 16px; font-size: 16px; font-weight: 600; color: #0f172a;">Hello ${name || 'Customer'},</p>`;
+
 const orderItemRows = (items = []) => items.map(item => `
   <tr>
     <td>${item.name || item.sku || 'Product'}</td>
@@ -96,56 +110,69 @@ const itemsTable = (order) => `
 const actionButton = (label, url) => url ? `<p style="text-align:center; margin: 24px 0;"><a href="${url}" class="button" target="_blank" rel="noopener">${label}</a></p>` : '';
 
 const templates = {
-  registration: ({ name }) => wrap('Welcome to The Sri Tech', 'Welcome to The Sri Tech', `
+  registration: ({ name }) => wrap('Welcome to SriTech Engineering', 'Welcome to Sri Tech', `
     ${customerGreeting(name)}
-    <p class="muted">Your account has been created successfully. We are excited to help you discover our sustainable engineering solutions.</p>
+    <p class="muted">Your account has been created successfully. We are excited to help you discover our high-efficiency sustainable energy solutions.</p>
     ${actionButton('Explore Products', company.websiteUrl)}
-    <p class="muted">If you have questions, reply to this email anytime.</p>
+    <p class="muted">If you have any questions, feel free to reply to this email anytime.</p>
   `),
 
-  emailVerification: ({ name, otp, verifyUrl }) => wrap('Verify Your Email', 'Verify Your Email', `
+  emailVerification: ({ name, otp, verifyUrl }) => wrap('Verify Your Email - Sri Tech', 'Verify Your Email', `
     ${customerGreeting(name)}
-    <p class="muted">Please verify your email address to complete registration.</p>
-    ${otp ? `<p style="font-size: 20px; font-weight: 700; margin: 16px 0;">Your verification code is: <span style="letter-spacing: 0.15em;">${otp}</span></p>` : ''}
-    ${verifyUrl ? actionButton('Verify Email', verifyUrl) : ''}
-    <p class="muted">This code is valid for 10 minutes. If you did not request this, ignore this message.</p>
+    <p style="color: #475569; font-size: 15px; margin-bottom: 20px;">
+      Thank you for registering with <strong>SriTech Engineering</strong>. To complete your account setup and verify your email address, please use the 6-digit verification code below:
+    </p>
+
+    ${otp ? `
+    <div style="background: #f0fdf4; border: 2px dashed #10b981; border-radius: 12px; padding: 24px; text-align: center; margin: 24px 0;">
+      <div style="font-size: 12px; font-weight: 700; color: #047857; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 8px;">Your Verification Code</div>
+      <div style="font-family: 'Courier New', Courier, monospace; font-size: 38px; font-weight: 800; color: #065f46; letter-spacing: 12px; margin: 8px 0;">${otp}</div>
+      <div style="font-size: 13px; color: #059669; margin-top: 8px; font-weight: 500;">⏱️ Code expires in 10 minutes</div>
+    </div>
+    ` : ''}
+
+    ${verifyUrl ? actionButton('Verify Account Now', verifyUrl) : ''}
+
+    <p style="color: #64748b; font-size: 13px; margin-top: 24px; line-height: 1.5;">
+      If you did not request this verification code, please ignore this email or contact support if you have concerns.
+    </p>
   `),
 
-  passwordReset: ({ name, resetUrl }) => wrap('Reset Your Password', 'Password Reset Request', `
+  passwordReset: ({ name, resetUrl }) => wrap('Reset Your Password - Sri Tech', 'Password Reset Request', `
     ${customerGreeting(name)}
-    <p class="muted">We received a request to reset your password. Click the button below to continue.</p>
+    <p class="muted">We received a request to reset your password. Click the button below to set a new password for your account.</p>
     ${actionButton('Reset Password', resetUrl)}
-    <p class="muted">If you did not request this, your account is still safe.</p>
+    <p class="muted">If you did not request a password reset, your account is still secure and you can safely ignore this email.</p>
   `),
 
   paymentSuccessful: ({ order, viewOrderUrl, invoiceUrl }) => wrap(`Payment Received — ${order.orderId}`, 'Payment Successful', `
     ${customerGreeting(order.customerName)}
-    <p class="muted">We have successfully received your payment.</p>
+    <p class="muted">We have successfully received your payment. Your order is now being processed.</p>
     ${orderDetailsSection(order)}
     ${itemsTable(order)}
-    ${actionButton('View Order', viewOrderUrl)}
-    ${actionButton('Download Invoice', invoiceUrl)}
+    ${actionButton('View Order Details', viewOrderUrl)}
+    ${invoiceUrl ? actionButton('Download Invoice', invoiceUrl) : ''}
   `),
 
   orderConfirmation: ({ order, viewOrderUrl, invoiceUrl }) => wrap(`Order Confirmed — ${order.orderId}`, 'Order Confirmed', `
     ${customerGreeting(order.customerName)}
-    <p class="muted">Your order is confirmed and will be processed shortly.</p>
+    <p class="muted">Your order has been confirmed and will be processed for dispatch shortly.</p>
     ${orderDetailsSection(order)}
     ${itemsTable(order)}
     ${actionButton('Track Your Order', viewOrderUrl)}
-    ${actionButton('Download Invoice', invoiceUrl)}
+    ${invoiceUrl ? actionButton('Download Invoice', invoiceUrl) : ''}
   `),
 
-  orderStatusUpdate: ({ order, statusTitle, statusNote, viewOrderUrl, trackingUrl, invoiceUrl }) => wrap(`Order Update — ${order.orderId}`, statusTitle, `
+  orderStatusUpdate: ({ order, statusTitle, statusNote, viewOrderUrl, trackingUrl, invoiceUrl }) => wrap(`Order Update — ${order.orderId}`, statusTitle || 'Order Status Update', `
     ${customerGreeting(order.customerName)}
-    <p class="muted">Current status: <strong>${order.status}</strong></p>
-    <p>${statusNote}</p>
+    <p class="muted">Your order status has been updated to: <strong style="color: #059669;">${order.status}</strong></p>
+    ${statusNote ? `<p style="background: #f8fafc; padding: 14px; border-radius: 8px; border-left: 4px solid #059669; margin: 16px 0;">${statusNote}</p>` : ''}
     ${orderDetailsSection(order)}
     <div class="section">
       <h2>Delivery Details</h2>
       <table class="details-table">
         <tr><th>Estimated Delivery</th><td>${order.estimatedDelivery ? new Date(order.estimatedDelivery).toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' }) : 'Not available yet'}</td></tr>
-        <tr><th>Courier</th><td>${order.courierPartner || 'Not assigned yet'}</td></tr>
+        <tr><th>Courier Partner</th><td>${order.courierPartner || 'Not assigned yet'}</td></tr>
       </table>
     </div>
     ${itemsTable(order)}
@@ -156,7 +183,7 @@ const templates = {
 
   returnRequest: ({ order, returnRequest, viewOrderUrl }) => wrap(`Return Request Received — ${order.orderId}`, 'Return Request Submitted', `
     ${customerGreeting(order.customerName)}
-    <p class="muted">We have received your return request and will review it shortly.</p>
+    <p class="muted">We have received your return request and our team is reviewing it.</p>
     <div class="section">
       <h2>Return Details</h2>
       <table class="details-table">
@@ -168,23 +195,23 @@ const templates = {
     ${actionButton('View Order', viewOrderUrl)}
   `),
 
-  returnStatusUpdate: ({ order, returnRequest, statusTitle, statusNote, viewOrderUrl }) => wrap(`Return Update — ${order.orderId}`, statusTitle, `
+  returnStatusUpdate: ({ order, returnRequest, statusTitle, statusNote, viewOrderUrl }) => wrap(`Return Update — ${order.orderId}`, statusTitle || 'Return Request Update', `
     ${customerGreeting(order.customerName)}
-    <p class="muted">Your return request is now <strong>${returnRequest.status}</strong>.</p>
+    <p class="muted">Your return request is now <strong style="color: #059669;">${returnRequest.status}</strong>.</p>
     <div class="section">
       <h2>Return Request</h2>
       <table class="details-table">
         <tr><th>Request ID</th><td>${returnRequest.returnId}</td></tr>
         <tr><th>Status</th><td>${returnRequest.status}</td></tr>
-        <tr><th>Note</th><td>${statusNote}</td></tr>
+        ${statusNote ? `<tr><th>Note</th><td>${statusNote}</td></tr>` : ''}
       </table>
     </div>
     ${actionButton('View Order', viewOrderUrl)}
   `),
 
-  refundStatusUpdate: ({ order, refundRequest, statusTitle, statusNote, viewOrderUrl }) => wrap(`Refund Update — ${order.orderId}`, statusTitle, `
+  refundStatusUpdate: ({ order, refundRequest, statusTitle, statusNote, viewOrderUrl }) => wrap(`Refund Update — ${order.orderId}`, statusTitle || 'Refund Update', `
     ${customerGreeting(order.customerName)}
-    <p class="muted">Your refund request is now <strong>${refundRequest.status}</strong>.</p>
+    <p class="muted">Your refund request is now <strong style="color: #059669;">${refundRequest.status}</strong>.</p>
     <div class="section">
       <h2>Refund Details</h2>
       <table class="details-table">
@@ -254,14 +281,14 @@ const templates = {
     <div class="section">
       <p><strong>Subject:</strong> ${subject}</p>
       <p><strong>Response:</strong></p>
-      <p>${response}</p>
+      <p style="background: #f8fafc; padding: 14px; border-radius: 8px; border-left: 4px solid #059669; margin: 16px 0;">${response}</p>
     </div>
-    <p class="muted">If you need further assistance, reply to this email anytime.</p>
+    <p class="muted">If you need further assistance, feel free to reply to this email anytime.</p>
   `),
 
   supportAutoConfirmation: ({ supportQuery }) => wrap(`We received your complaint — ${supportQuery.subject}`, 'Complaint Received', `
     ${customerGreeting(supportQuery.customerName)}
-    <p class="muted">Thank you for contacting Sri Tech. We have successfully received your complaint and created a support ticket.</p>
+    <p class="muted">Thank you for contacting Sri Tech. We have successfully received your message and created a support ticket.</p>
     <div class="section">
       <table class="details-table">
         <tr><th>Ticket ID</th><td>${supportQuery._id}</td></tr>

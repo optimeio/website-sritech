@@ -13,12 +13,8 @@ const normalizeOtp = (otp = '') => String(otp).trim();
 const buildOtpText = (name, otp) => `Hello ${name || 'there'},\n\nYour verification code is: ${otp}\n\nThis code is valid for 10 minutes. If you did not request this, ignore this email.\n`;
 
 const sendOtpEmail = async (user, otp) => {
-  const subject = 'Verify Your Email';
-  const html = `
-    <h2>Your OTP is</h2>
-    <h1>${otp}</h1>
-    <p>This OTP expires in 10 minutes.</p>
-  `;
+  const subject = 'Verify Your Email - Sri Tech';
+  const html = templates.emailVerification({ name: user.name || user.email, otp });
   const text = buildOtpText(user.name || user.email, otp);
 
   return sendEmail(user.email, subject, html, {
