@@ -1943,78 +1943,14 @@ main {
         font-size: 0.88rem !important;
         padding: 0.7rem 3.2rem 0.7rem 2.7rem !important;
     }
-    /* Mobile-Friendly E-Commerce Toolbar & Layout Switcher */
-    .products-mobile-toolbar {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        width: 100%;
-        max-width: 100%;
-        margin: -0.5rem 0 1rem 0;
-        padding: 0 0.25rem;
-        box-sizing: border-box;
-    }
-
-    .products-results-count {
-        font-size: 0.82rem;
-        color: #475569;
-        font-weight: 500;
-    }
-
-    .products-results-count strong {
-        color: #0f172a;
-        font-weight: 800;
-    }
-
-    .ecom-view-switch {
-        display: inline-flex;
-        align-items: center;
-        background: #f1f5f9;
-        padding: 3px;
-        border-radius: 8px;
-        gap: 3px;
-        border: 1px solid #e2e8f0;
-    }
-
-    .view-switch-btn {
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-        padding: 4px 9px;
-        border-radius: 6px;
-        font-size: 0.74rem;
-        font-weight: 700;
-        color: #64748b;
-        background: transparent;
-        border: none;
-        cursor: pointer;
-        transition: all 0.2s ease;
-    }
-
-    .view-switch-btn i {
-        font-size: 0.72rem;
-    }
-
-    .view-switch-btn.active {
-        background: #ffffff;
-        color: #15803d;
-        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
-    }
-
     /* 2-Column Mobile Default Grid */
-    .product-grid,
-    .product-grid.grid-cols-2 {
+    .product-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
         max-width: 100% !important;
         margin: 0 auto !important;
         gap: 0.65rem !important;
         padding: 0 !important;
         width: 100% !important;
-    }
-
-    .product-grid.grid-cols-3 {
-        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-        gap: 0.45rem !important;
     }
 
     .product-card-modern {
@@ -2170,64 +2106,7 @@ main {
         display: none !important;
     }
 
-    /* 3-Column Compact Micro Card Styles on Mobile */
-    .product-grid.grid-cols-3 .product-card-modern {
-        padding: 0.4rem 0.35rem 0.5rem 0.35rem !important;
-        border-radius: 10px !important;
-    }
 
-    .product-grid.grid-cols-3 .product-image-showcase {
-        height: 95px !important;
-        margin-bottom: 0.25rem !important;
-    }
-
-    .product-grid.grid-cols-3 .card-badge {
-        padding: 0.12rem 0.35rem !important;
-        font-size: 0.52rem !important;
-    }
-
-    .product-grid.grid-cols-3 .card-wishlist-btn {
-        width: 22px !important;
-        height: 22px !important;
-        font-size: 0.62rem !important;
-    }
-
-    .product-grid.grid-cols-3 .product-card-title {
-        font-size: 0.72rem !important;
-        height: 2.4em !important;
-    }
-
-    .product-grid.grid-cols-3 .product-card-subtitle,
-    .product-grid.grid-cols-3 .reviews-count,
-    .product-grid.grid-cols-3 .product-save-tag,
-    .product-grid.grid-cols-3 .product-save-placeholder,
-    .product-grid.grid-cols-3 .product-features-row {
-        display: none !important;
-    }
-
-    .product-grid.grid-cols-3 .product-rating-line {
-        height: 15px !important;
-    }
-
-    .product-grid.grid-cols-3 .rating-pill {
-        font-size: 0.58rem !important;
-        padding: 0 3px !important;
-    }
-
-    .product-grid.grid-cols-3 .current-price {
-        font-size: 0.92rem !important;
-    }
-
-    .product-grid.grid-cols-3 .mrp-price,
-    .product-grid.grid-cols-3 .discount-tag {
-        font-size: 0.56rem !important;
-    }
-
-    .product-grid.grid-cols-3 .card-buy-btn {
-        height: 28px !important;
-        font-size: 0.68rem !important;
-        padding: 0 0.35rem !important;
-    }
 }
 
 @media (max-width: 480px) {

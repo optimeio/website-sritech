@@ -36,7 +36,6 @@ function App() {
   const [toastMessage, setToastMessage] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
-  const [mobileGridCols, setMobileGridCols] = useState(2);
   const [entryName, setEntryName] = useState("");
   const [entryWhatsapp, setEntryWhatsapp] = useState("");
   const [entryEmail, setEntryEmail] = useState("");
@@ -5275,34 +5274,7 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
             </div>
           </div>
 
-          {/* Mobile-Friendly E-Commerce Grid View Toolbar */}
-          <div className="products-mobile-toolbar">
-            <span className="products-results-count">
-              <strong>{filteredProducts.length}</strong> {t('products.itemsCount', 'Products')}
-            </span>
-            <div className="ecom-view-switch" role="group" aria-label="Products Layout Switcher">
-              <button
-                type="button"
-                className={`view-switch-btn ${mobileGridCols === 2 ? 'active' : ''}`}
-                onClick={() => setMobileGridCols(2)}
-                aria-label="2 Columns View"
-              >
-                <i className="fa-solid fa-table-cells"></i>
-                <span>2 Col</span>
-              </button>
-              <button
-                type="button"
-                className={`view-switch-btn ${mobileGridCols === 3 ? 'active' : ''}`}
-                onClick={() => setMobileGridCols(3)}
-                aria-label="3 Columns View"
-              >
-                <i className="fa-solid fa-table-cells-large"></i>
-                <span>3 Col</span>
-              </button>
-            </div>
-          </div>
-
-          <div className={`product-grid grid-cols-${mobileGridCols}`}>
+          <div className="product-grid">
             {filteredProducts.length > 0 ? (
               filteredProducts.map((product, pIndex) => {
                 const ratingInfo = getProductRatingInfo(product);
