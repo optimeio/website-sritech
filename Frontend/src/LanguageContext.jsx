@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback } from 'react';
-import translations from './translations';
+import translations, { translateSpecKey, translateSpecValue, translateCategoryName } from './translations';
 
 const LanguageContext = createContext();
 
@@ -12,6 +12,7 @@ export function LanguageProvider({ children }) {
     }
   });
 
+  // Always show the welcome page / language selector popup on page refresh
   const [hasSelectedLanguage, setHasSelectedLanguage] = useState(false);
 
   const setLanguage = useCallback((lang) => {
@@ -23,31 +24,64 @@ export function LanguageProvider({ children }) {
     } catch {}
   }, []);
 
-  // t('hero.badge') → translations[language].hero.badge
-  const t = useCallback((key) => {
+  const openLanguageSelector = useCallback(() => {
+    setHasSelectedLanguage(false);
+  }, []);
+
+  // t('hero.badge', 'Optional Fallback') → translations[language].hero.badge
+  const t = useCallback((key, fallbackDefault) => {
+    if (!key) return '';
     const keys = key.split('.');
     let val = translations[language];
     for (const k of keys) {
       if (val && typeof val === 'object' && k in val) {
         val = val[k];
       } else {
-        // Fallback to English
-        let fallback = translations.en;
-        for (const fk of keys) {
-          if (fallback && typeof fallback === 'object' && fk in fallback) {
-            fallback = fallback[fk];
-          } else {
-            return key; // return the key itself as last resort
-          }
-        }
-        return fallback;
+        val = undefined;
+        break;
       }
     }
-    return val;
+    if (val !== undefined && val !== null) return val;
+
+    // Fallback to English
+    let fallback = translations.en;
+    for (const fk of keys) {
+      if (fallback && typeof fallback === 'object' && fk in fallback) {
+        fallback = fallback[fk];
+      } else {
+        fallback = undefined;
+        break;
+      }
+    }
+    if (fallback !== undefined && fallback !== null) return fallback;
+
+    return fallbackDefault !== undefined ? fallbackDefault : key;
+  }, [language]);
+
+  const translateKey = useCallback((key) => {
+    return translateSpecKey(key, language);
+  }, [language]);
+
+  const translateVal = useCallback((val) => {
+    return translateSpecValue(val, language);
+  }, [language]);
+
+  const translateCat = useCallback((cat) => {
+    return translateCategoryName(cat, language);
   }, [language]);
 
   return (
-    <LanguageContext.Provider value={{ language, setLanguage, t, hasSelectedLanguage }}>
+    <LanguageContext.Provider value={{
+      language,
+      setLanguage,
+      openLanguageSelector,
+      t,
+      hasSelectedLanguage,
+      setHasSelectedLanguage,
+      translateKey,
+      translateVal,
+      translateCat
+    }}>
       {children}
     </LanguageContext.Provider>
   );

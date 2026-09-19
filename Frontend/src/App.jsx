@@ -6,6 +6,7 @@ import AdminDashboard from './AdminDashboard'
 import UserDashboard from './components/UserDashboard'
 import Footer from './components/Footer'
 import MyOrders from './pages/MyOrders.jsx'
+import ProductDetailPage from './pages/ProductDetailPage.jsx'
 import { useLanguage } from './LanguageContext'
 import LanguageSelectorPopup from './components/LanguageSelectorPopup'
 
@@ -20,7 +21,7 @@ const DEFAULT_BANNERS = [
 const FALLBACK_PRODUCTS = [];
 
 function App() {
-  const { language, setLanguage, t } = useLanguage();
+  const { language, setLanguage, openLanguageSelector, t, translateCat, translateVal, translateKey } = useLanguage();
   // State
   const [activeSection, setActiveSection] = useState('home');
   const [selectedProduct, setSelectedProduct] = useState(null);
@@ -35,9 +36,17 @@ function App() {
   const [toastMessage, setToastMessage] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
+  const [mobileGridCols, setMobileGridCols] = useState(2);
   const [entryName, setEntryName] = useState("");
   const [entryWhatsapp, setEntryWhatsapp] = useState("");
+  const [entryEmail, setEntryEmail] = useState("");
   const [entryLocation, setEntryLocation] = useState("");
+  const [entryPurpose, setEntryPurpose] = useState("Hotel / Restaurant");
+  const [entryStoveModel, setEntryStoveModel] = useState("Single Layer Dual Stove Turbo Model");
+  const [entryFuelType, setEntryFuelType] = useState("Wood & Biomass");
+  const [entryCapacity, setEntryCapacity] = useState("200 - 500 People");
+  const [entryNotes, setEntryNotes] = useState("");
+  const [isSubmittingEntry, setIsSubmittingEntry] = useState(false);
   const [showEntryModal, setShowEntryModal] = useState(false);
   const [showOfferModal, setShowOfferModal] = useState(false);
   const [showAdminLogin, setShowAdminLogin] = useState(false);
@@ -72,6 +81,44 @@ function App() {
     return () => clearInterval(interval);
   }, []);
 
+  // E-commerce style random quote popup timers and product click counter
+  const initialQuoteTimerRef = useRef(null);
+  const productQuoteTimerRef = useRef(null);
+  const productClickCountRef = useRef(0);
+  // Random threshold of either 2 or 3 product views
+  const nextProductThresholdRef = useRef(Math.floor(Math.random() * 2) + 2);
+
+  // Initial random popup after landing or language selection (random between 6s and 12s)
+  useEffect(() => {
+    const triggerRandomInitialQuote = () => {
+      if (initialQuoteTimerRef.current) clearTimeout(initialQuoteTimerRef.current);
+      // Random delay between 6000ms and 12000ms (not a standard fixed time)
+      const randomDelay = Math.floor(Math.random() * (12000 - 6000 + 1)) + 6000;
+      initialQuoteTimerRef.current = setTimeout(() => {
+        setShowEntryModal(prev => {
+          if (!prev && !isEntrySubmitted) return true;
+          return prev;
+        });
+      }, randomDelay);
+    };
+
+    // Trigger random timer on initial landing
+    triggerRandomInitialQuote();
+
+    // Also re-trigger random timer when user chooses language in welcome popup
+    const onLangSelected = () => {
+      triggerRandomInitialQuote();
+    };
+
+    window.addEventListener('sritech:language-selected', onLangSelected);
+
+    return () => {
+      if (initialQuoteTimerRef.current) clearTimeout(initialQuoteTimerRef.current);
+      if (productQuoteTimerRef.current) clearTimeout(productQuoteTimerRef.current);
+      window.removeEventListener('sritech:language-selected', onLangSelected);
+    };
+  }, [isEntrySubmitted]);
+
   const [offers, setOffers] = useState([]);
   const [offerData, setOfferData] = useState({
     title: 'Special Offer! 🎉',
@@ -98,15 +145,16 @@ function App() {
   const getCategoryDisplayName = (value) => {
     if (!value) return '';
     if (typeof value === 'object') {
-      if (value.name) return value.name.toString();
+      if (value.name) return translateCat ? translateCat(value.name.toString()) : value.name.toString();
       value = value.slug || '';
     }
     const raw = value.toString();
-    return raw
+    const formatted = raw
       .split(/[-\s]+/)
       .filter(Boolean)
       .map(word => word.charAt(0).toUpperCase() + word.slice(1))
       .join(' ');
+    return translateCat ? translateCat(formatted) : formatted;
   };
 
   const baseCategories = Array.isArray(categories) && categories.length > 0
@@ -158,6 +206,7 @@ function App() {
   const location = useLocation();
   const isMyOrdersPage = location.pathname === '/my-orders';
   const isCustomerDashboardPage = location.pathname === '/customer-dashboard';
+  const isProductDetailPage = location.pathname.startsWith('/product/');
   const [currentHeroIndex, setCurrentHeroIndex] = useState(0);
   const [activeWorkflowStep, setActiveWorkflowStep] = useState(0);
   const displayBanners = heroBanners && heroBanners.length > 0 ? heroBanners : DEFAULT_BANNERS;
@@ -183,6 +232,54 @@ function App() {
   const [activeUser, setActiveUser] = useState(null);
   const [authPortalIsGate, setAuthPortalIsGate] = useState(false); // true = portal is mandatory gate on /
   const [showLoginReminder, setShowLoginReminder] = useState(true);
+
+  // Synchronized Auth Modal Handlers with URL Route Management
+  const openAuthModal = (mode = 'login', options = {}) => {
+    const targetMode = (mode === 'signup' || mode === 'register') ? 'signup' : 'login';
+    setAuthMode(targetMode);
+    setAuthErrorMessage(null);
+    setAuthFieldErrors({ email: '', password: '' });
+    setShowAuthModal(true);
+    if (options.isGate) {
+      setAuthPortalIsGate(true);
+    }
+    const currentPath = (location.pathname || '').toLowerCase();
+    const targetPath = targetMode === 'signup' ? '/signup' : '/login';
+    if (currentPath !== targetPath && !['/my-orders', '/customer-dashboard'].includes(currentPath)) {
+      navigate(targetPath, { replace: options.replace || false });
+    }
+  };
+
+  const closeAuthModal = (options = {}) => {
+    setShowAuthModal(false);
+    setAuthPortalIsGate(false);
+    setAuthMode('login');
+    setAuthErrorMessage(null);
+    setAuthFieldErrors({ email: '', password: '' });
+    setUserCredentials({ name: '', phone: '', address: '', city: '', state: '', pincode: '', email: '', password: '', confirmPassword: '' });
+    setVerificationEmail('');
+    setOtpCode('');
+
+    const currentPath = (location.pathname || '').toLowerCase();
+    const authPaths = ['/login', '/signin', '/signup', '/register'];
+    if (authPaths.includes(currentPath)) {
+      navigate(options?.redirectTo || '/', { replace: true });
+    }
+  };
+
+  const switchAuthMode = (newMode) => {
+    const targetMode = (newMode === 'signup' || newMode === 'register') ? 'signup' : 'login';
+    setAuthMode(targetMode);
+    setAuthErrorMessage(null);
+    setAuthFieldErrors({ email: '', password: '' });
+    setVerificationEmail('');
+    setOtpCode('');
+    const currentPath = (location.pathname || '').toLowerCase();
+    const authPaths = ['/login', '/signin', '/signup', '/register'];
+    if (authPaths.includes(currentPath)) {
+      navigate(targetMode === 'signup' ? '/signup' : '/login', { replace: true });
+    }
+  };
 
   // Suggestions search state
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -717,10 +814,24 @@ function App() {
     }
   }, [isAdmin]);
 
+  // URL route synchronization for /login, /signin, /signup, /register, and protected customer pages
   useEffect(() => {
-    if ((location.pathname === '/my-orders' || location.pathname === '/customer-dashboard') && !isUserLoggedIn) {
+    const authPaths = ['/login', '/signin', '/signup', '/register'];
+    const currentPath = (location.pathname || '').toLowerCase();
+
+    if (authPaths.includes(currentPath)) {
+      if (isUserLoggedIn) {
+        navigate('/customer-dashboard', { replace: true });
+      } else {
+        const targetMode = (currentPath === '/signup' || currentPath === '/register') ? 'signup' : 'login';
+        setAuthMode(targetMode);
+        setShowAuthModal(true);
+      }
+    } else if ((currentPath === '/my-orders' || currentPath === '/customer-dashboard') && !isUserLoggedIn) {
       setAuthMode('login');
       setShowAuthModal(true);
+    } else if (showAuthModal && !authPortalIsGate && !['/my-orders', '/customer-dashboard'].includes(currentPath)) {
+      setShowAuthModal(false);
     }
   }, [location.pathname, isUserLoggedIn]);
 
@@ -783,11 +894,29 @@ function App() {
 
   }, [selectedProduct]);
 
-  // Fetch reviews when product is selected
+  // Fetch reviews when product is selected & trigger quote popup after 2-3 product clicks randomly
   useEffect(() => {
     if (selectedProduct) {
       trackGAEvent('view_item', 'ecommerce', selectedProduct.name, Number(String(selectedProduct.price).replace(/[^0-9]/g, '')) || 0);
       setSelectedProductImageIndex(0);
+
+      // Track product clicks/views: trigger quote modal randomly after 2 or 3 product views
+      productClickCountRef.current += 1;
+      if (productClickCountRef.current >= nextProductThresholdRef.current) {
+        productClickCountRef.current = 0;
+        // Randomly choose 2 or 3 for next cycle
+        nextProductThresholdRef.current = Math.floor(Math.random() * 2) + 2;
+        // Random non-standard delay between 1500ms and 3500ms
+        const randomProductDelay = Math.floor(Math.random() * (3500 - 1500 + 1)) + 1500;
+        if (productQuoteTimerRef.current) clearTimeout(productQuoteTimerRef.current);
+        productQuoteTimerRef.current = setTimeout(() => {
+          setShowEntryModal(prev => {
+            if (!prev && !isEntrySubmitted) return true;
+            return prev;
+          });
+        }, randomProductDelay);
+      }
+
       const productId = selectedProduct._id || selectedProduct.id;
       const fetchReviews = async () => {
         try {
@@ -803,7 +932,7 @@ function App() {
     } else {
       setSelectedProductReviews([]);
     }
-  }, [selectedProduct]);
+  }, [selectedProduct, isEntrySubmitted]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -901,6 +1030,8 @@ function App() {
       const normalizedPayload = {
         name: String(newProduct?.name || '').trim(),
         price: String(newProduct?.price || '').trim(),
+        originalPrice: Number(newProduct?.originalPrice || newProduct?.mrp || 0),
+        mrp: Number(newProduct?.originalPrice || newProduct?.mrp || 0),
         category: String(newProduct?.category || '').trim(),
         description: String(newProduct?.description || '').trim(),
         specifications: String(newProduct?.specifications || '').trim(),
@@ -909,6 +1040,10 @@ function App() {
         stoveWeight: String(newProduct?.stoveWeight || '').trim(),
         dimensions: String(newProduct?.dimensions || '').trim(),
         material: String(newProduct?.material || '').trim(),
+        usage: String(newProduct?.usage || '').trim(),
+        fuelType: String(newProduct?.fuelType || '').trim(),
+        cookingSurface: String(newProduct?.cookingSurface || '').trim(),
+        cookingCapacity: String(newProduct?.cookingCapacity || '').trim(),
         stock: Number(newProduct?.stock || 0),
         shippingCharge: Number(newProduct?.shippingCharge || 0),
         gstPercent: Number(newProduct?.gstPercent || 0),
@@ -973,6 +1108,16 @@ function App() {
       showToast('Error deleting product', 'error');
       refreshProducts();
     }
+  };
+
+  const fetchProductDetails = async (productId) => {
+    try {
+      const res = await fetch(`${API_URL}/products/${productId}`);
+      if (res.ok) return await res.json();
+    } catch (err) {
+      console.error('Error fetching product details:', err);
+    }
+    return null;
   };
 
   const updateProduct = async (productId, updatedData) => {
@@ -1211,6 +1356,40 @@ function App() {
     }
   };
 
+  const updateLeadStatus = async (leadId, nextStatus, adminNotes) => {
+    try {
+      const res = await fetch(`${API_URL}/leads/${leadId}`, {
+        method: 'PATCH',
+        headers: getAuthHeaders({ contentType: true, admin: true }),
+        body: JSON.stringify({ status: nextStatus, adminNotes })
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setLeads(prev => prev.map(l => ((l._id || l.id) === leadId ? updated : l)));
+        showToast('Inquiry status updated.', 'success');
+        return updated;
+      }
+    } catch (err) {
+      console.error('Error updating lead status:', err);
+    }
+  };
+
+  const deleteLead = async (leadId) => {
+    try {
+      const res = await fetch(`${API_URL}/leads/${leadId}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders({ admin: true })
+      });
+      if (res.ok) {
+        setLeads(prev => prev.filter(l => (l._id || l.id) !== leadId));
+        showToast('Inquiry deleted successfully.', 'info');
+        return true;
+      }
+    } catch (err) {
+      console.error('Error deleting lead:', err);
+    }
+  };
+
   const updateOrder = async (orderId, orderData) => {
     try {
       const res = await fetch(`${API_URL}/orders/${orderId}`, {
@@ -1383,35 +1562,52 @@ function App() {
 
   const handleEntrySubmit = async (e) => {
     e.preventDefault();
-    const formData = new FormData(e.target);
+    setIsSubmittingEntry(true);
     const leadData = {
-      name: formData.get('userName'),
-      whatsapp: formData.get('userWhatsapp'),
-      location: formData.get('userLocation')
+      name: entryName,
+      whatsapp: entryWhatsapp,
+      phone: entryWhatsapp,
+      email: entryEmail || '',
+      location: entryLocation || 'Tamil Nadu, India',
+      purpose: entryPurpose || 'Hotel / Restaurant',
+      stoveModel: entryStoveModel || 'Single Layer Dual Stove Turbo Model',
+      fuelType: entryFuelType || 'Wood & Biomass',
+      capacity: entryCapacity || '200 - 500 People',
+      notes: entryNotes || ''
     };
 
     try {
-      await fetch(`${API_URL}/leads`, {
+      const res = await fetch(`${API_URL}/leads`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(leadData)
       });
+      if (res.ok) {
+        const saved = await res.json();
+        setLeads(prev => [saved, ...(prev || [])]);
+      }
+      setIsEntrySubmitted(true);
+      try {
+        sessionStorage.setItem('sritech-inquiry-done', 'true');
+      } catch {}
+      setTimeout(() => {
+        setShowEntryModal(false);
+        setIsEntrySubmitted(false);
+      }, 3500);
+    } catch (err) {
+      console.error("Error saving lead:", err);
       setIsEntrySubmitted(true);
       setTimeout(() => {
         setShowEntryModal(false);
-        setTimeout(() => setShowOfferModal(true), 500);
-      }, 1000);
-    } catch (err) {
-      console.error("Error saving lead:", err);
-      // Fallback: still show website even if lead saving fails
-      setShowEntryModal(false);
-      setTimeout(() => setShowOfferModal(true), 500);
+        setIsEntrySubmitted(false);
+      }, 3000);
+    } finally {
+      setIsSubmittingEntry(false);
     }
   };
 
   const closeEntryModal = () => {
     setShowEntryModal(false);
-    setTimeout(() => setShowOfferModal(true), 500);
   };
   const getUserHeaders = () => getAuthHeaders();
 
@@ -2467,7 +2663,7 @@ function App() {
             } catch (e) {
               console.error('Failed to update users after signup:', e);
             }
-            setShowAuthModal(false);
+            closeAuthModal({ redirectTo: !isAdmin ? '/customer-dashboard' : undefined });
             if (!isAdmin) {
               setTimeout(() => openUserDashboard('Overview'), 0);
             }
@@ -2511,10 +2707,7 @@ function App() {
 
             if (token && user) {
               applyAuthenticatedUser(token, user);
-              setAuthMode('login');
-              setShowAuthModal(false);
-              setAuthErrorMessage(null);
-              setAuthFieldErrors({ email: '', password: '' });
+              closeAuthModal({ redirectTo: !isAdmin ? '/customer-dashboard' : undefined });
               showToast('Account verified successfully!', 'success');
               if (!isAdmin) {
                 setTimeout(() => openUserDashboard('Overview'), 500);
@@ -2550,11 +2743,8 @@ function App() {
             persistAdminSession(adminData.token);
             setIsAdmin(true);
             setIsViewingPublicProducts(false);
-            setShowAuthModal(false);
+            closeAuthModal({ redirectTo: '/admin' });
             setShowAdminLogin(false);
-            setUserCredentials({ name: '', phone: '', address: '', email: '', password: '', confirmPassword: '' });
-            setAuthErrorMessage(null);
-            setAuthFieldErrors({ email: '', password: '' });
             await fetchData();
             navigate('/admin');
             showToast('Admin authenticated successfully!', 'success');
@@ -2591,9 +2781,7 @@ function App() {
           const user = data.user || data;
           const token = data.token;
           applyAuthenticatedUser(token, user);
-          setShowAuthModal(false);
-          setAuthErrorMessage(null);
-          setAuthFieldErrors({ email: '', password: '' });
+          closeAuthModal({ redirectTo: !isAdmin ? '/customer-dashboard' : undefined });
           loginSuccess = true;
           showToast('✅ Login successful!', 'success');
           if (!isAdmin) {
@@ -2719,10 +2907,16 @@ function App() {
   const getProductFinalPrice = (product) => {
     if (!product) return 0;
     const priceNum = parsePrice(product.price);
+    const origPrice = Number(product.originalPrice || product.mrp) || 0;
     const prodDiscountPercent = Number(product.discountPercent || product.discount) || 0;
 
     let basePrice = priceNum;
-    if (prodDiscountPercent > 0) {
+    // If product has originalPrice / MRP set and originalPrice > priceNum,
+    // priceNum IS ALREADY the discounted selling price (e.g. MRP: 5000, Selling: 4500).
+    // Do NOT discount it again!
+    if (origPrice > 0 && origPrice > priceNum) {
+      basePrice = priceNum;
+    } else if (prodDiscountPercent > 0 && origPrice === 0) {
       basePrice = Math.round(priceNum * (1 - prodDiscountPercent / 100));
       
       // Catalog price normalization helper
@@ -2795,21 +2989,29 @@ const resolvedCartItems = cart
 
 const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p.id)?.toString()));
 
+  const cleanSpecText = (str) => {
+    if (typeof str !== 'string') return str || '';
+    return str
+      .replace(/[\u25A0-\u25FF\uFFFD\uF000-\uFFFF\uE000-\uF8FF\u0000-\u0008\u000B-\u000C\u000E-\u001F]/g, '')
+      .replace(/\s*[\u2022\u2023\u25E6\u2043\u2219\u25A1\u25A0]\s*$/, '')
+      .trim();
+  };
+
   const getProductSpecsInfo = (product) => {
     if (!product) return {};
-    const name = product.name || '';
-    const desc = product.description || '';
-    const specs = product.specifications || '';
+    const name = cleanSpecText(product.name || '');
+    const desc = cleanSpecText(product.description || '');
+    const specs = cleanSpecText(product.specifications || '');
 
-    let burnerSize = product.burnerSize || '';
-    let stoveWeight = product.stoveWeight || '';
-    let dimensions = product.dimensions || '';
-    let material = product.material || '';
-    let howToUse = product.howToUse || '';
+    let burnerSize = cleanSpecText(product.burnerSize || '');
+    let stoveWeight = cleanSpecText(product.stoveWeight || '');
+    let dimensions = cleanSpecText(product.dimensions || '');
+    let material = cleanSpecText(product.material || '');
+    let howToUse = cleanSpecText(product.howToUse || '');
 
     if (!burnerSize) {
       const match = (desc + ' ' + specs + ' ' + name).match(/(?:burner size|burner)\s*:\s*([^,\.\n;]+)/i);
-      if (match) burnerSize = match[1].trim();
+      if (match) burnerSize = cleanSpecText(match[1]);
       else if (/6"/i.test(name) || /6 inch/i.test(name)) burnerSize = '6 Inches';
       else if (/double layer/i.test(name)) burnerSize = '6 Inches';
       else if (/single layer/i.test(name)) burnerSize = '5 Inches';
@@ -2818,7 +3020,7 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
 
     if (!stoveWeight) {
       const match = (desc + ' ' + specs).match(/(?:stove weight|weight|wt)\s*:\s*([^,\.\n;]+)/i);
-      if (match) stoveWeight = match[1].trim();
+      if (match) stoveWeight = cleanSpecText(match[1]);
       else if (/m5/i.test(name)) stoveWeight = '18 to 20 kg';
       else if (/m4/i.test(name)) stoveWeight = '8.5 kg';
       else stoveWeight = '8.5 kg';
@@ -2826,7 +3028,7 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
 
     if (!dimensions) {
       const match = (desc + ' ' + specs).match(/(?:dimensions|dim)\s*:\s*([^,\.\n;]+)/i);
-      if (match) dimensions = match[1].trim();
+      if (match) dimensions = cleanSpecText(match[1]);
       else if (/m5/i.test(name)) dimensions = '18" × 18" × 19"';
       else if (/m4/i.test(name)) dimensions = '12" × 10" × 14"';
       else dimensions = '12" × 10" × 14"';
@@ -2834,35 +3036,76 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
 
     if (!material) {
       const match = (desc + ' ' + specs).match(/material\s*:\s*([^,\.\n;]+)/i);
-      if (match) material = match[1].trim();
+      if (match) material = cleanSpecText(match[1]);
       else if (/ss|stainless steel/i.test(desc + ' ' + specs + ' ' + name)) material = 'Premium Stainless Steel (SS)';
       else material = 'Mild Steel (MS)';
     }
 
     const usagePairs = [];
-    if (desc && desc.includes(':')) {
-      const excludedKeys = ['burner size', 'burner', 'stove weight', 'weight', 'dimensions', 'dim', 'material', 'how to use', 'specifications', 'price', 'stock'];
-      const kvRegex = /([A-Za-z0-9\s/&()-]+?)\s*:\s*([^:]+?)(?=(?:\s+[A-Za-z0-9\s/&()-]+?:|$))/g;
-      let match;
-      while ((match = kvRegex.exec(desc)) !== null) {
-        let key = match[1].trim();
-        let val = match[2].trim();
+    const hasExplicitUsages = Boolean(product.usage || product.fuelType || product.cookingSurface || product.cookingCapacity);
 
-        const knownKeyPatterns = ['Usage', 'Fuel Type', 'Cooking Surface', 'Cooking Capacity', 'Suitable For', 'Application', 'Features', 'Power Source', 'Capacity'];
-        const foundKnownKey = knownKeyPatterns.find(k => key.toLowerCase().endsWith(k.toLowerCase()));
-        if (foundKnownKey) {
-          key = foundKnownKey;
-        }
+    if (hasExplicitUsages) {
+      if (product.usage) {
+        usagePairs.push({ key: 'Usage', val: cleanSpecText(product.usage) });
+      }
+      if (product.fuelType) {
+        usagePairs.push({ key: 'Fuel Type', val: cleanSpecText(product.fuelType) });
+      }
+      if (product.cookingSurface) {
+        usagePairs.push({ key: 'Cooking Surface', val: cleanSpecText(product.cookingSurface) });
+      }
+      if (product.cookingCapacity) {
+        usagePairs.push({ key: 'Cooking Capacity', val: cleanSpecText(product.cookingCapacity) });
+      }
+    } else {
+      if (desc && desc.includes(':')) {
+        const excludedKeys = ['burner size', 'burner', 'stove weight', 'weight', 'dimensions', 'dim', 'material', 'how to use', 'specifications', 'price', 'stock'];
+        const kvRegex = /([A-Za-z0-9\s/&()-]+?)\s*:\s*([^:]+?)(?=(?:\s+[A-Za-z0-9\s/&()-]+?:|$))/g;
+        let match;
+        while ((match = kvRegex.exec(desc)) !== null) {
+          let key = cleanSpecText(match[1]);
+          let val = cleanSpecText(match[2]);
 
-        const normKey = key.toLowerCase();
-        const isExcluded = excludedKeys.some(ex => normKey.includes(ex));
+          const knownKeyPatterns = ['Usage', 'Fuel Type', 'Cooking Surface', 'Cooking Capacity', 'Suitable For', 'Application', 'Features', 'Power Source', 'Capacity'];
+          const foundKnownKey = knownKeyPatterns.find(k => key.toLowerCase().endsWith(k.toLowerCase()));
+          if (foundKnownKey) {
+            key = foundKnownKey;
+          }
 
-        if (key && val && !isExcluded && key.length < 35 && val.length < 200) {
-          if (!usagePairs.some(p => p.key.toLowerCase() === key.toLowerCase())) {
-            usagePairs.push({ key, val });
+          const normKey = key.toLowerCase();
+          const isExcluded = excludedKeys.some(ex => normKey.includes(ex));
+
+          if (key && val && !isExcluded && key.length < 35 && val.length < 250) {
+            if (!usagePairs.some(p => p.key.toLowerCase() === key.toLowerCase())) {
+              usagePairs.push({ key, val });
+            }
           }
         }
       }
+    }
+
+    // Ensure logical Cooking Capacity is always present and clean
+    const hasCapacity = usagePairs.some(p => p.key.toLowerCase().includes('capacity'));
+    if (!hasCapacity) {
+      let defaultCapacity = 'Up to 10 kg (4 - 8 Persons / Home Cooking)';
+      if (/m9|m10|12"|12 inch|dual stove/i.test(name)) {
+        defaultCapacity = 'Up to 90 kg (150 - 300+ Persons / Mega Commercial & Temples)';
+      } else if (/m8|10"|10 inch/i.test(name)) {
+        defaultCapacity = 'Up to 75 kg (100 - 150 Persons / Large Commercial)';
+      } else if (/m6|dual turbo/i.test(name)) {
+        defaultCapacity = 'Up to 50 kg (40 - 75 Persons / Dual Commercial)';
+      } else if (/m7|8"|8 inch/i.test(name)) {
+        defaultCapacity = 'Up to 40 kg (40 - 75 Persons / Commercial & Hotels)';
+      } else if (/m5/i.test(name)) {
+        defaultCapacity = 'Up to 30 kg (25 - 40 Persons / Commercial & Catering)';
+      } else if (/m4/i.test(name)) {
+        defaultCapacity = 'Up to 25 kg (15 - 25 Persons / Small Hotels & Homes)';
+      } else if (/m1|m2|m3|eco|portable|l-shape|normal stove/i.test(name)) {
+        defaultCapacity = 'Up to 10 kg (4 - 8 Persons / Home Cooking)';
+      } else if (/commercial|hotel|catering|restaurant|temple/i.test(name + ' ' + desc)) {
+        defaultCapacity = 'Up to 50 kg (40 - 75 Persons / Dual Commercial)';
+      }
+      usagePairs.push({ key: 'Cooking Capacity', val: defaultCapacity });
     }
 
     return {
@@ -2929,6 +3172,9 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
     setSelectedProduct(product);
     setSelectedProductImageIndex(0);
     setShowSuggestions(false);
+    const slug = getProductSlug(product);
+    navigate(`/product/${slug}`);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const filteredProducts = displayedProducts.filter(product => {
@@ -3020,6 +3266,8 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
         refundRequests={refundRequests}
         activityLogs={activityLogs}
         leads={leads}
+        onUpdateLeadStatus={updateLeadStatus}
+        onDeleteLead={deleteLead}
         users={users}
         onToggleBlockUser={handleToggleBlockUser}
         onDeleteUser={handleDeleteUser}
@@ -3031,74 +3279,10 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
         onAddHeroBanner={addHeroBanner}
         onDeleteHeroBanner={deleteHeroBanner}
         onRespondToSupport={respondToSupport}
+        fetchProductDetails={fetchProductDetails}
       />
     ) : (
     <div className="app-wrapper">
-      {isAdmin && isViewingPublicProducts && (
-        <div className="admin-storefront-bar" style={{
-          background: 'linear-gradient(90deg, #1e293b, #0f172a)',
-          color: '#f8fafc',
-          padding: '0.6rem 1.5rem',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          fontSize: '0.85rem',
-          position: 'sticky',
-          top: 0,
-          zIndex: 9999,
-          borderBottom: '1px solid #334155',
-          fontFamily: 'system-ui, -apple-system, sans-serif',
-          boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span className="status-pulse-dot" style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e' }}></span>
-            <span>Logged in as <strong>CEO & Super Admin</strong> (Storefront Preview Mode)</span>
-          </div>
-          <div style={{ display: 'flex', gap: '12px' }}>
-            <button 
-              onClick={() => {
-                setIsViewingPublicProducts(false);
-                navigate('/admin');
-              }}
-              style={{
-                background: '#22c55e',
-                color: 'white',
-                border: 'none',
-                padding: '6px 14px',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontWeight: 600,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                transition: 'background 0.2s'
-              }}
-            >
-              <i className="fa-solid fa-gauge"></i>
-              Go to Admin Dashboard
-            </button>
-            <button 
-              onClick={handleLogout}
-              style={{
-                background: 'rgba(239, 68, 68, 0.2)',
-                color: '#f87171',
-                border: '1px solid rgba(239, 68, 68, 0.4)',
-                padding: '6px 14px',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontWeight: 500,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                transition: 'background 0.2s'
-              }}
-            >
-              <i className="fa-solid fa-right-from-bracket"></i>
-              Logout Admin
-            </button>
-          </div>
-        </div>
-      )}
       <LanguageSelectorPopup />
       {/* Toast Notification */}
       {toastMessage && (
@@ -3107,513 +3291,7 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
         </div>
       )}
 
-      {/* Product Detail Modal */}
-      {selectedProduct && (
-        <div id="productDetailModal" className="modal-overlay active" style={{ display: 'flex' }}>
-          <div className="modal-content detail-modal" role="dialog" aria-modal="true">
-            <button className="close-modal" onClick={() => { setSelectedProduct(null); if (location.pathname.startsWith('/product/')) navigate('/', { replace: true }); }} aria-label="Close">&times;</button>
-            
-            <div className="detail-modal-body">
-              {/* Left Column: Image Slider */}
-              <div className="product-slider">
-                <div className="slider-main-image">
-                  {selectedProduct.video && selectedProductImageIndex === (selectedProduct.images?.length || 0) ? (
-                    selectedProduct.video.includes('youtube.com') || selectedProduct.video.includes('youtu.be') ? (
-                      (() => {
-                        let embedId = '';
-                        if (selectedProduct.video.includes('youtube.com/watch?v=')) {
-                          embedId = selectedProduct.video.split('watch?v=')[1]?.split('&')[0];
-                        } else if (selectedProduct.video.includes('youtu.be/')) {
-                          embedId = selectedProduct.video.split('youtu.be/')[1]?.split('?')[0];
-                        } else if (selectedProduct.video.includes('youtube.com/embed/')) {
-                          embedId = selectedProduct.video.split('embed/')[1]?.split('?')[0];
-                        }
-                        return (
-                          <iframe 
-                            width="100%" 
-                            height="100%" 
-                            src={`https://www.youtube.com/embed/${embedId}?autoplay=1`} 
-                            title="Product Video" 
-                            frameBorder="0" 
-                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                            allowFullScreen
-                            style={{ borderRadius: '16px', minHeight: '320px', width: '100%', aspectRatio: '16/9' }}
-                          />
-                        );
-                      })()
-                    ) : selectedProduct.video.includes('vimeo.com') ? (
-                      (() => {
-                        const vimeoId = selectedProduct.video.split('vimeo.com/')[1]?.split('?')[0];
-                        return (
-                          <iframe 
-                            src={`https://player.vimeo.com/video/${vimeoId}?autoplay=1`} 
-                            width="100%" 
-                            height="100%" 
-                            frameBorder="0" 
-                            allow="autoplay; fullscreen; picture-in-picture" 
-                            allowFullScreen
-                            style={{ borderRadius: '16px', minHeight: '320px', width: '100%', aspectRatio: '16/9' }}
-                          />
-                        );
-                      })()
-                    ) : (
-                      <video 
-                        src={selectedProduct.video} 
-                        controls 
-                        autoPlay 
-                        style={{ width: '100%', height: '100%', maxHeight: '420px', objectFit: 'contain', borderRadius: '16px' }}
-                      />
-                    )
-                  ) : selectedProduct.images && selectedProduct.images.length > 0 ? (
-                    <img loading="lazy" 
-                      src={selectedProduct.images[selectedProductImageIndex]} 
-                      alt={selectedProduct.name} 
-                    />
-                  ) : (
-                    <i className={`fa-solid ${selectedProduct.icon || 'fa-box'} placeholder-img`} style={{ fontSize: '7rem' }} aria-hidden="true"></i>
-                  )}
-                  
-                  {((selectedProduct.images?.length || 0) + (selectedProduct.video ? 1 : 0)) > 1 && (
-                    <>
-                      <button 
-                        className="slider-arrow prev" 
-                        onClick={() => setSelectedProductImageIndex(prev => (prev === 0 ? ((selectedProduct.images?.length || 0) + (selectedProduct.video ? 1 : 0)) - 1 : prev - 1))}
-                        aria-label="Previous media"
-                      >
-                        <i className="fa-solid fa-chevron-left"></i>
-                      </button>
-                      <button 
-                        className="slider-arrow next" 
-                        onClick={() => setSelectedProductImageIndex(prev => (prev === ((selectedProduct.images?.length || 0) + (selectedProduct.video ? 1 : 0)) - 1 ? 0 : prev + 1))}
-                        aria-label="Next media"
-                      >
-                        <i className="fa-solid fa-chevron-right"></i>
-                      </button>
-                    </>
-                  )}
-                </div>
 
-                {/* Thumbnails indicator */}
-                {((selectedProduct.images?.length || 0) + (selectedProduct.video ? 1 : 0)) > 1 && (
-                  <div className="slider-thumbnails">
-                    {selectedProduct.images && selectedProduct.images.map((img, idx) => (
-                      <button
-                        key={idx}
-                        className={`thumbnail-btn ${selectedProductImageIndex === idx ? 'active' : ''}`}
-                        onClick={() => setSelectedProductImageIndex(idx)}
-                      >
-                        <img loading="lazy" src={img} alt={`Thumbnail ${idx + 1}`} />
-                      </button>
-                    ))}
-                    {selectedProduct.video && (
-                      <button
-                        className={`thumbnail-btn video-thumb ${selectedProductImageIndex === selectedProduct.images.length ? 'active' : ''}`}
-                        onClick={() => setSelectedProductImageIndex(selectedProduct.images.length)}
-                        style={{ position: 'relative' }}
-                      >
-                        <div style={{ width: '100%', height: '100%', minHeight: '50px', display: 'grid', placeItems: 'center', background: '#1e293b', borderRadius: '8px' }}>
-                          <i className="fa-solid fa-play" style={{ color: '#fff', fontSize: '1.2rem' }}></i>
-                        </div>
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Right Column: Details Info */}
-              <div className="product-detail-info">
-                <span className="category-badge">
-                  {((selectedProduct.category || '').toString().includes('-') 
-                    ? selectedProduct.category 
-                    : (selectedProduct.category || '').toLowerCase().replace(/\s+/g, '-'))
-                    .split('-')
-                    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-                    .join(' ')}
-                </span>
-                <h2>{selectedProduct.name}</h2>
-                {(() => {
-                  const modalRatingInfo = getProductRatingInfo(selectedProduct);
-                  const totalReviews = selectedProductReviews.length || Math.round(modalRatingInfo.count / 3);
-                  return (
-                    <div className="product-detail-rating-row" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', margin: '0.4rem 0 1rem 0', flexWrap: 'wrap' }}>
-                      <span className="rating-badge" style={{ background: '#16a34a', color: '#ffffff', padding: '0.2rem 0.6rem', borderRadius: '4px', fontWeight: '700', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
-                        {modalRatingInfo.rating} <i className="fa-solid fa-star" style={{ fontSize: '0.7rem' }}></i>
-                      </span>
-                      <span style={{ fontSize: '0.85rem', fontWeight: '600', color: '#475569' }}>
-                        {modalRatingInfo.count} Ratings & {totalReviews} Reviews
-                      </span>
-                      <span style={{ color: '#cbd5e1' }}>•</span>
-                      <span style={{ fontSize: '0.82rem', color: '#16a34a', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                        <i className="fa-solid fa-circle-check"></i> Verified Purchase
-                      </span>
-                    </div>
-                  );
-                })()}
-                <div className="price-tag">
-                  {(() => {
-                    const priceNum = parsePrice(selectedProduct.price);
-                    const activeOffer = getActiveOfferForProduct(selectedProduct);
-                    const activeCoupon = coupons.find(c => 
-                      c.isActive && 
-                      c.linkedProduct === (selectedProduct._id || selectedProduct.id) &&
-                      (!c.expiryDate || new Date(c.expiryDate) > new Date())
-                    );
-                    
-                    const prodDiscountPercent = Number(selectedProduct.discountPercent || selectedProduct.discount) || 0;
-                    
-                    let discountedPrice = null;
-                    let discountText = '';
-                    let originalPrice = null;
-
-                    if (prodDiscountPercent > 0) {
-                      originalPrice = priceNum;
-                      discountedPrice = getProductFinalPrice(selectedProduct);
-                      discountText = `${prodDiscountPercent}% off`;
-                    } else if (activeOffer) {
-                      if (activeOffer.discountType === 'fixed') {
-                        originalPrice = priceNum;
-                        discountedPrice = Math.max(0, priceNum - (Number(activeOffer.discountValue) || 0));
-                        discountText = `₹${Number(activeOffer.discountValue) || 0} off`;
-                      } else if (activeOffer.discountType === 'percentage') {
-                        const dVal = Number(activeOffer.discountValue) || 0;
-                        originalPrice = priceNum;
-                        discountedPrice = Math.round(priceNum * (1 - dVal / 100));
-                        discountText = `${dVal}% off`;
-                      }
-                    } else if (activeCoupon) {
-                      const discountVal = parseFloat(activeCoupon.discountValue) || 0;
-                      if (activeCoupon.discountType === 'Fixed') {
-                        originalPrice = priceNum;
-                        discountedPrice = Math.max(0, priceNum - discountVal);
-                        discountText = `₹${discountVal} off`;
-                      } else {
-                        originalPrice = priceNum;
-                        discountedPrice = Math.round(priceNum * (1 - discountVal / 100));
-                        discountText = `${discountVal}% off`;
-                      }
-                    }
-
-                    const displayPrice = discountedPrice !== null ? discountedPrice : priceNum;
-
-                    if (originalPrice !== null && originalPrice > displayPrice) {
-                      return (
-                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-                          <span style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--text-dark)' }}>₹{displayPrice.toLocaleString('en-IN')}</span>
-                          <span style={{ fontSize: '1.1rem', textDecoration: 'line-through', color: 'var(--text-muted)' }}>₹{originalPrice.toLocaleString('en-IN')}</span>
-                          <span style={{ fontSize: '1rem', fontWeight: 700, color: '#388e3c' }}>{discountText} {activeCoupon ? `(Coupon: ${activeCoupon.code})` : ''}</span>
-                        </div>
-                      );
-                    }
-
-                    return `₹${priceNum.toLocaleString('en-IN')}`;
-                  })()}
-                </div>
-                {typeof selectedProduct.stock === 'number' && (
-                  <div className="stock-info" style={{ marginBottom: '1rem', fontWeight: 600, color: selectedProduct.stock > 0 ? '#15803d' : '#b91c1c' }}>
-                    {selectedProduct.stock > 0 ? `In stock: ${selectedProduct.stock}` : 'Out of stock'}
-                  </div>
-                )}
-                {/* Product Specification & Usages Containers */}
-                {(() => {
-                  const specsInfo = getProductSpecsInfo(selectedProduct);
-                  return (
-                    <div className="product-details-containers-wrapper" style={{ marginTop: '1rem', marginBottom: '1.5rem' }}>
-                      {/* 4 Small Specification Containers */}
-                      <div className="small-containers-grid">
-                        <div className="small-spec-card">
-                          <div className="spec-card-icon-wrap" style={{ background: 'rgba(255, 122, 0, 0.1)', color: '#ff7a00' }}>
-                            <i className="fa-solid fa-fire-burner"></i>
-                          </div>
-                          <div className="spec-card-info">
-                            <span className="spec-card-label">Burner Size</span>
-                            <strong className="spec-card-value">{specsInfo.burnerSize}</strong>
-                          </div>
-                        </div>
-
-                        <div className="small-spec-card">
-                          <div className="spec-card-icon-wrap" style={{ background: 'rgba(21, 128, 61, 0.1)', color: '#15803d' }}>
-                            <i className="fa-solid fa-weight-hanging"></i>
-                          </div>
-                          <div className="spec-card-info">
-                            <span className="spec-card-label">Stove Weight</span>
-                            <strong className="spec-card-value">{specsInfo.stoveWeight}</strong>
-                          </div>
-                        </div>
-
-                        <div className="small-spec-card">
-                          <div className="spec-card-icon-wrap" style={{ background: 'rgba(37, 99, 235, 0.1)', color: '#2563eb' }}>
-                            <i className="fa-solid fa-ruler-combined"></i>
-                          </div>
-                          <div className="spec-card-info">
-                            <span className="spec-card-label">Dimensions</span>
-                            <strong className="spec-card-value">{specsInfo.dimensions}</strong>
-                          </div>
-                        </div>
-
-                        <div className="small-spec-card">
-                          <div className="spec-card-icon-wrap" style={{ background: 'rgba(147, 51, 234, 0.1)', color: '#9333ea' }}>
-                            <i className="fa-solid fa-cubes"></i>
-                          </div>
-                          <div className="spec-card-info">
-                            <span className="spec-card-label">Material</span>
-                            <strong className="spec-card-value">{specsInfo.material}</strong>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Usages Container */}
-                      <div className="product-usage-container">
-                        <h4 className="container-header">
-                          <i className="fa-solid fa-layer-group" style={{ color: '#15803d' }}></i> Usages & Features
-                        </h4>
-                        {specsInfo.usagePairs && specsInfo.usagePairs.length > 0 ? (
-                          <div className="usage-chips-grid">
-                            {specsInfo.usagePairs.map((pair, pIdx) => (
-                              <div key={pIdx} className="usage-chip-item">
-                                <span className="usage-chip-key">{pair.key}</span>
-                                <span className="usage-chip-val">{pair.val}</span>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="description-text" style={{ margin: 0 }}>
-                            {specsInfo.rawDescription || `Ideal for Homes, Small Hotels, Tea Shops & Commercial Kitchens. Built for high efficiency and minimal fuel consumption.`}
-                          </p>
-                        )}
-                      </div>
-
-                      {/* How to Use Container */}
-                      <div className="product-how-to-use-container">
-                        <h4 className="container-header">
-                          <i className="fa-solid fa-circle-info" style={{ color: '#15803d' }}></i> How to Use
-                        </h4>
-                        <p className="how-to-use-text">
-                          {specsInfo.howToUse || `1. Place stove on a stable, non-combustible surface.\n2. Fill combustion chamber with fuel (wood, coconut shell, husk or biomass).\n3. Connect & switch on air regulator blower for clean combustion.\n4. Light fuel from top/side port and adjust fan speed for flame intensity.`}
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })()}
-                <div className="actions-row">
-                  <button className="buy-now-btn" onClick={() => { setSelectedProduct(null); if (location.pathname.startsWith('/product/')) navigate('/', { replace: true }); handleBuyNow(selectedProduct); }}>Buy Now</button>
-                  <button className="add-to-cart" onClick={() => handleAddToCart(selectedProduct)}>Add to Cart</button>
-                </div>
-
-                <div className="mockup-trust-banner">
-                  <div className="mockup-trust-item">
-                    <i className="fa-solid fa-truck-fast mockup-trust-icon" style={{ color: '#16a34a' }}></i>
-                    <div className="mockup-trust-text">
-                      <strong>Secure Delivery</strong>
-                      <span>Insured Transit Across India</span>
-                    </div>
-                  </div>
-                  <div className="mockup-trust-item">
-                    <i className="fa-solid fa-shield-halved mockup-trust-icon" style={{ color: '#16a34a' }}></i>
-                    <div className="mockup-trust-text">
-                      <strong>100% Secure Checkout</strong>
-                      <span>Direct Razorpay Payment</span>
-                    </div>
-                  </div>
-                  <div className="mockup-trust-item">
-                    <i className="fa-solid fa-rotate-left mockup-trust-icon" style={{ color: '#16a34a' }}></i>
-                    <div className="mockup-trust-text">
-                      <strong>SriTech Guarantee</strong>
-                      <span>Certified Quality Support</span>
-                    </div>
-                  </div>
-                  <div className="mockup-trust-item">
-                    <i className="fa-solid fa-award mockup-trust-icon" style={{ color: '#16a34a' }}></i>
-                    <div className="mockup-trust-text">
-                      <strong>Heavy-Duty MS</strong>
-                      <span>Flame-Resistant Build</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-                        {/* Reviews Section */}
-            <div className="reviews-section" style={{ borderTop: '1px solid var(--border-color)', paddingTop: '2rem', marginTop: '1rem' }}>
-              <h3 style={{ fontSize: '1.5rem', color: 'var(--text-main)', marginBottom: '1.5rem', textAlign: 'left' }}>Customer Reviews</h3>
-              
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }} className="reviews-layout">
-                {/* Reviews List */}
-                <div className="reviews-list" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxHeight: '350px', overflowY: 'auto', paddingRight: '0.5rem' }}>
-                  {selectedProductReviews.length > 0 ? (
-                    selectedProductReviews.map((rev, index) => (
-                      <div key={rev._id || index} className="review-card" style={{ background: 'var(--bg-secondary)', padding: '1.25rem', borderRadius: '12px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.5rem', textAlign: 'left' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontWeight: 'bold', color: 'var(--text-main)' }}>{rev.customerName}</span>
-                          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                            {new Date(rev.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
-                          </span>
-                        </div>
-                        <div className="review-rating" style={{ color: '#fbbf24', fontSize: '0.9rem' }}>
-                          {Array.from({ length: 5 }).map((_, i) => (
-                            <i key={i} className={`${i < rev.rating ? 'fa-solid' : 'fa-regular'} fa-star`}></i>
-                          ))}
-                        </div>
-                        <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', margin: '0', lineHeight: '1.4' }}>{rev.comment}</p>
-                      </div>
-                    ))
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '3rem 1rem', background: '#f8fafc', borderRadius: '12px', border: '1px dashed #cbd5e1', textAlign: 'center', height: '100%' }}>
-                      <i className="fa-solid fa-comment-dots" style={{ fontSize: '3rem', color: '#94a3b8', marginBottom: '1rem' }}></i>
-                      <h4 style={{ margin: '0 0 0.5rem 0', color: '#334155' }}>No reviews yet</h4>
-                      <p style={{ color: '#64748b', fontSize: '0.9rem', margin: 0 }}>Be the first to review this product.</p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Submit Review Form */}
-                <div className="review-form-container" style={{ textAlign: 'left' }}>
-                  <form onSubmit={handleSubmitReview} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                    <h4 style={{ color: 'var(--text-main)', margin: '0' }}>Share Your Experience</h4>
-                    <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: '0' }}>You can rate this product below.</p>
-                    
-                    <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                      <label style={{ fontSize: '0.9rem', fontWeight: 'bold', color: 'var(--text-main)' }}>Your Rating</label>
-                      <div style={{ display: 'flex', gap: '0.5rem', fontSize: '1.5rem', color: '#fbbf24', cursor: 'pointer' }}>
-                        {[1, 2, 3, 4, 5].map((star) => (
-                          <i 
-                            key={star} 
-                            className={`${star <= newReviewRating ? 'fa-solid' : 'fa-regular'} fa-star`}
-                            onClick={() => setNewReviewRating(star)}
-                          ></i>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                      <label htmlFor="reviewComment" style={{ fontSize: '0.9rem', fontWeight: 'bold', color: 'var(--text-main)' }}>Your Review</label>
-                      <textarea 
-                        id="reviewComment"
-                        rows="4" 
-                        placeholder="What did you think of the product? Share your experience with others..." 
-                        required
-                        value={newReviewComment}
-                        onChange={(e) => setNewReviewComment(e.target.value)}
-                        style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)', width: '100%', fontFamily: 'inherit', resize: 'vertical' }}
-                      ></textarea>
-                    </div>
-
-                    <button type="submit" className="buy-now-btn" style={{ width: '100%', padding: '0.75rem' }}>Submit Review</button>
-                  </form>
-                </div>
-              </div>
-            </div>
-
-            {/* Bottom: Related Products */}
-            {(() => {
-              const currentCategorySlug = (selectedProduct.category || '').toLowerCase().trim().replace(/\s+/g, '-');
-              const currentId = (selectedProduct._id || selectedProduct.id)?.toString();
-
-              let relatedList = products.filter(p => {
-                const catSlug = (p.category || '').toLowerCase().trim().replace(/\s+/g, '-');
-                const pId = (p._id || p.id)?.toString();
-                return catSlug === currentCategorySlug && pId !== currentId;
-              });
-
-              if (relatedList.length < 4) {
-                const otherProducts = products.filter(p => (p._id || p.id)?.toString() !== currentId && !relatedList.some(r => (r._id || r.id)?.toString() === (p._id || p.id)?.toString()));
-                relatedList = [...relatedList, ...otherProducts].slice(0, 4);
-              } else {
-                relatedList = relatedList.slice(0, 4);
-              }
-
-              if (relatedList.length === 0) return null;
-
-              return (
-                <div className="related-products-section">
-                  <div className="related-products-header">
-                    <div>
-                      <h3 className="related-products-title">
-                        <i className="fa-solid fa-layer-group" style={{ color: '#15803d' }}></i> Similar Products You Might Like
-                      </h3>
-                      <p className="related-products-subtitle">Top-rated items carefully chosen from our catalog</p>
-                    </div>
-                  </div>
-
-                  <div className="related-products-grid">
-                    {relatedList.map(relatedProduct => {
-                      const relPriceNum = parsePrice(relatedProduct.price);
-                      const relFinalPrice = getProductFinalPrice(relatedProduct);
-                      const relDiscPercent = Number(relatedProduct.discountPercent || relatedProduct.discount) || 0;
-                      const hasDiscount = relDiscPercent > 0 || relPriceNum > relFinalPrice;
-
-                      return (
-                        <div 
-                          key={relatedProduct._id || relatedProduct.id} 
-                          className="related-product-card"
-                          onClick={() => {
-                            setSelectedProduct(relatedProduct);
-                            setSelectedProductImageIndex(0);
-                            setTimeout(() => {
-                              document.getElementById('productDetailModal')?.scrollTo({ top: 0, behavior: 'smooth' });
-                            }, 50);
-                          }}
-                        >
-                          <div className="related-product-img-wrap">
-                            {hasDiscount && (
-                              <span className="related-product-badge discount">
-                                {relDiscPercent > 0 ? `${relDiscPercent}% OFF` : 'SPECIAL'}
-                              </span>
-                            )}
-                            {relatedProduct.images && relatedProduct.images.length > 0 ? (
-                              <img loading="lazy" src={relatedProduct.images[0]} alt={relatedProduct.name} className="related-product-img" />
-                            ) : (
-                              <div className="related-product-fallback-img">
-                                <i className={`fa-solid ${relatedProduct.icon || 'fa-box'}`}></i>
-                              </div>
-                            )}
-                            <div className="related-product-overlay">
-                              <span className="related-product-quickview">Quick View <i className="fa-solid fa-arrow-right"></i></span>
-                            </div>
-                          </div>
-
-                          <div className="related-product-info">
-                            <span className="related-product-category">
-                              {((relatedProduct.category || '').toString().includes('-') 
-                                ? relatedProduct.category 
-                                : (relatedProduct.category || '').toLowerCase().replace(/\s+/g, '-'))
-                                .replace(/-/g, ' ')}
-                            </span>
-                            <h4 className="related-product-title-text" title={relatedProduct.name}>
-                              {relatedProduct.name}
-                            </h4>
-
-                            {(() => {
-                              const relRatingInfo = getProductRatingInfo(relatedProduct);
-                              return (
-                                <div className="rating-row-grid" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', margin: '0.2rem 0' }}>
-                                  <span className="rating-badge">{relRatingInfo.rating} <i className="fa-solid fa-star"></i></span>
-                                  <span className="rating-count">({relRatingInfo.count})</span>
-                                </div>
-                              );
-                            })()}
-
-                            <div className="related-product-price-row">
-                              <span className="related-product-final-price">
-                                ₹{relFinalPrice.toLocaleString('en-IN')}
-                              </span>
-                              {hasDiscount && (
-                                <span className="related-product-mrp-price">
-                                  ₹{relPriceNum.toLocaleString('en-IN')}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })()}
-
-          </div>
-        </div>
-      )}
 
        {/* Cart Modal */}
        {showCart && (
@@ -3625,17 +3303,17 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
              <div className="modal-heading-row">
                <div>
                  <h2 className="modal-title">
-                   <i className="fa-solid fa-cart-shopping"></i> Shopping Cart
+                   <i className="fa-solid fa-cart-shopping"></i> {t('cartModal.title', 'Shopping Cart')}
                  </h2>
-                 <p className="modal-subtitle">Ready to checkout? Review your selected items below.</p>
+                 <p className="modal-subtitle">{t('cartModal.subtitle', 'Ready to checkout? Review your selected items below.')}</p>
                </div>
-               <div className="modal-pill">{resolvedCartItems.length} item{resolvedCartItems.length === 1 ? '' : 's'}</div>
+               <div className="modal-pill">{resolvedCartItems.length} {resolvedCartItems.length === 1 ? t('cartModal.item', 'item') : t('cartModal.items', 'items')}</div>
              </div>
              {resolvedCartItems.length === 0 ? (
                <div className="modal-empty-state">
                  <i className="fa-solid fa-cart-flatbed"></i>
-                 <p>Your cart is empty.</p>
-                 <span>Add a few favorites and come back here anytime.</span>
+                 <p>{t('cartModal.emptyTitle', 'Your cart is empty.')}</p>
+                 <span>{t('cartModal.emptySubtitle', 'Add a few favorites and come back here anytime.')}</span>
                </div>
              ) : (
                <div>
@@ -3676,7 +3354,7 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
                  </ul>
                  
                  <button className="cta-button checkout-cta-button" onClick={handleCheckoutCart} style={{ width: '100%', padding: '1rem', fontSize: '1.1rem', color: '#ffffff' }}>
-                   Proceed to Checkout
+                   {t('cartModal.checkout', 'Proceed to Checkout')}
                  </button>
                </div>
              )}
@@ -3692,88 +3370,88 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
                &times;
              </button>
              <h2 style={{ fontSize: '1.8rem', color: 'var(--text-main)', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-               <i className="fa-solid fa-credit-card"></i> Order Checkout
+               <i className="fa-solid fa-credit-card"></i> {t('checkout.orderCheckout', 'Order Checkout')}
              </h2>
 
              {/* Order Summary & Delivery Address */}
              <div className="checkout-summary-card">
                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.85rem' }}>
                  <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                   <i className="fa-solid fa-location-dot" style={{ color: '#15803d' }}></i> Shipping & Delivery Address
+                   <i className="fa-solid fa-location-dot" style={{ color: '#15803d' }}></i> {t('checkout.shippingAddress', 'Shipping & Delivery Address')}
                  </h3>
                  <span style={{ fontSize: '0.8rem', background: 'rgba(21, 128, 61, 0.08)', color: '#15803d', fontWeight: '700', padding: '0.25rem 0.6rem', borderRadius: '20px' }}>
-                   Step 1 of 2
+                   {t('checkout.step1Of2', 'Step 1 of 2')}
                  </span>
                </div>
 
                <div className="checkout-summary-userinfo" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.85rem', marginBottom: '1.25rem' }}>
                  <div style={{ gridColumn: 'span 1' }}>
-                   <label className="checkout-summary-label">Full Name <span style={{ color: '#ef4444' }}>*</span></label>
+                   <label className="checkout-summary-label">{t('checkout.fullName', 'Full Name')} <span style={{ color: '#ef4444' }}>*</span></label>
                    <input
                      type="text"
                      value={userCredentials.name}
                      onChange={(e) => updateUserCredentials('name', e.target.value)}
-                     placeholder="e.g. Rahul Sharma"
+                     placeholder={t('checkout.fullNamePlaceholder', 'e.g. Rahul Sharma')}
                      className="checkout-summary-input"
                      style={{ border: checkoutFieldErrors.name ? '1.5px solid #ef4444' : undefined }}
                    />
                  </div>
 
                  <div style={{ gridColumn: 'span 1' }}>
-                   <label className="checkout-summary-label">Mobile Number <span style={{ color: '#ef4444' }}>*</span></label>
+                   <label className="checkout-summary-label">{t('checkout.mobileNumber', 'Mobile Number')} <span style={{ color: '#ef4444' }}>*</span></label>
                    <input
                      type="tel"
                      value={userCredentials.phone}
                      onChange={(e) => updateUserCredentials('phone', e.target.value.replace(/\D/g, '').slice(0, 10))}
-                     placeholder="10-digit mobile number"
+                     placeholder={t('checkout.mobilePlaceholder', '10-digit mobile number')}
                      className="checkout-summary-input"
                      style={{ border: checkoutFieldErrors.phone ? '1.5px solid #ef4444' : undefined }}
                    />
                  </div>
 
                  <div style={{ gridColumn: 'span 2' }}>
-                   <label className="checkout-summary-label">Flat, House No., Building / Street Address <span style={{ color: '#ef4444' }}>*</span></label>
+                   <label className="checkout-summary-label">{t('checkout.addressLabel', 'Flat, House No., Building / Street Address')} <span style={{ color: '#ef4444' }}>*</span></label>
                    <input
                      type="text"
                      value={userCredentials.address}
                      onChange={(e) => updateUserCredentials('address', e.target.value)}
-                     placeholder="e.g. Flat 402, Green Valley Apartments, Main Street"
+                     placeholder={t('checkout.addressPlaceholder', 'e.g. Flat 402, Green Valley Apartments, Main Street')}
                      className="checkout-summary-input"
                      style={{ border: checkoutFieldErrors.address ? '1.5px solid #ef4444' : undefined }}
                    />
                  </div>
 
                  <div>
-                   <label className="checkout-summary-label">City / District <span style={{ color: '#ef4444' }}>*</span></label>
+                   <label className="checkout-summary-label">{t('checkout.cityDistrict', 'City / District')} <span style={{ color: '#ef4444' }}>*</span></label>
                    <input
                      type="text"
                      value={userCredentials.city || ''}
                      onChange={(e) => updateUserCredentials('city', e.target.value)}
-                     placeholder="e.g. Chennai"
+                     placeholder={t('checkout.cityPlaceholder', 'e.g. Chennai')}
                      className="checkout-summary-input"
                      style={{ border: checkoutFieldErrors.city ? '1.5px solid #ef4444' : undefined }}
                    />
                  </div>
 
                  <div>
-                   <label className="checkout-summary-label">State <span style={{ color: '#ef4444' }}>*</span></label>
+                   <label className="checkout-summary-label">{t('checkout.state', 'State')} <span style={{ color: '#ef4444' }}>*</span></label>
                    <input
                      type="text"
                      value={userCredentials.state || ''}
                      onChange={(e) => updateUserCredentials('state', e.target.value)}
-                     placeholder="e.g. Tamil Nadu"
+                     placeholder={t('checkout.statePlaceholder', 'e.g. Tamil Nadu')}
                      className="checkout-summary-input"
                      style={{ border: checkoutFieldErrors.state ? '1.5px solid #ef4444' : undefined }}
                    />
                  </div>
 
                  <div style={{ gridColumn: 'span 2' }}>
-                   <label className="checkout-summary-label">Pincode / Postal Code <span style={{ color: '#ef4444' }}>*</span></label>
+                   <label className="checkout-summary-label">{t('checkout.pincode', 'Pincode / Postal Code')} <span style={{ color: '#ef4444' }}>*</span></label>
                    <input
                      type="text"
                      value={userCredentials.pincode || ''}
                      onChange={(e) => updateUserCredentials('pincode', e.target.value.replace(/\D/g, '').slice(0, 6))}
-                     placeholder="e.g. 600001"
+                     placeholder={t('checkout.pincodePlaceholder', 'e.g. 600001')}
                      className="checkout-summary-input"
                      style={{ border: checkoutFieldErrors.pincode ? '1.5px solid #ef4444' : undefined }}
                    />
@@ -3791,7 +3469,7 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
                      )}
                      <div className="checkout-summary-order-item-text">
                        <span className="checkout-summary-order-item-name">{item.name}</span>
-                        <span className="checkout-summary-order-item-details">{Number(item.quantity) || 1} qty • {discountPercent}% discount</span>
+                        <span className="checkout-summary-order-item-details">{Number(item.quantity) || 1} {t('checkout.qty', 'qty')} • {discountPercent}% {t('checkout.discount', 'discount')}</span>
                      </div>
                    </div>
                  ))}
@@ -3799,7 +3477,7 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
                 <div className="checkout-shipping-method-section" style={{ background: '#ffffff', padding: '0.85rem 1rem', borderRadius: '12px', border: '1px solid #e2e8f0', marginBottom: '0.75rem' }}>
                   <span style={{ fontSize: '0.85rem', fontWeight: '700', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.6rem' }}>
                     <i className="fa-solid fa-truck-fast" style={{ color: '#ff7a00' }} />
-                    Select Shipping Method
+                    {t('checkout.shippingMethod', 'Select Shipping Method')}
                   </span>
                   <div style={{ display: 'grid', gap: '0.5rem' }}>
                     {availableCourierOptions.map((courier, idx) => {
@@ -3839,28 +3517,28 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
                   </div>
                 </div>
                 <div className="checkout-summary-row">
-                  <span>Subtotal</span>
+                  <span>{t('checkout.subtotal', 'Subtotal')}</span>
                  <strong>₹{checkoutTotal.toLocaleString('en-IN')}</strong>
                </div>
                {discountAmount > 0 && (
                  <div className="checkout-summary-row">
-                   <span>Discount ({discountPercent}%)</span>
+                   <span>{t('checkout.discount', 'Discount')} ({discountPercent}%)</span>
                    <strong>-₹{discountAmount.toLocaleString('en-IN')}</strong>
                  </div>
                )}
                <div className="checkout-summary-row">
-                 <span>Shipping</span>
-                 <strong>{shippingFee === 0 ? 'FREE' : `₹${shippingFee.toLocaleString('en-IN')}`}</strong>
+                 <span>{t('checkout.shipping', 'Shipping')}</span>
+                 <strong>{shippingFee === 0 ? t('checkout.free', 'FREE') : `₹${shippingFee.toLocaleString('en-IN')}`}</strong>
                </div>
                {gstAmount > 0 && (
                  <div className="checkout-summary-row">
-                   <span>GST ({gstRate}%)</span>
+                   <span>{t('checkout.gst', 'GST')} ({gstRate}%)</span>
                    <strong>₹{gstAmount.toLocaleString('en-IN')}</strong>
                  </div>
                )}
                <div className="checkout-summary-divider" />
                <div className="checkout-summary-row total-row">
-                 <span>Total</span>
+                 <span>{t('checkout.total', 'Total')}</span>
                  <strong>₹{checkoutGrandTotal.toLocaleString('en-IN')}</strong>
                </div>
                <div className="checkout-summary-divider" />
@@ -3887,11 +3565,11 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
                >
                  {isProcessingPayment ? (
                    <>
-                     <i className="fa-solid fa-spinner fa-spin"></i> Processing...
+                     <i className="fa-solid fa-spinner fa-spin"></i> {t('checkout.processing', 'Processing...')}
                    </>
                  ) : (
                    <>
-                     <i className="fa-solid fa-lock"></i> Pay Now
+                     <i className="fa-solid fa-lock"></i> {t('checkout.payNow', 'Pay Now')}
                    </>
                  )}
                </button>
@@ -3909,7 +3587,7 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
                    fontWeight: '600'
                  }}
                >
-                 Continue Shopping
+                 {t('checkout.continueShopping', 'Continue Shopping')}
                </button>
              </div>
            </div>
@@ -3926,17 +3604,17 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
               <div className="modal-heading-row">
                 <div>
                   <h2 className="modal-title">
-                    <i className="fa-solid fa-heart" style={{ color: '#ef4444' }}></i> Your Wishlist
+                    <i className="fa-solid fa-heart" style={{ color: '#ef4444' }}></i> {t('wishlistModal.title', 'Your Wishlist')}
                   </h2>
-                  <p className="modal-subtitle">Items you saved for later are waiting here.</p>
+                  <p className="modal-subtitle">{t('wishlistModal.subtitle', 'Items you saved for later are waiting here.')}</p>
                 </div>
                 <div className="modal-pill wishlist-pill">{resolvedWaitlistItems.length} saved</div>
               </div>
               {resolvedWaitlistItems.length === 0 ? (
                 <div className="modal-empty-state wishlist-empty">
                   <i className="fa-regular fa-heart"></i>
-                  <p>Your wishlist is empty.</p>
-                  <span>Save products you love and they’ll appear here.</span>
+                  <p>{t('wishlistModal.emptyTitle', 'Your wishlist is empty.')}</p>
+                  <span>{t('wishlistModal.emptySubtitle', 'Save products you love and they’ll appear here.')}</span>
                 </div>
               ) : (
                 <ul className="modal-item-list">
@@ -3979,31 +3657,323 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
           </div>
         )}
 
-      {/* Entry Modal */}
+      {/* Entry Modal / Stove Inquiry Modal */}
       <div id="entryModal" className={`modal-overlay ${showEntryModal ? 'active' : ''}`}>
-        <div className="modal-content" role="dialog" aria-modal="true">
-          <button className="close-modal" onClick={closeEntryModal} aria-label="Close">&times;</button>
-          <div className="modal-header">
-            <h2>Welcome to The Sri Tech</h2>
-            <p>Please enter your details to explore our premium collection.</p>
-          </div>
-          <form id="entryForm" onSubmit={handleEntrySubmit}>
-            <div className="form-group">
-              <label htmlFor="userName"><i className="fa-regular fa-user"></i> Name</label>
-              <input type="text" id="userName" name="userName" placeholder="Your Full Name" required value={entryName} onChange={e => setEntryName(e.target.value)} />
+        <div
+          className="modal-content stove-inquiry-modal"
+          role="dialog"
+          aria-modal="true"
+          style={{
+            maxWidth: '680px',
+            width: '95%',
+            maxHeight: '92vh',
+            overflowY: 'auto',
+            borderRadius: '24px',
+            padding: '2.25rem 2rem',
+            boxShadow: '0 25px 60px rgba(0,0,0,0.35), 0 0 0 1px rgba(255, 122, 0, 0.25)',
+            position: 'relative'
+          }}
+        >
+          <button
+            className="close-modal"
+            onClick={closeEntryModal}
+            aria-label="Close"
+            style={{
+              position: 'absolute',
+              top: '1.25rem',
+              right: '1.25rem',
+              background: '#f1f5f9',
+              border: 'none',
+              borderRadius: '50%',
+              width: '36px',
+              height: '36px',
+              fontSize: '1.35rem',
+              cursor: 'pointer',
+              color: '#64748b',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 10
+            }}
+          >
+            &times;
+          </button>
+
+          {isEntrySubmitted ? (
+            <div style={{ textAlign: 'center', padding: '3rem 1.5rem' }}>
+              <div style={{
+                width: '72px',
+                height: '72px',
+                background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+                borderRadius: '50%',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#fff',
+                fontSize: '2.5rem',
+                marginBottom: '1.5rem',
+                boxShadow: '0 10px 25px rgba(16, 185, 129, 0.3)'
+              }}>
+                <i className="fa-solid fa-check"></i>
+              </div>
+              <h2 style={{ fontSize: '1.8rem', color: '#0f172a', marginBottom: '0.75rem', fontWeight: 800 }}>
+                {t('entry.successTitle', 'Inquiry Received Successfully! 🎉')}
+              </h2>
+              <p style={{ color: '#475569', fontSize: '1.05rem', lineHeight: '1.6', maxWidth: '480px', margin: '0 auto 2rem' }}>
+                {t('entry.successMsg', 'Thank you! Our engineering team will contact you on WhatsApp / Phone shortly with full specifications, catalog, and discounted pricing.')}
+              </p>
+              <button
+                type="button"
+                className="cta-button"
+                onClick={closeEntryModal}
+                style={{
+                  background: '#15803D',
+                  color: '#fff',
+                  padding: '0.85rem 2.25rem',
+                  borderRadius: '12px',
+                  fontWeight: 700,
+                  fontSize: '1.05rem',
+                  border: 'none',
+                  cursor: 'pointer'
+                }}
+              >
+                {t('entry.skip', 'Explore Products')}
+              </button>
             </div>
-            <div className="form-group">
-              <label htmlFor="userWhatsapp"><i className="fa-brands fa-whatsapp"></i> WhatsApp Number</label>
-              <input type="tel" id="userWhatsapp" name="userWhatsapp" placeholder="+1 (555) 000-0000" required value={entryWhatsapp} onChange={e => setEntryWhatsapp(e.target.value)} />
+          ) : (
+            <div>
+              <div className="modal-header" style={{ textAlign: 'center', marginBottom: '1.75rem' }}>
+                <span style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  background: 'rgba(255, 122, 0, 0.1)',
+                  color: '#EA580C',
+                  padding: '0.35rem 0.85rem',
+                  borderRadius: '20px',
+                  fontSize: '0.82rem',
+                  fontWeight: 700,
+                  marginBottom: '0.65rem'
+                }}>
+                  {t('entry.badge', '🔥 Custom Kitchen Consultation')}
+                </span>
+                <h2 style={{ fontSize: '1.65rem', color: '#0f172a', margin: '0 0 0.5rem', fontWeight: 800 }}>
+                  {t('entry.title', 'Find Your Perfect Rocket Stove | Custom Quote')}
+                </h2>
+                <p style={{ color: '#64748b', fontSize: '0.92rem', margin: '0 auto', maxWidth: '500px', lineHeight: 1.5 }}>
+                  {t('entry.subtitle', 'Share your cooking requirements for instant pricing, engineering guidance & best discounts.')}
+                </p>
+              </div>
+
+              <form id="entryForm" onSubmit={handleEntrySubmit} style={{ display: 'grid', gap: '1rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem' }}>
+                  {/* Name */}
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label htmlFor="userName" style={{ fontWeight: 600, fontSize: '0.88rem', color: '#334155', display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.35rem' }}>
+                      <i className="fa-regular fa-user" style={{ color: '#15803D' }}></i> {t('entry.name', 'Full Name / Business Name')} *
+                    </label>
+                    <input
+                      type="text"
+                      id="userName"
+                      required
+                      value={entryName}
+                      onChange={e => setEntryName(e.target.value)}
+                      placeholder={t('entry.namePlaceholder', 'e.g. Ramesh Kumar / Hotel')}
+                      style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '10px', border: '1.5px solid #cbd5e1', fontSize: '0.92rem', boxSizing: 'border-box' }}
+                    />
+                  </div>
+
+                  {/* WhatsApp / Phone */}
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label htmlFor="userWhatsapp" style={{ fontWeight: 600, fontSize: '0.88rem', color: '#334155', display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.35rem' }}>
+                      <i className="fa-brands fa-whatsapp" style={{ color: '#10B981' }}></i> {t('entry.whatsapp', 'WhatsApp / Phone Number')} *
+                    </label>
+                    <input
+                      type="tel"
+                      id="userWhatsapp"
+                      required
+                      value={entryWhatsapp}
+                      onChange={e => setEntryWhatsapp(e.target.value)}
+                      placeholder={t('entry.whatsappPlaceholder', '+91 98765 43210')}
+                      style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '10px', border: '1.5px solid #cbd5e1', fontSize: '0.92rem', boxSizing: 'border-box' }}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem' }}>
+                  {/* Purpose of Use */}
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label htmlFor="userPurpose" style={{ fontWeight: 600, fontSize: '0.88rem', color: '#334155', display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.35rem' }}>
+                      <i className="fa-solid fa-utensils" style={{ color: '#FF7A00' }}></i> {t('entry.purpose', 'Purpose of Use')}
+                    </label>
+                    <select
+                      id="userPurpose"
+                      value={entryPurpose}
+                      onChange={e => setEntryPurpose(e.target.value)}
+                      style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '10px', border: '1.5px solid #cbd5e1', fontSize: '0.9rem', background: '#fff', boxSizing: 'border-box' }}
+                    >
+                      <option value="Hotel / Restaurant">{t('entry.purposeHotel', 'Hotel / Restaurant / Canteen')}</option>
+                      <option value="Temple / Annadhanam">{t('entry.purposeTemple', 'Temple / Annadhanam / Ashram')}</option>
+                      <option value="Catering Service">{t('entry.purposeCatering', 'Catering Service / Event Kitchen')}</option>
+                      <option value="Cloud Kitchen / Fast Food">{t('entry.purposeCloudKitchen', 'Cloud Kitchen / Fast Food / Stall')}</option>
+                      <option value="Bakery / Tea Stall">{t('entry.purposeBakery', 'Bakery / Tea Stall / Sweet Shop')}</option>
+                      <option value="Domestic / Farmhouse">{t('entry.purposeDomestic', 'Domestic Kitchen / Farmhouse / Villa')}</option>
+                      <option value="Industrial / Commercial">{t('entry.purposeIndustrial', 'Industrial Boiling / Commercial Heating')}</option>
+                    </select>
+                  </div>
+
+                  {/* Which Stove Model */}
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label htmlFor="userStoveModel" style={{ fontWeight: 600, fontSize: '0.88rem', color: '#334155', display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.35rem' }}>
+                      <i className="fa-solid fa-fire-burner" style={{ color: '#EA580C' }}></i> {t('entry.stoveModel', 'Which Stove Model Do You Want?')}
+                    </label>
+                    <select
+                      id="userStoveModel"
+                      value={entryStoveModel}
+                      onChange={e => setEntryStoveModel(e.target.value)}
+                      style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '10px', border: '1.5px solid #cbd5e1', fontSize: '0.9rem', background: '#fff', boxSizing: 'border-box' }}
+                    >
+                      <option value="Single Layer Single Stove Model">{t('entry.stoveSingle', 'Single Layer Single Stove Model (1 Burner)')}</option>
+                      <option value="Single Layer Dual Stove Turbo Model">{t('entry.stoveDualTurbo', 'Single Layer Dual Stove Turbo Model (2 Burners)')}</option>
+                      <option value="Double Layer Dual Stove Commercial Model">{t('entry.stoveDoubleCommercial', 'Double Layer Dual Stove Heavy-Duty Commercial Model')}</option>
+                      <option value="Triple Burner Mega Commercial Stove">{t('entry.stoveTripleMega', 'Triple Burner Mega Commercial Stove (500+ People)')}</option>
+                      <option value="Custom Fabricated Stove">{t('entry.stoveCustom', 'Custom Fabricated Stove Tailored to Your Vessels')}</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem' }}>
+                  {/* Fuel Type */}
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label htmlFor="userFuelType" style={{ fontWeight: 600, fontSize: '0.88rem', color: '#334155', display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.35rem' }}>
+                      <i className="fa-solid fa-tree" style={{ color: '#16A34A' }}></i> {t('entry.fuelType', 'Preferred Fuel Type')}
+                    </label>
+                    <select
+                      id="userFuelType"
+                      value={entryFuelType}
+                      onChange={e => setEntryFuelType(e.target.value)}
+                      style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '10px', border: '1.5px solid #cbd5e1', fontSize: '0.9rem', background: '#fff', boxSizing: 'border-box' }}
+                    >
+                      <option value="Wood & Biomass">{t('entry.fuelFirewood', 'Firewood & Biomass (Economical)')}</option>
+                      <option value="Coconut Shell & Husk">{t('entry.fuelCoconutShell', 'Coconut Shell & Husk (High Heat)')}</option>
+                      <option value="Charcoal / Briquettes">{t('entry.fuelCharcoal', 'Charcoal / Briquettes (Smokeless)')}</option>
+                      <option value="Universal Any Dry Solid Fuel">{t('entry.fuelUniversal', 'Universal Any Dry Solid Fuel')}</option>
+                    </select>
+                  </div>
+
+                  {/* Cooking Capacity */}
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label htmlFor="userCapacity" style={{ fontWeight: 600, fontSize: '0.88rem', color: '#334155', display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.35rem' }}>
+                      <i className="fa-solid fa-users" style={{ color: '#2563EB' }}></i> {t('entry.capacity', 'Cooking Capacity Needed')}
+                    </label>
+                    <select
+                      id="userCapacity"
+                      value={entryCapacity}
+                      onChange={e => setEntryCapacity(e.target.value)}
+                      style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '10px', border: '1.5px solid #cbd5e1', fontSize: '0.9rem', background: '#fff', boxSizing: 'border-box' }}
+                    >
+                      <option value="Up to 50 People">{t('entry.capacity50', 'Up to 50 People')}</option>
+                      <option value="50 - 200 People">{t('entry.capacity200', '50 - 200 People')}</option>
+                      <option value="200 - 500 People">{t('entry.capacity500', '200 - 500 People')}</option>
+                      <option value="500+ People">{t('entry.capacity500Plus', '500+ People (Large Commercial Scale)')}</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem' }}>
+                  {/* City / Location */}
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label htmlFor="userLocation" style={{ fontWeight: 600, fontSize: '0.88rem', color: '#334155', display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.35rem' }}>
+                      <i className="fa-solid fa-location-dot" style={{ color: '#DC2626' }}></i> {t('entry.location', 'City / Town / Delivery Location')} *
+                    </label>
+                    <input
+                      type="text"
+                      id="userLocation"
+                      required
+                      value={entryLocation}
+                      onChange={e => setEntryLocation(e.target.value)}
+                      placeholder={t('entry.locationPlaceholder', 'e.g. Chennai, Madurai, Bangalore...')}
+                      style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '10px', border: '1.5px solid #cbd5e1', fontSize: '0.92rem', boxSizing: 'border-box' }}
+                    />
+                  </div>
+
+                  {/* Email (Optional) */}
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label htmlFor="userEmail" style={{ fontWeight: 600, fontSize: '0.88rem', color: '#334155', display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.35rem' }}>
+                      <i className="fa-regular fa-envelope" style={{ color: '#6366F1' }}></i> {t('entry.email', 'Email Address (Optional)')}
+                    </label>
+                    <input
+                      type="email"
+                      id="userEmail"
+                      value={entryEmail}
+                      onChange={e => setEntryEmail(e.target.value)}
+                      placeholder={t('entry.emailPlaceholder', 'name@example.com')}
+                      style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '10px', border: '1.5px solid #cbd5e1', fontSize: '0.92rem', boxSizing: 'border-box' }}
+                    />
+                  </div>
+                </div>
+
+                {/* Specific Notes */}
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label htmlFor="userNotes" style={{ fontWeight: 600, fontSize: '0.88rem', color: '#334155', display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.35rem' }}>
+                    <i className="fa-regular fa-comment-dots" style={{ color: '#0EA5E9' }}></i> {t('entry.notes', 'Special Requirements / Vessel Dimensions')}
+                  </label>
+                  <textarea
+                    id="userNotes"
+                    rows={2}
+                    value={entryNotes}
+                    onChange={e => setEntryNotes(e.target.value)}
+                    placeholder={t('entry.notesPlaceholder', 'e.g. vessel diameter, boiling requirements, special dimensions...')}
+                    style={{ width: '100%', padding: '0.65rem 1rem', borderRadius: '10px', border: '1.5px solid #cbd5e1', fontSize: '0.9rem', resize: 'vertical', boxSizing: 'border-box' }}
+                  />
+                </div>
+
+                {/* Submit & Skip buttons */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', marginTop: '0.5rem' }}>
+                  <button
+                    type="submit"
+                    className="cta-button submit-entry"
+                    disabled={isSubmittingEntry}
+                    style={{
+                      width: '100%',
+                      padding: '0.95rem',
+                      borderRadius: '12px',
+                      background: 'linear-gradient(135deg, #FF7A00 0%, #FF5500 100%)',
+                      color: '#fff',
+                      fontWeight: 800,
+                      fontSize: '1.05rem',
+                      border: 'none',
+                      cursor: isSubmittingEntry ? 'not-allowed' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.5rem',
+                      boxShadow: '0 8px 20px rgba(255, 122, 0, 0.3)'
+                    }}
+                  >
+                    <i className="fa-solid fa-paper-plane"></i>
+                    {isSubmittingEntry ? t('entry.submitting', 'Submitting...') : t('entry.submit', 'Get Instant Quote & Catalog 🚀')}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={closeEntryModal}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#64748b',
+                      fontSize: '0.9rem',
+                      cursor: 'pointer',
+                      padding: '0.4rem',
+                      textDecoration: 'underline'
+                    }}
+                  >
+                    {t('entry.skip', 'Browse Stoves First')}
+                  </button>
+                </div>
+              </form>
             </div>
-            <div className="form-group">
-              <label htmlFor="userLocation"><i className="fa-solid fa-location-dot"></i> Location</label>
-              <input type="text" id="userLocation" name="userLocation" placeholder="City, Country" required value={entryLocation} onChange={e => setEntryLocation(e.target.value)} />
-            </div>
-            <button type="submit" className="cta-button submit-entry">
-              {isEntrySubmitted ? 'Welcome!' : 'Continue to Website'}
-            </button>
-          </form>
+          )}
         </div>
       </div>
 
@@ -4087,145 +4057,223 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
       </div>
 
       {/* ============================================================
-           PREMIUM USER LOGIN PORTAL — Full-Screen Split Layout
+           PREMIUM USER LOGIN / SIGNUP PORTAL — Full-Screen Split Layout
       ============================================================ */}
       {showAuthModal && createPortal(
-        <div className="auth-split-overlay">
-          
-          {/* ── LEFT PANE: Cinematic Background ── */}
+        <div 
+          className="auth-split-overlay"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !authPortalIsGate) {
+              closeAuthModal();
+            }
+          }}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="auth-modal-title"
+        >
+          {/* ── LEFT PANE: Cinematic Eco Showcase (Desktop) ── */}
           <div className="auth-left-pane">
             <div className="auth-left-content">
-              <h2>Cook Smarter.<span>Save More.</span></h2>
-              <p className="auth-subhead">Join thousands of customers using our fuel-efficient combustion systems for sustainable cooking and a cleaner future.</p>
+              <div className="auth-brand-badge">
+                <i className="fa-solid fa-fire-flame-curved"></i> {t('auth.brandBadge', 'SriTech Eco Living')}
+              </div>
+              <h2>{t('auth.leftTitle1', 'Cook Smarter.')}<span>{t('auth.leftTitle2', 'Save More.')}</span></h2>
+              <p className="auth-subhead">
+                {t('auth.leftSubtitle', 'Join thousands of households & businesses utilizing our high-efficiency combustion systems for sustainable cooking and substantial fuel savings.')}
+              </p>
+              
               <ul className="auth-trust-list">
-                <li><i className="fa-solid fa-shield-halved"></i> Secure Login & Checkout</li>
-                <li><i className="fa-solid fa-truck-fast"></i> Lightning Fast Delivery Tracking</li>
-                <li><i className="fa-solid fa-headset"></i> 24/7 Dedicated Support</li>
-                <li><i className="fa-solid fa-leaf"></i> 100% Eco-Friendly Materials</li>
+                <li>
+                  <div className="trust-icon-box"><i className="fa-solid fa-shield-halved"></i></div>
+                  <div>
+                    <strong>{t('auth.trustSecureTitle', 'Secure Login & Checkout')}</strong>
+                    <span>{t('auth.trustSecureDesc', 'Bank-grade 256-bit encrypted authentication')}</span>
+                  </div>
+                </li>
+                <li>
+                  <div className="trust-icon-box"><i className="fa-solid fa-truck-fast"></i></div>
+                  <div>
+                    <strong>{t('auth.trustTrackingTitle', 'Fast Delivery Tracking')}</strong>
+                    <span>{t('auth.trustTrackingDesc', 'Real-time door-to-door courier updates')}</span>
+                  </div>
+                </li>
+                <li>
+                  <div className="trust-icon-box"><i className="fa-solid fa-headset"></i></div>
+                  <div>
+                    <strong>{t('auth.trustSupportTitle', '24/7 Dedicated Support')}</strong>
+                    <span>{t('auth.trustSupportDesc', 'Instant assistance via WhatsApp and helpline')}</span>
+                  </div>
+                </li>
+                <li>
+                  <div className="trust-icon-box"><i className="fa-solid fa-leaf"></i></div>
+                  <div>
+                    <strong>{t('auth.trustEcoTitle', '100% Eco-Friendly Materials')}</strong>
+                    <span>{t('auth.trustEcoDesc', 'Heavy-duty steel built for generations')}</span>
+                  </div>
+                </li>
               </ul>
             </div>
             
             {/* Floating embers animation */}
-            {[...Array(12)].map((_, i) => (
+            {[...Array(10)].map((_, i) => (
               <div 
                 key={i} 
                 className="ember" 
                 style={{ 
-                  left: `${Math.random() * 100}%`, 
-                  animationDelay: `${Math.random() * 3}s`,
-                  animationDuration: `${3 + Math.random() * 4}s`,
-                  width: `${3 + Math.random() * 4}px`,
-                  height: `${3 + Math.random() * 4}px`
+                  left: `${(i * 10) + Math.sin(i) * 5}%`, 
+                  animationDelay: `${(i * 0.4) % 3}s`,
+                  animationDuration: `${3.5 + (i % 3)}s`,
+                  width: `${3 + (i % 3)}px`,
+                  height: `${3 + (i % 3)}px`
                 }}
               />
             ))}
           </div>
 
-          {/* ── RIGHT PANE: Glassmorphism Form ── */}
+          {/* ── RIGHT PANE: Modern Glassmorphic Card ── */}
           <div className="auth-right-pane">
             <div className="auth-glass-card">
-              <button
-                className="auth-close-btn"
-                onClick={() => { setShowAuthModal(false); setAuthMode('login'); setUserCredentials({ name:'',phone:'',address:'',email:'',password:'',confirmPassword:'' }); }}
-                aria-label="Close"
-              >
-                <i className="fa-solid fa-xmark"></i>
-              </button>
+              {!authPortalIsGate && (
+                <button
+                  type="button"
+                  className="auth-close-btn"
+                  onClick={() => closeAuthModal()}
+                  aria-label="Close modal"
+                >
+                  <i className="fa-solid fa-xmark"></i>
+                </button>
+              )}
 
               <div className="auth-header">
-                <h3>{authMode === 'login' ? 'Welcome Back' : authMode === 'verify' ? 'Verify Your Email' : 'Create Account'}</h3>
-                <p>{authMode === 'login' ? 'Sign in to your premium account' : authMode === 'verify' ? 'Enter the code sent to your inbox.' : 'Start your sustainable journey today'}</p>
+                <div className="auth-header-logo-mobile">
+                  <img src="/sri-tech-logo-final.png" alt="SriTech Logo" className="auth-modal-brand-logo" />
+                </div>
+                <h3 id="auth-modal-title">
+                  {authMode === 'login' ? t('auth.welcomeBack', 'Welcome Back') : authMode === 'verify' ? t('auth.verifyEmail', 'Verify Your Email') : t('auth.createAccount', 'Create Account')}
+                </h3>
+                <p>
+                  {authMode === 'login' 
+                    ? t('auth.signInSubtitle', 'Sign in to access your orders, cart & account') 
+                    : authMode === 'verify' 
+                    ? (t('auth.verifySubtitle', 'Enter the 6-digit code sent to your email') + (verificationEmail ? ` (${verificationEmail})` : ''))
+                    : t('auth.createSubtitle', 'Create your account to start ordering with exclusive savings')}
+                </p>
               </div>
+
+              {/* Error Alert Banner */}
+              {authErrorMessage && (
+                <div className="auth-error-banner" role="alert">
+                  <i className="fa-solid fa-circle-exclamation"></i>
+                  <span>{authErrorMessage}</span>
+                </div>
+              )}
 
               {/* Toggle Switch */}
-              <div className="auth-toggle-group">
-                <button 
-                  type="button"
-                  className={`auth-toggle-btn ${authMode === 'login' ? 'active' : ''}`}
-                  onClick={() => { setAuthMode('login'); setAuthErrorMessage(null); setAuthFieldErrors({ email: '', password: '' }); }}
-                >
-                  Sign In
-                </button>
-                <button 
-                  type="button"
-                  className={`auth-toggle-btn ${authMode === 'signup' ? 'active' : ''}`}
-                  onClick={() => { setAuthMode('signup'); setVerificationEmail(''); setOtpCode(''); setAuthErrorMessage(null); setAuthFieldErrors({ email: '', password: '' }); }}
-                >
-                  Sign Up
-                </button>
-              </div>
+              {authMode !== 'verify' && (
+                <div className="auth-toggle-group">
+                  <button 
+                    type="button"
+                    className={`auth-toggle-btn ${authMode === 'login' ? 'active' : ''}`}
+                    onClick={() => switchAuthMode('login')}
+                  >
+                    <i className="fa-solid fa-arrow-right-to-bracket"></i> {t('auth.signInTab', 'Sign In')}
+                  </button>
+                  <button 
+                    type="button"
+                    className={`auth-toggle-btn ${authMode === 'signup' ? 'active' : ''}`}
+                    onClick={() => switchAuthMode('signup')}
+                  >
+                    <i className="fa-solid fa-user-plus"></i> {t('auth.signUpTab', 'Sign Up')}
+                  </button>
+                </div>
+              )}
 
-              <form onSubmit={handleUserAuthSubmit} noValidate>
+              <form onSubmit={handleUserAuthSubmit} noValidate className="auth-form-body">
                 
-                {/* Sign Up Specific Fields */}
+                {/* Sign Up: Full Name */}
                 {authMode === 'signup' && (
-                  <>
-                    <div className="auth-form-group">
-                      <label>Full Name</label>
-                      <div className="auth-input-wrapper">
-                        <i className="fa-regular fa-user prefix-icon"></i>
-                        <input 
-                          type="text" 
-                          name="name"
-                          className={`auth-input ${authFieldErrors.name ? 'invalid' : ''}`} 
-                          placeholder="John Doe" 
-                          required
-                          value={userCredentials.name}
-                          onChange={(e) => updateUserCredentials('name', e.target.value)}
-                        />
-                      </div>
-                      {authFieldErrors.name && (
-                        <p className="auth-field-error">{authFieldErrors.name}</p>
-                      )}
+                  <div className="auth-form-group">
+                    <label htmlFor="auth-name">{t('auth.fullName', 'Full Name')}</label>
+                    <div className="auth-input-wrapper">
+                      <i className="fa-regular fa-user prefix-icon"></i>
+                      <input 
+                        id="auth-name"
+                        type="text" 
+                        name="name"
+                        autoComplete="name"
+                        className={`auth-input ${authFieldErrors.name ? 'invalid' : ''}`} 
+                        placeholder={t('auth.fullNamePlaceholder', 'John Doe')} 
+                        required
+                        value={userCredentials.name}
+                        onChange={(e) => updateUserCredentials('name', e.target.value)}
+                      />
                     </div>
-                    <div className="auth-form-group">
-                      <label>Mobile Number</label>
-                      <div className="auth-input-wrapper">
-                        <i className="fa-solid fa-phone prefix-icon"></i>
-                        <input 
-                          type="tel" 
-                          name="phone"
-                          inputMode="numeric"
-                          className={`auth-input ${authFieldErrors.phone ? 'invalid' : ''}`} 
-                          placeholder="9876543210" 
-                          required
-                          value={userCredentials.phone || ''}
-                          onChange={(e) => updateUserCredentials('phone', e.target.value)}
-                        />
-                      </div>
-                      {authFieldErrors.phone && (
-                        <p className="auth-field-error">{authFieldErrors.phone}</p>
-                      )}
-                    </div>
-                    <div className="auth-form-group">
-                      <label>Address</label>
-                      <div className="auth-input-wrapper">
-                        <i className="fa-solid fa-map-location-dot prefix-icon"></i>
-                        <input 
-                          type="text" 
-                          name="address"
-                          className="auth-input" 
-                          placeholder="123 Street Name" 
-                          required
-                          value={userCredentials.address || ''}
-                          onChange={(e) => updateUserCredentials('address', e.target.value)}
-                        />
-                      </div>
-                    </div>
-                  </>
+                    {authFieldErrors.name && (
+                      <p className="auth-field-error"><i className="fa-solid fa-circle-exclamation"></i> {authFieldErrors.name}</p>
+                    )}
+                  </div>
                 )}
 
-                {/* Common Fields: Email */}
+                {/* Sign Up: Mobile Number */}
+                {authMode === 'signup' && (
+                  <div className="auth-form-group">
+                    <label htmlFor="auth-phone">{t('auth.mobileNumber', 'Mobile Number')}</label>
+                    <div className="auth-input-wrapper">
+                      <i className="fa-solid fa-phone prefix-icon"></i>
+                      <input 
+                        id="auth-phone"
+                        type="tel" 
+                        name="phone"
+                        inputMode="numeric"
+                        autoComplete="tel"
+                        maxLength="10"
+                        className={`auth-input ${authFieldErrors.phone ? 'invalid' : ''}`} 
+                        placeholder={t('auth.mobilePlaceholder', '10-digit mobile number')} 
+                        required
+                        value={userCredentials.phone || ''}
+                        onChange={(e) => updateUserCredentials('phone', e.target.value)}
+                      />
+                    </div>
+                    {authFieldErrors.phone && (
+                      <p className="auth-field-error"><i className="fa-solid fa-circle-exclamation"></i> {authFieldErrors.phone}</p>
+                    )}
+                  </div>
+                )}
+
+                {/* Sign Up: Address */}
+                {authMode === 'signup' && (
+                  <div className="auth-form-group">
+                    <label htmlFor="auth-address">{t('auth.deliveryAddress', 'Delivery Address')}</label>
+                    <div className="auth-input-wrapper">
+                      <i className="fa-solid fa-map-location-dot prefix-icon"></i>
+                      <input 
+                        id="auth-address"
+                        type="text" 
+                        name="address"
+                        autoComplete="street-address"
+                        className="auth-input" 
+                        placeholder={t('auth.addressPlaceholder', 'Street, Area, City')} 
+                        required
+                        value={userCredentials.address || ''}
+                        onChange={(e) => updateUserCredentials('address', e.target.value)}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Email Address (Login & Sign Up) */}
                 <div className="auth-form-group">
-                  <label>Email Address</label>
+                  <label htmlFor="auth-email">{t('auth.emailAddress', 'Email Address')}</label>
                   <div className="auth-input-wrapper">
                     <i className="fa-regular fa-envelope prefix-icon"></i>
                     <input 
                       ref={emailInputRef}
+                      id="auth-email"
                       type="email" 
                       name="email"
+                      autoComplete="email"
                       className={`auth-input ${authFieldErrors.email ? 'invalid' : ''}`} 
-                      placeholder="hello@example.com" 
+                      placeholder={t('auth.emailPlaceholder', 'name@example.com')} 
                       required
                       value={authMode === 'verify' ? (verificationEmail || '') : (userCredentials.email || '')}
                       disabled={authMode === 'verify'}
@@ -4233,74 +4281,103 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
                     />
                   </div>
                   {authFieldErrors.email && (
-                    <p className="auth-field-error">{authFieldErrors.email}</p>
+                    <p className="auth-field-error"><i className="fa-solid fa-circle-exclamation"></i> {authFieldErrors.email}</p>
                   )}
                 </div>
 
+                {/* Password (Login & Sign Up) */}
                 {authMode !== 'verify' && (
                   <div className="auth-form-group">
-                    <label>Password</label>
+                    <label htmlFor="auth-password">{t('auth.password', 'Password')}</label>
                     <div className="auth-input-wrapper">
                       <i className="fa-solid fa-lock prefix-icon"></i>
                       <input 
                         ref={passwordInputRef}
+                        id="auth-password"
                         type={showPassword ? "text" : "password"} 
                         name="password"
+                        autoComplete={authMode === 'signup' ? 'new-password' : 'current-password'}
                         className={`auth-input ${authFieldErrors.password ? 'invalid' : ''}`} 
                         placeholder="••••••••" 
                         required
                         value={userCredentials.password || ''}
                         onChange={(e) => updateUserCredentials('password', e.target.value)}
                       />
-                      <button type="button" className="pwd-toggle" onClick={() => setShowPassword(!showPassword)}>
+                      <button 
+                        type="button" 
+                        className="pwd-toggle" 
+                        onClick={() => setShowPassword(!showPassword)}
+                        aria-label={showPassword ? "Hide password" : "Show password"}
+                      >
                         <i className={`fa-regular ${showPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
                       </button>
                     </div>
                     {authFieldErrors.password && (
-                      <p className="auth-field-error">{authFieldErrors.password}</p>
+                      <p className="auth-field-error"><i className="fa-solid fa-circle-exclamation"></i> {authFieldErrors.password}</p>
                     )}
                   </div>
                 )}
 
-                {/* Sign Up Specific Field: Confirm Password */}
+                {/* Sign Up: Confirm Password */}
                 {authMode === 'signup' && (
                   <div className="auth-form-group">
-                    <label>Confirm Password</label>
+                    <label htmlFor="auth-confirm-password">{t('auth.confirmPassword', 'Confirm Password')}</label>
                     <div className="auth-input-wrapper">
                       <i className="fa-solid fa-shield-check prefix-icon"></i>
                       <input 
+                        id="auth-confirm-password"
                         type={showConfirmPassword ? "text" : "password"} 
                         name="confirmPassword"
+                        autoComplete="new-password"
                         className={`auth-input ${authFieldErrors.confirmPassword ? 'invalid' : ''}`} 
                         placeholder="••••••••" 
                         required
                         value={userCredentials.confirmPassword || ''}
                         onChange={(e) => updateUserCredentials('confirmPassword', e.target.value)}
                       />
-                      <button type="button" className="pwd-toggle" onClick={() => setShowConfirmPassword(!showConfirmPassword)}>
+                      <button 
+                        type="button" 
+                        className="pwd-toggle" 
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+                      >
                         <i className={`fa-regular ${showConfirmPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
                       </button>
                     </div>
                     {authFieldErrors.confirmPassword && (
-                      <p className="auth-field-error">{authFieldErrors.confirmPassword}</p>
+                      <p className="auth-field-error"><i className="fa-solid fa-circle-exclamation"></i> {authFieldErrors.confirmPassword}</p>
                     )}
                   </div>
                 )}
 
+                {/* OTP Verification Code */}
                 {authMode === 'verify' && (
                   <div className="auth-form-group">
-                    <label>Verification Code</label>
+                    <label htmlFor="auth-otp">{t('auth.otpVerification', '6-Digit Verification Code')}</label>
                     <div className="auth-input-wrapper">
-                      <i className="fa-regular fa-key prefix-icon"></i>
+                      <i className="fa-solid fa-key prefix-icon"></i>
                       <input 
+                        id="auth-otp"
                         type="text" 
                         name="otpCode"
-                        className="auth-input" 
-                        placeholder="Enter 6-digit OTP" 
+                        inputMode="numeric"
+                        maxLength="6"
+                        className="auth-input auth-otp-input" 
+                        placeholder={t('auth.otpPlaceholder', '000000')} 
                         required
+                        autoFocus
                         value={otpCode}
-                        onChange={(e) => setOtpCode(e.target.value)}
+                        onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                       />
+                    </div>
+                    <div className="auth-verify-actions">
+                      <button 
+                        type="button" 
+                        className="auth-link-action"
+                        onClick={() => switchAuthMode('signup')}
+                      >
+                        {t('auth.changeEmail', '← Change Email')}
+                      </button>
                     </div>
                   </div>
                 )}
@@ -4309,43 +4386,61 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
                 {authMode === 'login' && (
                   <div className="auth-options">
                     <label className="remember-me" htmlFor="rememberMe">
-                      <input type="checkbox" id="rememberMe" name="rememberMe" /> Remember me
+                      <input type="checkbox" id="rememberMe" name="rememberMe" defaultChecked /> 
+                      <span>{t('auth.rememberMe', 'Remember me')}</span>
                     </label>
-                    <a href="#" className="forgot-pwd" onClick={handleForgotPassword}>Forgot Password?</a>
+                    <button type="button" className="forgot-pwd-btn" onClick={handleForgotPassword}>
+                      {t('auth.forgotPassword', 'Forgot Password?')}
+                    </button>
                   </div>
                 )}
 
                 {/* Submit Button */}
                 <button type="submit" className="auth-submit-btn" disabled={authSubmitting}>
-                  {authSubmitting
-                    ? (authMode === 'login' ? 'Signing In...' : authMode === 'verify' ? 'Verifying...' : 'Creating Account...')
-                    : (authMode === 'login' ? 'Sign In' : authMode === 'verify' ? 'Verify Email' : 'Create Account')}
+                  {authSubmitting ? (
+                    <span className="auth-btn-loading">
+                      <i className="fa-solid fa-circle-notch fa-spin"></i>
+                      <span>{authMode === 'login' ? t('auth.signingIn', 'Signing In...') : authMode === 'verify' ? t('auth.verifying', 'Verifying...') : t('auth.creatingAccount', 'Creating Account...')}</span>
+                    </span>
+                  ) : (
+                    <span>
+                      {authMode === 'login' ? t('auth.signInBtn', 'Sign In to Account') : authMode === 'verify' ? t('auth.verifyBtn', 'Verify & Continue') : t('auth.createAccountBtn', 'Create My Account')}
+                    </span>
+                  )}
                 </button>
                 
               </form>
 
-              <div className="auth-divider">or continue with</div>
+              {/* Bottom Switcher & Guest Action */}
+              <div className="auth-footer-actions">
+                {authMode === 'login' ? (
+                  <p className="auth-switch-text">
+                    {t('auth.noAccount', "Don't have an account?")}{' '}
+                    <button type="button" className="auth-switch-link" onClick={() => switchAuthMode('signup')}>
+                      {t('auth.signUpHere', 'Sign Up here')}
+                    </button>
+                  </p>
+                ) : authMode === 'signup' ? (
+                  <p className="auth-switch-text">
+                    {t('auth.haveAccount', 'Already have an account?')}{' '}
+                    <button type="button" className="auth-switch-link" onClick={() => switchAuthMode('login')}>
+                      {t('auth.signInHere', 'Sign In here')}
+                    </button>
+                  </p>
+                ) : null}
 
-              {/* Social Login Options */}
-              <div className="social-login-grid">
-              </div>
-
-              {/* Continue as Guest */}
-              <div style={{ textAlign: 'center', marginTop: '2rem' }}>
-                <a
-                  href="#"
-                  className="guest"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setShowAuthModal(false);
-                    setAuthPortalIsGate(false);
-                    setAuthMode('login');
-                    setAuthErrorMessage(null);
-                    setAuthFieldErrors({ email: '', password: '' });
-                  }}
-                >
-                  Continue as guest →
-                </a>
+                {!authPortalIsGate && (
+                  <div className="auth-guest-wrapper">
+                    <button
+                      type="button"
+                      className="auth-guest-link"
+                      onClick={() => closeAuthModal()}
+                    >
+                      <span>{t('auth.continueAsGuest', 'Continue browsing as guest')}</span>
+                      <i className="fa-solid fa-arrow-right"></i>
+                    </button>
+                  </div>
+                )}
               </div>
 
             </div>
@@ -4359,12 +4454,12 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
         <div className="modal-content glass-card" style={{ maxWidth: '520px' }} role="dialog" aria-modal="true">
           <button className="close-modal" onClick={handleCloseReturnModal}>&times;</button>
           <div className="modal-header">
-            <h2>Request a Return</h2>
-            <p>Select the item and reason for return. Our team will review your request.</p>
+            <h2>{t('returnModal.title', 'Request a Return')}</h2>
+            <p>{t('returnModal.subtitle', 'Select the item and reason for return. Our team will review your request.')}</p>
           </div>
           <form onSubmit={handleSubmitReturnRequest}>
             <div className="form-group">
-              <label htmlFor="returnProduct">Product</label>
+              <label htmlFor="returnProduct">{t('returnModal.product', 'Product')}</label>
               <select
                 id="returnProduct"
                 value={returnRequestForm.productId}
@@ -4378,7 +4473,7 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
               </select>
             </div>
             <div className="form-group">
-              <label htmlFor="returnQuantity">Quantity</label>
+              <label htmlFor="returnQuantity">{t('returnModal.quantity', 'Quantity')}</label>
               <input
                 id="returnQuantity"
                 type="number"
@@ -4390,28 +4485,28 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
               />
             </div>
             <div className="form-group">
-              <label htmlFor="returnReason">Reason for Return</label>
+              <label htmlFor="returnReason">{t('returnModal.reason', 'Reason for Return')}</label>
               <textarea
                 id="returnReason"
                 rows="3"
                 value={returnRequestForm.reason}
                 onChange={(e) => handleReturnRequestChange('reason', e.target.value)}
-                placeholder="Describe why you want to return this item"
+                placeholder={t('returnModal.reasonPlaceholder', 'Describe why you want to return this item')}
                 required
               />
             </div>
             <div className="form-group">
-              <label htmlFor="returnDescription">Additional details</label>
+              <label htmlFor="returnDescription">{t('returnModal.additionalDetails', 'Additional details')}</label>
               <textarea
                 id="returnDescription"
                 rows="3"
                 value={returnRequestForm.description}
                 onChange={(e) => handleReturnRequestChange('description', e.target.value)}
-                placeholder="Add any extra information for the return team (optional)"
+                placeholder={t('returnModal.additionalPlaceholder', 'Add any extra information for the return team (optional)')}
               />
             </div>
             <button type="submit" className="cta-button" style={{ width: '100%' }}>
-              Submit Return Request
+              {t('returnModal.submit', 'Submit Return Request')}
             </button>
           </form>
         </div>
@@ -4422,44 +4517,44 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
         <div className="modal-content glass-card" style={{ maxWidth: '500px' }} role="dialog" aria-modal="true">
           <button className="close-modal" onClick={() => setShowComplaintModal(false)}>&times;</button>
           <div className="modal-header">
-            <h2>Customer Support</h2>
-            <p>Have a complaint or feedback? Raise a ticket here.</p>
+            <h2>{t('supportModal.title', 'Customer Support')}</h2>
+            <p>{t('supportModal.subtitle', 'Have a complaint or feedback? Raise a ticket here.')}</p>
           </div>
           <form onSubmit={handleComplaintSubmit}>
             <div className="form-group">
-              <label>Name</label>
+              <label>{t('supportModal.name', 'Name')}</label>
               <input 
                 type="text" 
-                placeholder="Your Name" 
+                placeholder={t('supportModal.namePlaceholder', 'Your Name')} 
                 required 
                 value={complaintForm.customerName}
                 onChange={(e) => setComplaintForm({...complaintForm, customerName: e.target.value})}
               />
             </div>
             <div className="form-group">
-              <label>Email Address</label>
+              <label>{t('supportModal.email', 'Email Address')}</label>
               <input 
                 type="email" 
-                placeholder="your.email@example.com" 
+                placeholder={t('supportModal.emailPlaceholder', 'your.email@example.com')} 
                 required 
                 value={complaintForm.email}
                 onChange={(e) => setComplaintForm({...complaintForm, email: e.target.value})}
               />
             </div>
             <div className="form-group">
-              <label>Subject</label>
+              <label>{t('supportModal.subject', 'Subject')}</label>
               <input 
                 type="text" 
-                placeholder="e.g. Order Delivery, Product Quality" 
+                placeholder={t('supportModal.subjectPlaceholder', 'e.g. Order Delivery, Product Quality')} 
                 required 
                 value={complaintForm.subject}
                 onChange={(e) => setComplaintForm({...complaintForm, subject: e.target.value})}
               />
             </div>
             <div className="form-group">
-              <label>Message / Details</label>
+              <label>{t('supportModal.message', 'Message / Details')}</label>
               <textarea 
-                placeholder="Describe your issue in detail..." 
+                placeholder={t('supportModal.messagePlaceholder', 'Describe your issue in detail...')} 
                 required 
                 rows="4"
                 value={complaintForm.message}
@@ -4468,7 +4563,7 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
               />
             </div>
             <button type="submit" className="cta-button" style={{ width: '100%', marginTop: '1rem' }}>
-              Submit Support Ticket
+              {t('supportModal.submit', 'Submit Support Ticket')}
             </button>
           </form>
         </div>
@@ -4489,11 +4584,11 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
           </button>
 
           {/* Left Logo */}
-          <a href="#" className="logo" onClick={(e) => { e.preventDefault(); scrollToSection(e, 'home'); }} style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
+          <a href="#" className="logo" onClick={(e) => { e.preventDefault(); scrollToSection(e, 'home'); }}>
             <img
               src="/sri-tech-logo-final.png"
               alt="SriTech Logo"
-              style={{ width: '240px', height: 'auto', maxHeight: '65px', objectFit: 'contain' }}
+              className="site-logo-img"
             />
           </a>
 
@@ -4510,7 +4605,7 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
               const catElem = document.getElementById('categories') || document.getElementById('category');
               if (catElem) catElem.scrollIntoView({ behavior: 'smooth' });
             }}>
-              Categories
+              {t('nav.categories', 'Categories')}
             </a>
             <a href="#about" className="action-btn" onClick={(e) => { scrollToSection(e, 'about'); }}>
               {t('nav.about')}
@@ -4529,6 +4624,8 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
                 <option value="en">English</option>
                 <option value="ta">தமிழ்</option>
                 <option value="hi">हिंदी</option>
+                <option value="te">తెలుగు</option>
+                <option value="ml">മലയാളം</option>
               </select>
             </div>
           </nav>
@@ -4540,7 +4637,7 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
               type="text"
               value={searchTerm}
               onChange={(e) => handleNavbarSearchChange(e.target.value)}
-              placeholder="Search products..."
+              placeholder={t('nav.searchProducts', 'Search products...')}
               className="navbar-search-input-field"
             />
             {searchTerm.trim() && (
@@ -4569,6 +4666,17 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
 
           {/* Right Actions */}
           <div className="header-actions">
+            {/* Request Quote / Custom Stove Button */}
+            <button
+              type="button"
+              className="action-btn header-quote-btn"
+              onClick={() => setShowEntryModal(true)}
+              title={t('entry.title', 'Request Custom Stove Quote')}
+            >
+              <i className="fa-solid fa-fire"></i>
+              <span className="quote-btn-text">{language === 'ta' ? 'விலைப்பட்டியல்' : language === 'hi' ? 'कोटेशन' : language === 'te' ? 'కోట్' : language === 'ml' ? 'കൊട്ടേഷൻ' : 'Get Quote'}</span>
+            </button>
+
             {/* Wishlist Button */}
             <button className="action-btn wishlist-btn-premium" title={t('nav.wishlist')} aria-label={t('nav.wishlist')} onClick={() => {
               if (isUserLoggedIn) {
@@ -4603,16 +4711,13 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
                   if (isUserLoggedIn) {
                     handleOpenOrderDashboard({ forceOpen: true });
                   } else {
-                    setAuthMode('login');
-                    setAuthErrorMessage(null);
-                    setShowAuthModal(true);
-                    setUserCredentials({ name: '', phone: '', address: '', email: '', password: '', confirmPassword: '' });
+                    openAuthModal('login');
                   }
                 }}
               >
                 <i className="fa-solid fa-user" aria-hidden="true"></i>
                 <span className="btn-text">
-                  {isUserLoggedIn ? (activeUser?.name?.split(' ')[0] || 'Account') : 'Login'}
+                  {isUserLoggedIn ? (activeUser?.name?.split(' ')[0] || t('nav.account', 'Account')) : t('nav.login', 'Login')}
                 </span>
               </button>
 
@@ -4620,38 +4725,10 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
                 <div 
                   className="login-reminder-tooltip"
                   onClick={() => setShowLoginReminder(false)}
-                  style={{
-                    position: 'absolute',
-                    top: '100%',
-                    right: '0',
-                    marginTop: '8px',
-                    background: '#15803d',
-                    color: '#ffffff',
-                    padding: '8px 12px',
-                    borderRadius: '8px',
-                    fontSize: '0.72rem',
-                    fontWeight: '600',
-                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-                    whiteSpace: 'nowrap',
-                    zIndex: 9999,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    animation: 'bounceTooltip 2s infinite'
-                  }}
                 >
-                  <div style={{
-                    position: 'absolute',
-                    top: '-4px',
-                    right: '20px',
-                    width: '8px',
-                    height: '8px',
-                    background: '#15803d',
-                    transform: 'rotate(45deg)'
-                  }} />
-                  <span>🔑 Remember to login!</span>
-                  <i className="fa-solid fa-xmark" style={{ fontSize: '0.65rem', opacity: 0.8, marginLeft: '4px' }}></i>
+                  <div className="tooltip-arrow" />
+                  <span>🔑 {t('nav.rememberLogin', 'Remember to login!')}</span>
+                  <i className="fa-solid fa-xmark tooltip-close-icon"></i>
                 </div>
               )}
             </div>
@@ -4661,11 +4738,11 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
         {/* Mobile Navigation Dropdown Menu Drawer */}
         <div className={`mobile-nav-panel ${showMobileMenu ? 'active' : ''}`}>
           <div className="mobile-nav-header">
-            <a href="#" className="logo" onClick={(e) => { e.preventDefault(); scrollToSection(e, 'home'); setShowMobileMenu(false); }}>
+            <a href="#" className="logo mobile-drawer-logo-link" onClick={(e) => { e.preventDefault(); scrollToSection(e, 'home'); setShowMobileMenu(false); }}>
               <img
                 src="/sri-tech-logo-final.png"
                 alt="SriTech Logo"
-                style={{ width: '180px', height: 'auto' }}
+                className="mobile-drawer-logo-img"
               />
             </a>
             <button className="mobile-drawer-close-btn" onClick={() => setShowMobileMenu(false)} aria-label="Close menu">
@@ -4674,14 +4751,24 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
           </div>
 
           <div className="mobile-nav-body">
+            {/* Quick Quote CTA button in Drawer */}
+            <button
+              type="button"
+              className="mobile-quote-drawer-btn"
+              onClick={() => { setShowMobileMenu(false); setShowEntryModal(true); }}
+            >
+              <i className="fa-solid fa-fire"></i>
+              <span>{t('entry.title', 'Request Custom Stove Quote')}</span>
+            </button>
+
             <div className="mobile-nav-links-list">
               <a href="#home" className="mobile-nav-link-item active" onClick={(e) => { scrollToSection(e, 'home'); setShowMobileMenu(false); }}>
                 <i className="fa-solid fa-house"></i>
-                <span>Home</span>
+                <span>{t('nav.home', 'Home')}</span>
               </a>
               <a href="#product" className="mobile-nav-link-item" onClick={(e) => { scrollToSection(e, 'product'); setShowMobileMenu(false); }}>
                 <i className="fa-solid fa-cubes"></i>
-                <span>Products</span>
+                <span>{t('nav.products', 'Products')}</span>
                 <i className="fa-solid fa-chevron-right arrow-icon"></i>
               </a>
               <a href="#category" className="mobile-nav-link-item" onClick={(e) => { 
@@ -4691,16 +4778,16 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
                 if (catElem) catElem.scrollIntoView({ behavior: 'smooth' });
               }}>
                 <i className="fa-solid fa-layer-group"></i>
-                <span>Categories</span>
+                <span>{t('nav.categories', 'Categories')}</span>
                 <i className="fa-solid fa-chevron-right arrow-icon"></i>
               </a>
               <a href="#about" className="mobile-nav-link-item" onClick={(e) => { scrollToSection(e, 'about'); setShowMobileMenu(false); }}>
                 <i className="fa-solid fa-address-card"></i>
-                <span>About Us</span>
+                <span>{t('nav.about', 'About Us')}</span>
               </a>
               <a href="#footer" className="mobile-nav-link-item" onClick={(e) => { scrollToSection(e, 'footer'); setShowMobileMenu(false); }}>
                 <i className="fa-solid fa-pen-to-square"></i>
-                <span>Contact Us</span>
+                <span>{t('nav.contact', 'Contact Us')}</span>
               </a>
             </div>
 
@@ -4709,11 +4796,11 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
             <div className="mobile-nav-secondary-actions">
               <button className="mobile-action-item" onClick={() => { setShowMobileMenu(false); if (isUserLoggedIn) openUserDashboard('wishlist'); else setShowWishlist(true); }}>
                 <i className="fa-regular fa-heart"></i>
-                <span>Wishlist</span>
+                <span>{t('nav.wishlist', 'Wishlist')}</span>
               </button>
               <button className="mobile-action-item" onClick={() => { setShowMobileMenu(false); if (isUserLoggedIn) openUserDashboard('cart'); else setShowCart(true); }}>
                 <i className="fa-solid fa-cart-shopping"></i>
-                <span>Cart</span>
+                <span>{t('nav.cart', 'Cart')}</span>
                 {resolvedCartItems.length > 0 && <span className="mobile-cart-badge">{resolvedCartItems.length}</span>}
               </button>
               <button className="mobile-action-item" onClick={() => {
@@ -4721,14 +4808,11 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
                 if (isUserLoggedIn) {
                   handleOpenOrderDashboard({ forceOpen: true });
                 } else {
-                  setAuthMode('login');
-                  setAuthErrorMessage(null);
-                  setShowAuthModal(true);
-                  setUserCredentials({ name: '', phone: '', address: '', email: '', password: '', confirmPassword: '' });
+                  openAuthModal('login');
                 }
               }}>
                 <i className="fa-solid fa-user"></i>
-                <span>{isUserLoggedIn ? (activeUser?.name || 'Account') : 'Login / Register'}</span>
+                <span>{isUserLoggedIn ? (activeUser?.name || t('nav.account', 'Account')) : t('nav.loginOrRegister', 'Login / Register')}</span>
               </button>
             </div>
 
@@ -4737,23 +4821,25 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
             <div className="mobile-action-item" style={{ cursor: 'default', flexDirection: 'column', alignItems: 'stretch', gap: '0.65rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
                 <i className="fa-solid fa-language" style={{ color: '#15803D' }}></i>
-                <span>Language</span>
+                <span>{t('nav.language', 'Language')}</span>
               </div>
-              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.2rem' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.2rem' }}>
                 <button 
                   type="button"
                   onClick={() => { setLanguage('en'); setShowMobileMenu(false); }}
                   style={{
-                    flex: 1,
-                    padding: '0.5rem',
+                    flex: '1 1 calc(33.333% - 0.4rem)',
+                    minWidth: '70px',
+                    padding: '0.5rem 0.25rem',
                     borderRadius: '8px',
                     border: '1.5px solid',
                     borderColor: language === 'en' ? '#15803D' : '#E5E7EB',
                     background: language === 'en' ? 'rgba(21, 128, 61, 0.05)' : '#FFFFFF',
                     color: language === 'en' ? '#15803D' : '#1F2937',
                     fontWeight: 700,
-                    fontSize: '0.85rem',
-                    cursor: 'pointer'
+                    fontSize: '0.82rem',
+                    cursor: 'pointer',
+                    textAlign: 'center'
                   }}
                 >
                   English
@@ -4762,16 +4848,18 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
                   type="button"
                   onClick={() => { setLanguage('ta'); setShowMobileMenu(false); }}
                   style={{
-                    flex: 1,
-                    padding: '0.5rem',
+                    flex: '1 1 calc(33.333% - 0.4rem)',
+                    minWidth: '70px',
+                    padding: '0.5rem 0.25rem',
                     borderRadius: '8px',
                     border: '1.5px solid',
                     borderColor: language === 'ta' ? '#15803D' : '#E5E7EB',
                     background: language === 'ta' ? 'rgba(21, 128, 61, 0.05)' : '#FFFFFF',
                     color: language === 'ta' ? '#15803D' : '#1F2937',
                     fontWeight: 700,
-                    fontSize: '0.85rem',
-                    cursor: 'pointer'
+                    fontSize: '0.82rem',
+                    cursor: 'pointer',
+                    textAlign: 'center'
                   }}
                 >
                   தமிழ்
@@ -4780,24 +4868,75 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
                   type="button"
                   onClick={() => { setLanguage('hi'); setShowMobileMenu(false); }}
                   style={{
-                    flex: 1,
-                    padding: '0.5rem',
+                    flex: '1 1 calc(33.333% - 0.4rem)',
+                    minWidth: '70px',
+                    padding: '0.5rem 0.25rem',
                     borderRadius: '8px',
                     border: '1.5px solid',
                     borderColor: language === 'hi' ? '#15803D' : '#E5E7EB',
                     background: language === 'hi' ? 'rgba(21, 128, 61, 0.05)' : '#FFFFFF',
                     color: language === 'hi' ? '#15803D' : '#1F2937',
                     fontWeight: 700,
-                    fontSize: '0.85rem',
-                    cursor: 'pointer'
+                    fontSize: '0.82rem',
+                    cursor: 'pointer',
+                    textAlign: 'center'
                   }}
                 >
                   हिंदी
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => { setLanguage('te'); setShowMobileMenu(false); }}
+                  style={{
+                    flex: '1 1 calc(50% - 0.4rem)',
+                    minWidth: '70px',
+                    padding: '0.5rem 0.25rem',
+                    borderRadius: '8px',
+                    border: '1.5px solid',
+                    borderColor: language === 'te' ? '#15803D' : '#E5E7EB',
+                    background: language === 'te' ? 'rgba(21, 128, 61, 0.05)' : '#FFFFFF',
+                    color: language === 'te' ? '#15803D' : '#1F2937',
+                    fontWeight: 700,
+                    fontSize: '0.82rem',
+                    cursor: 'pointer',
+                    textAlign: 'center'
+                  }}
+                >
+                  తెలుగు
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => { setLanguage('ml'); setShowMobileMenu(false); }}
+                  style={{
+                    flex: '1 1 calc(50% - 0.4rem)',
+                    minWidth: '70px',
+                    padding: '0.5rem 0.25rem',
+                    borderRadius: '8px',
+                    border: '1.5px solid',
+                    borderColor: language === 'ml' ? '#15803D' : '#E5E7EB',
+                    background: language === 'ml' ? 'rgba(21, 128, 61, 0.05)' : '#FFFFFF',
+                    color: language === 'ml' ? '#15803D' : '#1F2937',
+                    fontWeight: 700,
+                    fontSize: '0.82rem',
+                    cursor: 'pointer',
+                    textAlign: 'center'
+                  }}
+                >
+                  മലയാളം
                 </button>
               </div>
             </div>
           </div>
         </div>
+
+        {/* Mobile Navigation Backdrop Overlay */}
+        {showMobileMenu && (
+          <div 
+            className="mobile-nav-backdrop" 
+            onClick={() => setShowMobileMenu(false)}
+            aria-hidden="true"
+          />
+        )}
         </header>
       )}
 
@@ -4841,6 +4980,39 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
           />
         ) : isMyOrdersPage ? (
           <MyOrders />
+        ) : isProductDetailPage ? (
+          <ProductDetailPage
+            product={selectedProduct}
+            products={products}
+            selectedProductImageIndex={selectedProductImageIndex}
+            setSelectedProductImageIndex={setSelectedProductImageIndex}
+            reviews={selectedProductReviews}
+            newReviewRating={newReviewRating}
+            setNewReviewRating={setNewReviewRating}
+            newReviewComment={newReviewComment}
+            setNewReviewComment={setNewReviewComment}
+            onSubmitReview={handleSubmitReview}
+            onAddToCart={handleAddToCart}
+            onBuyNow={handleBuyNow}
+            onToggleWishlist={handleToggleWaitlist}
+            waitlist={waitlist}
+            getProductFinalPrice={getProductFinalPrice}
+            parsePrice={parsePrice}
+            getProductRatingInfo={getProductRatingInfo}
+            getProductSpecsInfo={getProductSpecsInfo}
+            getActiveOfferForProduct={getActiveOfferForProduct}
+            coupons={coupons}
+            isUserLoggedIn={isUserLoggedIn}
+            onOpenAuthModal={() => { setAuthMode('login'); setShowAuthModal(true); }}
+            onSelectProduct={(p) => {
+              setSelectedProduct(p);
+              setSelectedProductImageIndex(0);
+              const slug = getProductSlug(p);
+              navigate(`/product/${slug}`);
+              window.scrollTo({ top: 0, behavior: 'instant' });
+            }}
+            t={t}
+          />
         ) : (
           <>
             {/* Premium Dark Parallax Hero Section */}
@@ -5031,23 +5203,50 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
 
         {/* Product Section */}
         <section id="product" className="products-section">
-          <div className="section-header" style={{ justifyContent: 'center', textAlign: 'center', borderBottom: 'none', marginBottom: '2.5rem' }}>
-            <h2 className="wavy-title">
-              {Array.from(
-                new Intl.Segmenter('ta', { granularity: 'grapheme' }).segment(t('products.title'))
-              ).map((s, idx) => (
-                <span key={idx}>{s.segment}</span>
-              ))}
-            </h2>
+          {/* Nature Leaves Watermark Decoration */}
+          <div className="nature-leaf-bg leaf-left"></div>
+          <div className="nature-leaf-bg leaf-right"></div>
+
+          <div className="products-hero-header">
+            <div className="products-title-col">
+              <div className="products-tag-badge">
+                <i className="fa-solid fa-fire-flame-curved"></i>
+                <span>{t('products.ourTag')}</span>
+              </div>
+              <h2 className="products-main-heading">
+                {t('products.title')}
+              </h2>
+              <p className="products-sub-desc">
+                {t('products.subtitle')}
+              </p>
+            </div>
+
+            <div className="products-trust-divider"></div>
+
+            <div className="products-trust-points">
+              <div className="trust-point-item">
+                <i className="fa-solid fa-leaf trust-icon"></i>
+                <span>{t('products.betterYield')}</span>
+              </div>
+              <div className="trust-point-item">
+                <i className="fa-solid fa-shield-halved trust-icon"></i>
+                <span>{t('products.trustedQuality')}</span>
+              </div>
+              <div className="trust-point-item">
+                <i className="fa-solid fa-truck-fast trust-icon"></i>
+                <span>{t('products.builtForPerformance')}</span>
+              </div>
+            </div>
           </div>
 
-          <div className="products-filter-row">
+          <div className="products-controls-bar">
             <div className="category-pill-container">
               <button 
                 className={`category-pill ${selectedCategory === '' ? 'active' : ''}`} 
                 onClick={() => handleCategoryChange('')}
               >
-                {t('products.all')}
+                <i className="fa-solid fa-table-cells-large"></i>
+                <span>{t('products.all')}</span>
               </button>
               {productCategories.map(cat => (
                 <button 
@@ -5055,7 +5254,8 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
                   className={`category-pill ${selectedCategory === cat.slug ? 'active' : ''}`}
                   onClick={() => handleCategoryChange(cat.slug)}
                 >
-                  {cat.name.toUpperCase()}
+                  <i className="fa-solid fa-fire-burner"></i>
+                  <span>{(translateCat ? translateCat(cat.name) : cat.name).toUpperCase()}</span>
                 </button>
               ))}
             </div>
@@ -5069,12 +5269,42 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="products-search-input"
               />
+              <button type="button" className="search-action-btn" aria-label="Search">
+                <i className="fa-solid fa-magnifying-glass"></i>
+              </button>
             </div>
           </div>
 
-          <div className="product-grid">
+          {/* Mobile-Friendly E-Commerce Grid View Toolbar */}
+          <div className="products-mobile-toolbar">
+            <span className="products-results-count">
+              <strong>{filteredProducts.length}</strong> {t('products.itemsCount', 'Products')}
+            </span>
+            <div className="ecom-view-switch" role="group" aria-label="Products Layout Switcher">
+              <button
+                type="button"
+                className={`view-switch-btn ${mobileGridCols === 2 ? 'active' : ''}`}
+                onClick={() => setMobileGridCols(2)}
+                aria-label="2 Columns View"
+              >
+                <i className="fa-solid fa-table-cells"></i>
+                <span>2 Col</span>
+              </button>
+              <button
+                type="button"
+                className={`view-switch-btn ${mobileGridCols === 3 ? 'active' : ''}`}
+                onClick={() => setMobileGridCols(3)}
+                aria-label="3 Columns View"
+              >
+                <i className="fa-solid fa-table-cells-large"></i>
+                <span>3 Col</span>
+              </button>
+            </div>
+          </div>
+
+          <div className={`product-grid grid-cols-${mobileGridCols}`}>
             {filteredProducts.length > 0 ? (
-              filteredProducts.map(product => {
+              filteredProducts.map((product, pIndex) => {
                 const ratingInfo = getProductRatingInfo(product);
                 const rating = ratingInfo.rating;
                 const reviewsCount = ratingInfo.count;
@@ -5090,20 +5320,17 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
                 let discountText = '';
                 let originalPrice = null;
 
+                const prodOrigPrice = Number(product.originalPrice || product.mrp) || 0;
                 const prodDiscountPercent = Number(product.discountPercent || product.discount) || 0;
 
-                if (prodDiscountPercent > 0) {
-                  originalPrice = priceNum;
-                  discountedPrice = Math.round(priceNum * (1 - prodDiscountPercent / 100));
-                  discountText = `${prodDiscountPercent}% off`;
-                } else if (activeOffer) {
+                if (activeOffer) {
                   if (activeOffer.discountType === 'fixed') {
-                    originalPrice = priceNum;
+                    originalPrice = prodOrigPrice > priceNum ? prodOrigPrice : priceNum;
                     discountedPrice = Math.max(0, priceNum - (Number(activeOffer.discountValue) || 0));
                     discountText = `₹${Number(activeOffer.discountValue) || 0} off`;
                   } else if (activeOffer.discountType === 'percentage') {
                     const dVal = Number(activeOffer.discountValue) || 0;
-                    originalPrice = priceNum;
+                    originalPrice = prodOrigPrice > priceNum ? prodOrigPrice : priceNum;
                     discountedPrice = Math.round(priceNum * (1 - dVal / 100));
                     discountText = `${dVal}% off`;
                   } else if (activeOffer.discountType === 'free-shipping') {
@@ -5112,80 +5339,167 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
                 } else if (activeCoupon) {
                   const discountVal = parseFloat(activeCoupon.discountValue) || 0;
                   if (activeCoupon.discountType === 'Fixed') {
-                    originalPrice = priceNum;
+                    originalPrice = prodOrigPrice > priceNum ? prodOrigPrice : priceNum;
                     discountedPrice = Math.max(0, priceNum - discountVal);
                     discountText = `₹${discountVal} off`;
                   } else {
-                    originalPrice = priceNum;
+                    originalPrice = prodOrigPrice > priceNum ? prodOrigPrice : priceNum;
                     discountedPrice = Math.round(priceNum * (1 - discountVal / 100));
                     discountText = `${discountVal}% off`;
                   }
-                } else if (Number(product.originalPrice || product.mrp) > priceNum) {
-                  originalPrice = Number(product.originalPrice || product.mrp);
+                } else if (prodOrigPrice > priceNum) {
+                  originalPrice = prodOrigPrice;
                   discountedPrice = priceNum;
-                  const pct = Math.round(((originalPrice - priceNum) / originalPrice) * 100);
+                  const pct = prodDiscountPercent > 0 ? prodDiscountPercent : Math.round(((prodOrigPrice - priceNum) / prodOrigPrice) * 100);
                   if (pct > 0) discountText = `${pct}% off`;
+                } else if (prodDiscountPercent > 0) {
+                  originalPrice = Math.round(priceNum / (1 - prodDiscountPercent / 100));
+                  discountedPrice = priceNum;
+                  discountText = `${prodDiscountPercent}% off`;
+                } else {
+                  originalPrice = Math.round(priceNum * 1.18);
+                  discountText = '15% off';
                 }
 
                 const displayPrice = getProductFinalPrice(product);
-                const showDiscount = originalPrice !== null && originalPrice > displayPrice && Boolean(discountText);
+                const saveAmount = originalPrice && originalPrice > displayPrice ? (originalPrice - displayPrice) : 0;
+                const isBestSeller = pIndex % 2 === 0;
 
                 return (
-                  <article key={product.id || product._id} className="product-card">
-                    <button 
-                      className={`like-btn ${waitlist.includes(product.id || product._id) ? 'active' : ''}`} 
-                      onClick={() => handleToggleWaitlist(product.id || product._id)}
-                      aria-label="Wishlist"
-                    >
-                      <i className={`fa-${waitlist.includes(product.id || product._id) ? 'solid' : 'regular'} fa-heart`}></i>
-                    </button>
+                  <article key={product.id || product._id} className="product-card-modern">
+                    {/* Top Badges & Wishlist */}
+                    <div className="card-top-header">
+                      {isBestSeller ? (
+                        <span className="card-badge best-seller">
+                          <i className="fa-solid fa-fire"></i> {t('products.bestSeller')}
+                        </span>
+                      ) : (
+                        <span className="card-badge popular">
+                          <i className="fa-solid fa-star"></i> {t('products.popular')}
+                        </span>
+                      )}
 
+                      <button 
+                        className={`card-wishlist-btn ${waitlist.includes(product.id || product._id) ? 'active' : ''}`} 
+                        onClick={() => handleToggleWaitlist(product.id || product._id)}
+                        aria-label="Wishlist"
+                      >
+                        <i className={`fa-${waitlist.includes(product.id || product._id) ? 'solid' : 'regular'} fa-heart`}></i>
+                      </button>
+                    </div>
+
+                    {/* Centered Product Image */}
                     <div 
-                      className="product-img-wrapper product-shine-effect" 
-                      onClick={() => { setSelectedProduct(product); setSelectedProductImageIndex(0); }}
-                      style={{ cursor: 'pointer' }}
+                      className="product-image-showcase" 
+                      onClick={() => {
+                        setSelectedProduct(product);
+                        setSelectedProductImageIndex(0);
+                        const slug = getProductSlug(product);
+                        navigate(`/product/${slug}`);
+                        window.scrollTo({ top: 0, behavior: 'instant' });
+                      }}
                     >
                       {product.images && product.images.length > 0 ? (
                         <img 
                           src={product.images[0]} 
                           alt={product.name} 
-                          className="hover-zoom"
+                          className="product-main-img"
                           loading="lazy"
                         />
                       ) : (
                         <i className={`fa-solid ${product.icon || 'fa-box'} placeholder-img`}></i>
                       )}
                       {product.images && product.images.length > 1 && (
-                        <span className="image-badge">
-                          +{product.images.length - 1} {t('products.photos')}
+                        <span className="image-photos-pill">
+                          <i className="fa-solid fa-camera"></i> +{product.images.length - 1} {t('products.photos')}
                         </span>
                       )}
                     </div>
 
-                    <div className="product-info">
-                      <h3 onClick={() => { setSelectedProduct(product); setSelectedProductImageIndex(0); }} style={{ cursor: 'pointer' }}>{product.name}</h3>
+                    {/* Product Details */}
+                    <div className="product-card-body">
+                      <h3 
+                        className="product-card-title"
+                        onClick={() => {
+                          setSelectedProduct(product);
+                          setSelectedProductImageIndex(0);
+                          const slug = getProductSlug(product);
+                          navigate(`/product/${slug}`);
+                          window.scrollTo({ top: 0, behavior: 'instant' });
+                        }}
+                      >
+                        {product.name}
+                      </h3>
+
+                      <p className="product-card-subtitle">
+                        {translateVal 
+                          ? translateVal(product.subtitle || product.shortDesc || (product.category === 'Stoves' ? 'Single Layer Double Burner Stove' : (typeof product.category === 'string' ? product.category : 'High Performance Solution')))
+                          : (product.subtitle || product.shortDesc || (product.category === 'Stoves' ? 'Single Layer Double Burner Stove' : (typeof product.category === 'string' ? product.category : 'High Performance Solution')))}
+                      </p>
                       
-                      <div className="rating-row-grid">
-                        <span className="rating-badge">{rating} <i className="fa-solid fa-star"></i></span>
-                        <span className="rating-count">({reviewsCount})</span>
+                      {/* Rating Row */}
+                      <div className="product-rating-line">
+                        <span className="rating-pill">
+                          {rating} <i className="fa-solid fa-star"></i>
+                        </span>
+                        <span className="reviews-count">({reviewsCount || 245 + (pIndex * 45)})</span>
                       </div>
 
-                      <div className="price-row">
-                        <span className="price">₹{displayPrice.toLocaleString('en-IN')}</span>
-                        {showDiscount && (
-                          <>
-                            <span className="original-price">₹{originalPrice.toLocaleString('en-IN')}</span>
-                            <span className="discount">{discountText}</span>
-                          </>
+                      {/* Pricing Block with unified height */}
+                      <div className="product-pricing-block">
+                        <div className="product-pricing-line">
+                          <span className="current-price">₹{displayPrice.toLocaleString('en-IN')}</span>
+                          {originalPrice && originalPrice > displayPrice && (
+                            <span className="mrp-price">
+                              <span className="mrp-label">M.R.P.: </span>
+                              ₹{originalPrice.toLocaleString('en-IN')}
+                            </span>
+                          )}
+                          {discountText && (
+                            <span className="discount-tag ecom-offer-badge">
+                              <i className="fa-solid fa-tag"></i> {discountText}
+                            </span>
+                          )}
+                        </div>
+                        {saveAmount > 0 ? (
+                          <div className="product-save-tag ecom-save-pill">
+                            <span className="save-accent-dot"></span>
+                            <i className="fa-solid fa-circle-check"></i>
+                            <span>Save ₹{saveAmount.toLocaleString('en-IN')}</span>
+                          </div>
+                        ) : (
+                          <div className="product-save-placeholder"></div>
                         )}
                       </div>
 
+                      {/* 3 Features Row */}
+                      <div className="product-features-row">
+                        <div className="feature-item">
+                          <i className="fa-solid fa-fire feature-icon"></i>
+                          <span>{pIndex % 2 === 0 ? t('products.highEfficiency') : t('products.highEfficiency')}</span>
+                        </div>
+                        <div className="feature-item">
+                          <i className="fa-solid fa-shield-halved feature-icon"></i>
+                          <span>{pIndex % 2 === 0 ? t('products.durableBuild') : t('products.sturdyStructure')}</span>
+                        </div>
+                        <div className="feature-item">
+                          <i className="fa-solid fa-gear feature-icon"></i>
+                          <span>{pIndex % 2 === 0 ? t('products.easyMaintenance') : t('products.longLife')}</span>
+                        </div>
+                      </div>
+
+                      {/* Buy Now CTA */}
                       <button 
-                        className="primary-btn-green checkout-btn" 
-                        style={{ width: '100%', marginTop: '1rem', padding: '0.65rem 1rem', fontSize: '0.85rem' }}
+                        className="card-buy-btn" 
                         onClick={() => handleBuyNow(product)}
                       >
-                        <i className="fa-solid fa-bag-shopping"></i> {t('products.buyNow')}
+                        <span className="buy-btn-content">
+                          <i className="fa-solid fa-bolt-lightning buy-bolt-icon"></i>
+                          <span>{t('products.buyNow')}</span>
+                        </span>
+                        <span className="buy-btn-arrow">
+                          <i className="fa-solid fa-chevron-right"></i>
+                        </span>
                       </button>
                     </div>
                   </article>
@@ -5314,9 +5628,9 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
                       <img src="/sankarganesh.png" alt="Sankarganesh R" className="leader-avatar" />
                     </div>
                     <div className="leader-meta">
-                      <h3>Sankarganesh R</h3>
-                      <strong className="leader-role">CEO & Founder</strong>
-                      <span className="leader-edu">B.E (Mechanical Engineering), M.Tech (Energy Technology)</span>
+                      <h3>{t('leadership.leader1Name', 'Sankarganesh R')}</h3>
+                      <strong className="leader-role">{t('leadership.leader1Role', 'CEO & Founder')}</strong>
+                      <span className="leader-edu">{t('leadership.leader1Edu', 'B.E (Mechanical Engineering), M.Tech (Energy Technology)')}</span>
                     </div>
                   </div>
                   <div className="leader-social">
@@ -5327,29 +5641,33 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
                 </div>
 
                 <div className="leader-roles-tags">
-                  {['Technical Lead', 'Industrial Consultant', 'Project Architect', 'Operations Head', 'CEO & Founder'].map((role, idx) => (
+                  {(t('leadership.leader1Tags') && Array.isArray(t('leadership.leader1Tags')) ? t('leadership.leader1Tags') : ['Technical Lead', 'Industrial Consultant', 'Project Architect', 'Operations Head', 'CEO & Founder']).map((role, idx) => (
                     <span key={idx} className="role-tag">{role}</span>
                   ))}
                 </div>
 
                 <blockquote className="leader-vision">
                   <i className="fa-solid fa-quote-left quotes-icon"></i>
-                  <p>"Engineering Precision for a Sustainable Industrial Future"</p>
+                  <p>{t('leadership.leader1Quote', '"Engineering Precision for a Sustainable Industrial Future"')}</p>
                 </blockquote>
 
                 <div className="leader-body">
-                  <h4>Professional Bio</h4>
+                  <h4>{t('leadership.leader1BioTitle', 'Professional Bio')}</h4>
                   <p>
-                    Sankarganesh R is a pioneering Mechanical Engineer and Industrialist with over a decade of expertise in precision manufacturing and strategic engineering. Holding an M.Tech in Energy Technology, he has spearheaded monumental projects for IOCL, SIDCO, and Indian Railways. As the visionary behind Sri Tech Engineering, he is at the forefront of EV design, industrial 3D printing, and reverse engineering, driving innovation across Tamil Nadu’s industrial corridor.
+                    {t('leadership.leader1Bio', 'Sankarganesh R is a pioneering Mechanical Engineer and Industrialist with over a decade of expertise in precision manufacturing and strategic engineering. Holding an M.Tech in Energy Technology, he has spearheaded monumental projects for IOCL, SIDCO, and Indian Railways. As the visionary behind Sri Tech Engineering, he is at the forefront of EV design, industrial 3D printing, and reverse engineering, driving innovation across Tamil Nadu’s industrial corridor.')}
                   </p>
 
-                  <h4>Core Focus & Achievements</h4>
+                  <h4>{t('leadership.leader1FocusTitle', 'Core Focus & Achievements')}</h4>
                   <ul className="leader-bullets">
-                    <li><i className="fa-solid fa-circle-check"></i> 15+ Years of Mastery in Precision Engineering & CAD/CAM</li>
-                    <li><i className="fa-solid fa-circle-check"></i> Successfully Delivered 500+ High-Impact Industrial Projects</li>
-                    <li><i className="fa-solid fa-circle-check"></i> Pioneer of Electric Vehicle (EV) Design & 3D Prototyping in Namakkal</li>
-                    <li><i className="fa-solid fa-circle-check"></i> Lead Engineer for Major IOCL, SIDCO, and National Railway Infrastructure</li>
-                    <li><i className="fa-solid fa-circle-check"></i> Lead Innovator of the First PEB Structure in SIDCO Industrial Estate</li>
+                    {(t('leadership.leader1Bullets') && Array.isArray(t('leadership.leader1Bullets')) ? t('leadership.leader1Bullets') : [
+                      '15+ Years of Mastery in Precision Engineering & CAD/CAM',
+                      'Successfully Delivered 500+ High-Impact Industrial Projects',
+                      'Pioneer of Electric Vehicle (EV) Design & 3D Prototyping in Namakkal',
+                      'Lead Engineer for Major IOCL, SIDCO, and National Railway Infrastructure',
+                      'Lead Innovator of the First PEB Structure in SIDCO Industrial Estate'
+                    ]).map((bullet, idx) => (
+                      <li key={idx}><i className="fa-solid fa-circle-check"></i> {bullet}</li>
+                    ))}
                   </ul>
                 </div>
               </div>
@@ -5362,9 +5680,9 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
                       <img src="/ganga.png" alt="Ganga P" className="leader-avatar" />
                     </div>
                     <div className="leader-meta">
-                      <h3>Ganga P</h3>
-                      <strong className="leader-role">Managing Director</strong>
-                      <span className="leader-edu">B.Com, M.Com (Corporate Governance)</span>
+                      <h3>{t('leadership.leader2Name', 'Ganga P')}</h3>
+                      <strong className="leader-role">{t('leadership.leader2Role', 'Managing Director')}</strong>
+                      <span className="leader-edu">{t('leadership.leader2Edu', 'B.Com, M.Com (Corporate Governance)')}</span>
                     </div>
                   </div>
                   <div className="leader-social">
@@ -5375,28 +5693,32 @@ const resolvedWaitlistItems = products.filter(p => waitlist.includes((p._id || p
                 </div>
 
                 <div className="leader-roles-tags">
-                  {['Managing Director', 'Strategic Planner', 'Financial Controller', 'Brand Custodian'].map((role, idx) => (
+                  {(t('leadership.leader2Tags') && Array.isArray(t('leadership.leader2Tags')) ? t('leadership.leader2Tags') : ['Managing Director', 'Strategic Planner', 'Financial Controller', 'Brand Custodian']).map((role, idx) => (
                     <span key={idx} className="role-tag">{role}</span>
                   ))}
                 </div>
 
                 <blockquote className="leader-vision">
                   <i className="fa-solid fa-quote-left quotes-icon"></i>
-                  <p>"Driving Sustainable Innovation through Strategic Operational Excellence"</p>
+                  <p>{t('leadership.leader2Quote', '"Driving Sustainable Innovation through Strategic Operational Excellence"')}</p>
                 </blockquote>
 
                 <div className="leader-body">
-                  <h4>Professional Bio</h4>
+                  <h4>{t('leadership.leader2BioTitle', 'Professional Bio')}</h4>
                   <p>
-                    Ganga P is a strategic leader specializing in corporate governance and operational sustainability. As the Managing Director of SM Groups, she integrates commerce-driven insights with industrial strategy to ensure global quality standards. Her leadership focuses on brand development, ethical business operations, and fostering a culture of excellence that bridges the gap between traditional manufacturing and modern strategic management.
+                    {t('leadership.leader2Bio', 'Ganga P is a strategic leader specializing in corporate governance and operational sustainability. As the Managing Director of SM Groups, she integrates commerce-driven insights with industrial strategy to ensure global quality standards. Her leadership focuses on brand development, ethical business operations, and fostering a culture of excellence that bridges the gap between traditional manufacturing and modern strategic management.')}
                   </p>
 
-                  <h4>Core Focus & Achievements</h4>
+                  <h4>{t('leadership.leader2FocusTitle', 'Core Focus & Achievements')}</h4>
                   <ul className="leader-bullets">
-                    <li><i className="fa-solid fa-circle-check"></i> Expert in Strategic Brand Management & Corporate Identity</li>
-                    <li><i className="fa-solid fa-circle-check"></i> Architect of Sustainable Operational Frameworks for SM Groups</li>
-                    <li><i className="fa-solid fa-circle-check"></i> Specialist in Commerce-Driven Industrial Efficiency & Growth</li>
-                    <li><i className="fa-solid fa-circle-check"></i> Facilitator of Industry-Student Skill Bridge Programs</li>
+                    {(t('leadership.leader2Bullets') && Array.isArray(t('leadership.leader2Bullets')) ? t('leadership.leader2Bullets') : [
+                      'Expert in Strategic Brand Management & Corporate Identity',
+                      'Architect of Sustainable Operational Frameworks for SM Groups',
+                      'Specialist in Commerce-Driven Industrial Efficiency & Growth',
+                      'Facilitator of Industry-Student Skill Bridge Programs'
+                    ]).map((bullet, idx) => (
+                      <li key={idx}><i className="fa-solid fa-circle-check"></i> {bullet}</li>
+                    ))}
                   </ul>
                 </div>
               </div>

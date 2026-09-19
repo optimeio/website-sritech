@@ -10,7 +10,7 @@ const isValidObjectId = (id) => {
 const PRODUCT_IMAGE_LIMIT = Number(process.env.PRODUCT_IMAGE_LIMIT || 10);
 const MAX_DESCRIPTION_LENGTH = Number(process.env.PRODUCT_DESCRIPTION_MAX_LENGTH || 400);
 const MAX_SPECIFICATIONS_LENGTH = Number(process.env.PRODUCT_SPECIFICATIONS_MAX_LENGTH || 600);
-const PRODUCT_SELECT_FIELDS = 'name price category description specifications howToUse burnerSize stoveWeight dimensions material stock shippingCharge gstPercent discountPercent courierOptions icon isNewArrival createdAt sku slug images video';
+const PRODUCT_SELECT_FIELDS = 'name price originalPrice mrp category description specifications howToUse burnerSize stoveWeight dimensions material usage fuelType cookingSurface cookingCapacity stock shippingCharge gstPercent discountPercent courierOptions icon isNewArrival createdAt sku slug images video';
 
 const uploadToCloudinary = async (base64Str, resourceType = 'auto') => {
   if (!process.env.CLOUDINARY_CLOUD_NAME || typeof base64Str !== 'string' || !base64Str.startsWith('data:')) {
@@ -86,11 +86,24 @@ const serializeProduct = (product) => {
         { name: 'MML Express', price: 150 }
       ];
 
+  let origPrice = typeof plainProduct.originalPrice === 'number' && plainProduct.originalPrice > 0
+    ? plainProduct.originalPrice
+    : Number(plainProduct.originalPrice || plainProduct.mrp) || 0;
+
+  if (!origPrice && plainProduct.price && Number(plainProduct.discountPercent) > 0) {
+    const pNum = Number(String(plainProduct.price).replace(/[^\d.]/g, ''));
+    if (pNum > 0) {
+      origPrice = Math.round(pNum / (1 - Number(plainProduct.discountPercent) / 100));
+    }
+  }
+
   const sanitized = {
     ...plainProduct,
     _id: plainProduct._id,
     name: plainProduct.name,
     price: plainProduct.price,
+    originalPrice: origPrice,
+    mrp: origPrice,
     category: Array.isArray(plainProduct.category) ? plainProduct.category[0] || '' : String(plainProduct.category || ''),
     description,
     specifications,
@@ -99,6 +112,10 @@ const serializeProduct = (product) => {
     stoveWeight: plainProduct.stoveWeight || '',
     dimensions: plainProduct.dimensions || '',
     material: plainProduct.material || '',
+    usage: plainProduct.usage || '',
+    fuelType: plainProduct.fuelType || '',
+    cookingSurface: plainProduct.cookingSurface || '',
+    cookingCapacity: plainProduct.cookingCapacity || '',
     stock: typeof plainProduct.stock === 'number' ? plainProduct.stock : Number(plainProduct.stock) || 0,
     shippingCharge: typeof plainProduct.shippingCharge === 'number' ? plainProduct.shippingCharge : Number(plainProduct.shippingCharge) || 0,
     gstPercent: typeof plainProduct.gstPercent === 'number' ? plainProduct.gstPercent : Number(plainProduct.gstPercent) || 0,

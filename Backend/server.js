@@ -30,7 +30,6 @@ const mongoose = require('mongoose');
 require('./config/cloudinary');
 require('./config/razorpay');
 const errorHandler = require('./middleware/errorHandler');
-const { ensureDemoUser } = require('./utils/ensureDemoUser');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -271,11 +270,6 @@ const startServer = async () => {
     console.log('📍 Seeding default products...');
     await runWithTimeout(seedProducts(), 'Product seeding').catch(e => {
       console.warn('⚠️ Product seed warning:', e.message);
-    });
-
-    console.log('📍 Ensuring demo user account...');
-    await runWithTimeout(ensureDemoUser(), 'Ensuring demo user').catch(e => {
-      console.warn('⚠️ Demo user warning:', e.message);
     });
   } catch (err) {
     // Database connection failed, app should still run but API will fail

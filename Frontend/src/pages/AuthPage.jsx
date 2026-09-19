@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useLanguage } from '../LanguageContext';
 
 const API_URL = import.meta.env.VITE_API_URL || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? '/api' : 'https://website-sritech-refk.onrender.com/api');
 
 const AuthPage = () => {
+  const { t } = useLanguage();
   const [authMode, setAuthMode] = useState('login'); // 'login' | 'signup'
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -51,7 +53,7 @@ const AuthPage = () => {
       console.error(err);
       if (/already verified/i.test(err.message)) {
         setMessage('Your account is already verified! Please sign in.');
-                                                                                     setMessageType('success');
+        setMessageType('success');
         setAuthMode('login');
       } else {
         setMessage(err.message || 'OTP verification failed.');
@@ -196,15 +198,18 @@ const AuthPage = () => {
     <div className="auth-page-wrapper">
       <div className="auth-left-pane">
         <div className="auth-left-content">
-          <h2>Cook Smarter.<span>Save More.</span></h2>
+          <div className="auth-brand-badge" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', color: '#ff7a00', fontWeight: 'bold' }}>
+            <i className="fa-solid fa-fire-flame-curved"></i> {t('auth.brandBadge', 'SriTech Eco Living')}
+          </div>
+          <h2>{t('auth.leftTitle1', 'Cook Smarter.')}<span>{t('auth.leftTitle2', 'Save More.')}</span></h2>
           <p className="auth-subhead">
-            Join thousands of customers using fuel-efficient Rocket Stoves for sustainable cooking and a cleaner future.
+            {t('auth.leftSubtitle', 'Join thousands of households & businesses utilizing our high-efficiency combustion systems for sustainable cooking and substantial fuel savings.')}
           </p>
           <ul className="auth-trust-list">
-            <li>✓ Secure Login</li>
-            <li>✓ Fast Checkout</li>
-            <li>✓ Order Tracking</li>
-            <li>✓ 24/7 Customer Support</li>
+            <li>✓ {t('auth.trustSecureTitle', 'Secure Login & Checkout')}</li>
+            <li>✓ {t('auth.trustTrackingTitle', 'Fast Delivery Tracking')}</li>
+            <li>✓ {t('auth.trustSupportTitle', '24/7 Dedicated Support')}</li>
+            <li>✓ {t('auth.trustEcoTitle', '100% Eco-Friendly Materials')}</li>
           </ul>
         </div>
         {[...Array(12)].map((_, i) => (
@@ -225,42 +230,54 @@ const AuthPage = () => {
         <div className="auth-glass-card">
           <button className="auth-close-btn" onClick={() => navigate('/')}>✕</button>
           <div className="auth-header">
-            <h3>{authMode === 'login' ? 'Welcome Back' : authMode === 'verify' ? 'Verify Your Email' : 'Create Account'}</h3>
-            <p>{authMode === 'login' ? 'Sign in to your premium account' : authMode === 'verify' ? 'Enter the code we sent to your inbox.' : 'Start your sustainable journey today'}</p>
+            <h3>{authMode === 'login' ? t('auth.welcomeBack', 'Welcome Back') : authMode === 'verify' ? t('auth.verifyEmail', 'Verify Your Email') : t('auth.createAccount', 'Create Account')}</h3>
+            <p>
+              {authMode === 'login' 
+                ? t('auth.signInSubtitle', 'Sign in to access your orders, cart & account') 
+                : authMode === 'verify' 
+                ? (t('auth.verifySubtitle', 'Enter the 6-digit code sent to your email') + (verificationEmail ? ` (${verificationEmail})` : '')) 
+                : t('auth.createSubtitle', 'Create your account to start ordering with exclusive savings')}
+            </p>
           </div>
           <div className="auth-toggle-group">
             <button
               className={`auth-toggle-btn ${authMode === 'login' ? 'active' : ''}`}
               onClick={() => setAuthMode('login')}
-            >Sign In</button>
+            >
+              <i className="fa-solid fa-arrow-right-to-bracket" style={{ marginRight: '0.4rem' }}></i>
+              {t('auth.signInTab', 'Sign In')}
+            </button>
             <button
               className={`auth-toggle-btn ${authMode === 'signup' ? 'active' : ''}`}
               onClick={() => setAuthMode('signup')}
-            >Sign Up</button>
+            >
+              <i className="fa-solid fa-user-plus" style={{ marginRight: '0.4rem' }}></i>
+              {t('auth.signUpTab', 'Sign Up')}
+            </button>
           </div>
           <form className="auth-fields-grid" onSubmit={handleSubmit}>
             {authMode === 'verify' ? (
               <div className="auth-form-group">
-                <label htmlFor="otpCode">Verification Code</label>
+                <label htmlFor="otpCode">{t('auth.otpVerification', '6-Digit Verification Code')}</label>
                 <div className="auth-input-wrapper">
-                  <i className="fa-regular fa-key prefix-icon" />
+                  <i className="fa-solid fa-key prefix-icon" />
                   <input
                     id="otpCode"
                     name="otpCode"
                     type="text"
                     inputMode="numeric"
                     className="auth-input"
-                    placeholder="Enter 6-digit OTP"
+                    placeholder={t('auth.otpPlaceholder', '000000')}
                     required
                     value={otpCode}
-                    onChange={e => setOtpCode(e.target.value)}
+                    onChange={e => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                   />
                 </div>
               </div>
             ) : authMode === 'signup' && (
               <>
                 <div className="auth-form-group">
-                  <label htmlFor="name">Full Name</label>
+                  <label htmlFor="name">{t('auth.fullName', 'Full Name')}</label>
                   <div className="auth-input-wrapper">
                     <i className="fa-regular fa-user prefix-icon" />
                     <input
@@ -269,7 +286,7 @@ const AuthPage = () => {
                       type="text"
                       autoComplete="name"
                       className="auth-input"
-                      placeholder="John Doe"
+                      placeholder={t('auth.fullNamePlaceholder', 'John Doe')}
                       required
                       value={userCredentials.name}
                       onChange={e => setUserCredentials({ ...userCredentials, name: e.target.value })}
@@ -277,7 +294,7 @@ const AuthPage = () => {
                   </div>
                 </div>
                 <div className="auth-form-group">
-                  <label htmlFor="phone">Mobile Number</label>
+                  <label htmlFor="phone">{t('auth.mobileNumber', 'Mobile Number')}</label>
                   <div className="auth-input-wrapper">
                     <i className="fa-solid fa-phone prefix-icon" />
                     <input
@@ -287,7 +304,7 @@ const AuthPage = () => {
                       inputMode="numeric"
                       autoComplete="tel"
                       className="auth-input"
-                      placeholder="9876543210"
+                      placeholder={t('auth.mobilePlaceholder', '10-digit mobile number')}
                       required
                       value={userCredentials.phone}
                       onChange={e => {
@@ -298,7 +315,7 @@ const AuthPage = () => {
                   </div>
                 </div>
                 <div className="auth-form-group">
-                  <label htmlFor="address">Address</label>
+                  <label htmlFor="address">{t('auth.deliveryAddress', 'Delivery Address')}</label>
                   <div className="auth-input-wrapper">
                     <i className="fa-solid fa-map-location-dot prefix-icon" />
                     <input
@@ -307,7 +324,7 @@ const AuthPage = () => {
                       type="text"
                       autoComplete="street-address"
                       className="auth-input"
-                      placeholder="123 Street Name"
+                      placeholder={t('auth.addressPlaceholder', 'Street, Area, City')}
                       required
                       value={userCredentials.address}
                       onChange={e => setUserCredentials({ ...userCredentials, address: e.target.value })}
@@ -317,11 +334,10 @@ const AuthPage = () => {
               </>
             )}
 
-
             {authMode !== 'verify' && (
               <>
                 <div className="auth-form-group">
-                  <label htmlFor="email">Email Address</label>
+                  <label htmlFor="email">{t('auth.emailAddress', 'Email Address')}</label>
                   <div className="auth-input-wrapper">
                     <i className="fa-regular fa-envelope prefix-icon" />
                     <input
@@ -330,7 +346,7 @@ const AuthPage = () => {
                       type="email"
                       autoComplete="email"
                       className="auth-input"
-                      placeholder="hello@example.com"
+                      placeholder={t('auth.emailPlaceholder', 'name@example.com')}
                       required
                       value={userCredentials.email}
                       onChange={e => setUserCredentials({ ...userCredentials, email: e.target.value })}
@@ -338,7 +354,7 @@ const AuthPage = () => {
                   </div>
                 </div>
                 <div className="auth-form-group">
-                  <label htmlFor="password">Password</label>
+                  <label htmlFor="password">{t('auth.password', 'Password')}</label>
                   <div className="auth-input-wrapper">
                     <i className="fa-solid fa-lock prefix-icon" />
                     <input
@@ -360,8 +376,8 @@ const AuthPage = () => {
               </>
             )}
             {authMode === 'signup' && (
-                <div className="auth-form-group">
-                  <label htmlFor="confirmPassword">Confirm Password</label>
+              <div className="auth-form-group">
+                <label htmlFor="confirmPassword">{t('auth.confirmPassword', 'Confirm Password')}</label>
                 <div className="auth-input-wrapper">
                   <i className="fa-solid fa-shield-check prefix-icon" />
                   <input
@@ -383,17 +399,17 @@ const AuthPage = () => {
             )}
             {authMode === 'login' && (
               <div className="auth-options">
-                <input type="checkbox" id="rememberMe" name="rememberMe" />
-                <label className="remember-me" htmlFor="rememberMe">Remember me</label>
-                <a href="#" className="forgot-pwd" onClick={handleForgotPassword}>Forgot Password?</a>
+                <input type="checkbox" id="rememberMe" name="rememberMe" defaultChecked />
+                <label className="remember-me" htmlFor="rememberMe">{t('auth.rememberMe', 'Remember me')}</label>
+                <a href="#" className="forgot-pwd" onClick={handleForgotPassword}>{t('auth.forgotPassword', 'Forgot Password?')}</a>
               </div>
             )}
             <button type="submit" className="auth-submit-btn" disabled={isSubmitting}>
               {authMode === 'login'
-                ? (isSubmitting ? 'Signing In…' : 'Sign In')
+                ? (isSubmitting ? t('auth.signingIn', 'Signing In...') : t('auth.signInBtn', 'Sign In'))
                 : authMode === 'verify'
-                  ? (isSubmitting ? 'Verifying…' : 'Verify Email')
-                  : (isSubmitting ? 'Creating Account…' : 'Create Account')}
+                  ? (isSubmitting ? t('auth.verifying', 'Verifying...') : t('auth.verifyBtn', 'Verify & Continue'))
+                  : (isSubmitting ? t('auth.creatingAccount', 'Creating Account...') : t('auth.createAccountBtn', 'Create Account'))}
             </button>
           </form>
           {message && (

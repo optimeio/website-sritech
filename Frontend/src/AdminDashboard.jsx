@@ -61,6 +61,8 @@ const AdminDashboard = ({
   refundRequests = [],
   activityLogs = [],
   leads = [],
+  onUpdateLeadStatus,
+  onDeleteLead,
   users = [],
   onToggleBlockUser,
   onDeleteUser,
@@ -115,6 +117,10 @@ const AdminDashboard = ({
   const [inventoryStockDrafts, setInventoryStockDrafts] = useState({});
 
   const [expandedUserId, setExpandedUserId] = useState(null);
+  const [leadSearchTerm, setLeadSearchTerm] = useState('');
+  const [leadStatusFilter, setLeadStatusFilter] = useState('All');
+  const [selectedLead, setSelectedLead] = useState(null);
+  const [leadAdminNotesInput, setLeadAdminNotesInput] = useState('');
 
   const getWishlistItems = (user) => {
     const wishlistIds = [...(user?.wishlist || []), ...(user?.waitlist || [])].map(id => String(id));
@@ -293,6 +299,8 @@ const AdminDashboard = ({
   const [newProduct, setNewProduct] = useState({ 
     name: '', 
     price: '', 
+    originalPrice: '',
+    mrp: '',
     description: '',
     specifications: '',
     howToUse: '',
@@ -300,6 +308,10 @@ const AdminDashboard = ({
     stoveWeight: '',
     dimensions: '',
     material: '',
+    usage: '',
+    fuelType: '',
+    cookingSurface: '',
+    cookingCapacity: '',
     stock: 0,
     shippingCharge: 0,
     gstPercent: 0,
@@ -319,12 +331,103 @@ const AdminDashboard = ({
   // --- Edit Product State ---
   const [editingProductId, setEditingProductId] = useState(null);
   const [editProduct, setEditProduct] = useState({
-    name: '', price: '', description: '', specifications: '', howToUse: '', burnerSize: '', stoveWeight: '', dimensions: '', material: '', stock: 0, shippingCharge: 0, gstPercent: 0, discountPercent: 0, courierOptions: [], category: '', isNewArrival: false, images: [], video: ''
+    name: '', price: '', originalPrice: '', mrp: '', description: '', specifications: '', howToUse: '', burnerSize: '', stoveWeight: '', dimensions: '', material: '', usage: '', fuelType: '', cookingSurface: '', cookingCapacity: '', stock: 0, shippingCharge: 0, gstPercent: 0, discountPercent: 0, courierOptions: [], category: '', isNewArrival: false, images: [], video: ''
   });
   const [replaceEditImages, setReplaceEditImages] = useState(false);
 
+  // --- Auto-calculating Product Pricing & Discount Handlers ---
+  const handleNewProductPricingChange = (field, rawValue) => {
+    const cleanVal = String(rawValue || '').replace(/[^\d.]/g, '');
+    setNewProduct(prev => {
+      let nextMrp = field === 'originalPrice' ? cleanVal : (prev.originalPrice || prev.mrp || '');
+      let nextSelling = field === 'price' ? cleanVal : (prev.price || '');
+      let nextDiscount = field === 'discountPercent' ? cleanVal : (prev.discountPercent || 0);
+
+      const mrpNum = parseFloat(nextMrp) || 0;
+      const sellingNum = parseFloat(nextSelling) || 0;
+      const discNum = parseFloat(nextDiscount) || 0;
+
+      if (field === 'originalPrice') {
+        if (mrpNum > 0 && sellingNum > 0 && mrpNum >= sellingNum) {
+          nextDiscount = Math.round(((mrpNum - sellingNum) / mrpNum) * 100);
+        } else if (mrpNum > 0 && discNum > 0 && (!nextSelling || sellingNum === 0)) {
+          nextSelling = String(Math.round(mrpNum * (1 - discNum / 100)));
+        } else if (mrpNum > 0 && sellingNum > mrpNum) {
+          nextDiscount = 0;
+        }
+      } else if (field === 'price') {
+        if (mrpNum > 0 && sellingNum > 0) {
+          if (mrpNum >= sellingNum) {
+            nextDiscount = Math.round(((mrpNum - sellingNum) / mrpNum) * 100);
+          } else {
+            nextDiscount = 0;
+          }
+        }
+      } else if (field === 'discountPercent') {
+        const clampedDisc = Math.min(100, Math.max(0, discNum));
+        nextDiscount = cleanVal === '' ? '' : clampedDisc;
+        if (mrpNum > 0) {
+          nextSelling = String(Math.round(mrpNum * (1 - (clampedDisc / 100))));
+        }
+      }
+
+      return {
+        ...prev,
+        originalPrice: nextMrp,
+        mrp: nextMrp,
+        price: nextSelling,
+        discountPercent: nextDiscount === '' ? 0 : Number(nextDiscount)
+      };
+    });
+  };
+
+  const handleEditProductPricingChange = (field, rawValue) => {
+    const cleanVal = String(rawValue || '').replace(/[^\d.]/g, '');
+    setEditProduct(prev => {
+      let nextMrp = field === 'originalPrice' ? cleanVal : (prev.originalPrice || prev.mrp || '');
+      let nextSelling = field === 'price' ? cleanVal : (prev.price || '');
+      let nextDiscount = field === 'discountPercent' ? cleanVal : (prev.discountPercent || 0);
+
+      const mrpNum = parseFloat(nextMrp) || 0;
+      const sellingNum = parseFloat(nextSelling) || 0;
+      const discNum = parseFloat(nextDiscount) || 0;
+
+      if (field === 'originalPrice') {
+        if (mrpNum > 0 && sellingNum > 0 && mrpNum >= sellingNum) {
+          nextDiscount = Math.round(((mrpNum - sellingNum) / mrpNum) * 100);
+        } else if (mrpNum > 0 && discNum > 0 && (!nextSelling || sellingNum === 0)) {
+          nextSelling = String(Math.round(mrpNum * (1 - discNum / 100)));
+        } else if (mrpNum > 0 && sellingNum > mrpNum) {
+          nextDiscount = 0;
+        }
+      } else if (field === 'price') {
+        if (mrpNum > 0 && sellingNum > 0) {
+          if (mrpNum >= sellingNum) {
+            nextDiscount = Math.round(((mrpNum - sellingNum) / mrpNum) * 100);
+          } else {
+            nextDiscount = 0;
+          }
+        }
+      } else if (field === 'discountPercent') {
+        const clampedDisc = Math.min(100, Math.max(0, discNum));
+        nextDiscount = cleanVal === '' ? '' : clampedDisc;
+        if (mrpNum > 0) {
+          nextSelling = String(Math.round(mrpNum * (1 - (clampedDisc / 100))));
+        }
+      }
+
+      return {
+        ...prev,
+        originalPrice: nextMrp,
+        mrp: nextMrp,
+        price: nextSelling,
+        discountPercent: nextDiscount === '' ? 0 : Number(nextDiscount)
+      };
+    });
+  };
+
   const extractProductDefaults = (p) => {
-    if (!p) return { burnerSize: '', stoveWeight: '', dimensions: '', material: '', howToUse: '' };
+    if (!p) return { burnerSize: '', stoveWeight: '', dimensions: '', material: '', howToUse: '', usage: '', fuelType: '', cookingSurface: '', cookingCapacity: '' };
     const name = p.name || '';
     const desc = p.description || '';
     const specs = p.specifications || '';
@@ -334,6 +437,10 @@ const AdminDashboard = ({
     let dimensions = p.dimensions || '';
     let material = p.material || '';
     let howToUse = p.howToUse || '';
+    let usage = p.usage || '';
+    let fuelType = p.fuelType || '';
+    let cookingSurface = p.cookingSurface || '';
+    let cookingCapacity = p.cookingCapacity || '';
 
     if (!burnerSize) {
       const match = (desc + ' ' + specs + ' ' + name).match(/(?:burner size|burner)\s*:\s*([^,\.\n;]+)/i);
@@ -371,7 +478,37 @@ const AdminDashboard = ({
       howToUse = `1. Place stove on a stable, non-combustible surface.\n2. Fill combustion chamber with fuel (wood, coconut shell, husk or biomass).\n3. Connect & switch on air regulator blower for clean combustion.\n4. Light fuel from top/side port and adjust fan speed for flame intensity.`;
     }
 
-    return { burnerSize, stoveWeight, dimensions, material, howToUse };
+    if (!usage) {
+      const match = (desc + ' ' + specs).match(/usage\s*:\s*([^:\n;]+)/i);
+      if (match) usage = match[1].trim();
+      else usage = 'Crafted for Temples, Hotels, Restaurants, Bakeries, Cafes, Tea Shops, Catering Services, Cloud Kitchens, Street Food Businesses, and Every Professional Kitchen.';
+    }
+
+    if (!fuelType) {
+      const match = (desc + ' ' + specs).match(/(?:fuel type|fuel)\s*:\s*([^:\n;]+)/i);
+      if (match) fuelType = match[1].trim();
+      else fuelType = 'Wood, Coconut shell & husk, Charcoal & Biomass';
+    }
+
+    if (!cookingSurface) {
+      const match = (desc + ' ' + specs).match(/cooking surface\s*:\s*([^:\n;]+)/i);
+      if (match) cookingSurface = match[1].trim();
+      else cookingSurface = 'Flat';
+    }
+
+    if (!cookingCapacity) {
+      const match = (desc + ' ' + specs).match(/(?:cooking capacity|capacity)\s*:\s*([^:\n;]+)/i);
+      if (match) cookingCapacity = match[1].trim();
+      else if (/m9|m10|12"|12 inch|dual stove/i.test(name)) cookingCapacity = 'Up to 90 kg (150 - 300+ Persons / Mega Commercial & Temples)';
+      else if (/m8|10"|10 inch/i.test(name)) cookingCapacity = 'Up to 75 kg (100 - 150 Persons / Large Commercial)';
+      else if (/m6|dual turbo/i.test(name)) cookingCapacity = 'Up to 50 kg (40 - 75 Persons / Dual Commercial)';
+      else if (/m7|8"|8 inch/i.test(name)) cookingCapacity = 'Up to 40 kg (40 - 75 Persons / Commercial & Hotels)';
+      else if (/m5/i.test(name)) cookingCapacity = 'Up to 30 kg (25 - 40 Persons / Commercial & Catering)';
+      else if (/m4/i.test(name)) cookingCapacity = 'Up to 25 kg (15 - 25 Persons / Small Hotels & Homes)';
+      else cookingCapacity = 'Up to 10 kg (4 - 8 Persons / Home Cooking)';
+    }
+
+    return { burnerSize, stoveWeight, dimensions, material, howToUse, usage, fuelType, cookingSurface, cookingCapacity };
   };
 
   const startEditProduct = async (listProduct) => {
@@ -383,10 +520,25 @@ const AdminDashboard = ({
     }
 
     const defaults = extractProductDefaults(p);
+
+    const cleanPrice = p.price ? p.price.toString().replace(/[₹,]/g, '').trim() : '';
+    const numPrice = Number(cleanPrice) || 0;
+    const numDisc = typeof p.discountPercent === 'number' ? p.discountPercent : (Number(p.discountPercent) || 0);
+
+    let resolvedOriginalPrice = '';
+    if (p.originalPrice && Number(p.originalPrice) > 0) {
+      resolvedOriginalPrice = String(p.originalPrice);
+    } else if (p.mrp && Number(p.mrp) > 0) {
+      resolvedOriginalPrice = String(p.mrp);
+    } else if (numDisc > 0 && numPrice > 0) {
+      resolvedOriginalPrice = String(Math.round(numPrice / (1 - numDisc / 100)));
+    }
     
     setEditProduct({
       name: p.name || '',
-      price: p.price ? p.price.toString().replace(/[₹,]/g, '') : '',
+      price: cleanPrice,
+      originalPrice: resolvedOriginalPrice,
+      mrp: resolvedOriginalPrice,
       description: p.description || '',
       specifications: p.specifications || '',
       howToUse: p.howToUse || defaults.howToUse,
@@ -394,10 +546,14 @@ const AdminDashboard = ({
       stoveWeight: p.stoveWeight || defaults.stoveWeight,
       dimensions: p.dimensions || defaults.dimensions,
       material: p.material || defaults.material,
+      usage: p.usage || defaults.usage,
+      fuelType: p.fuelType || defaults.fuelType,
+      cookingSurface: p.cookingSurface || defaults.cookingSurface,
+      cookingCapacity: p.cookingCapacity || defaults.cookingCapacity,
       stock: typeof p.stock === 'number' ? p.stock : 0,
       shippingCharge: typeof p.shippingCharge === 'number' ? p.shippingCharge : 0,
       gstPercent: typeof p.gstPercent === 'number' ? p.gstPercent : 0,
-      discountPercent: typeof p.discountPercent === 'number' ? p.discountPercent : 0,
+      discountPercent: numDisc,
       courierOptions: Array.isArray(p.courierOptions) && p.courierOptions.length > 0 ? p.courierOptions : [
         { name: 'Rathimeena Parcel Service', price: 150 },
         { name: 'ST Couriers', price: 250 },
@@ -415,7 +571,13 @@ const AdminDashboard = ({
 
   const cancelEditProduct = () => {
     setEditingProductId(null);
-    setEditProduct({ name: '', price: '', category: '', isNewArrival: false, images: [], video: '', shippingCharge: 0 });
+    setEditProduct({
+      name: '', price: '', originalPrice: '', mrp: '', category: '',
+      description: '', specifications: '', howToUse: '',
+      burnerSize: '', stoveWeight: '', dimensions: '', material: '',
+      usage: '', fuelType: '', cookingSurface: '', cookingCapacity: '',
+      isNewArrival: false, images: [], video: '', shippingCharge: 0, discountPercent: 0, courierOptions: []
+    });
     setReplaceEditImages(false);
   };
 
@@ -485,6 +647,17 @@ const AdminDashboard = ({
 
     const payload = {
       ...editProduct,
+      burnerSize: String(editProduct.burnerSize || '').trim(),
+      stoveWeight: String(editProduct.stoveWeight || '').trim(),
+      dimensions: String(editProduct.dimensions || '').trim(),
+      material: String(editProduct.material || '').trim(),
+      usage: String(editProduct.usage || '').trim(),
+      fuelType: String(editProduct.fuelType || '').trim(),
+      cookingSurface: String(editProduct.cookingSurface || '').trim(),
+      cookingCapacity: String(editProduct.cookingCapacity || '').trim(),
+      originalPrice: Number(editProduct.originalPrice || editProduct.mrp || 0),
+      mrp: Number(editProduct.originalPrice || editProduct.mrp || 0),
+      discountPercent: Number(editProduct.discountPercent || 0),
       video: String(editProduct.video || '').trim(),
       images: (Array.isArray(editProduct.images) ? editProduct.images : []).map((img) => {
         if (typeof img !== 'string' || !img) return img;
@@ -536,6 +709,7 @@ const AdminDashboard = ({
     { name: 'Inventory', icon: 'fa-warehouse' },
     { name: 'Customers', icon: 'fa-users' },
     { name: 'Orders', icon: 'fa-cart-shopping' },
+    { name: 'Stove Enquiries', icon: 'fa-fire-burner' },
     { name: 'Coupons', icon: 'fa-ticket' },
     { name: 'Support', icon: 'fa-headset' },
     { name: 'Activity Logs', icon: 'fa-file-lines' },
@@ -638,6 +812,8 @@ const AdminDashboard = ({
       ...newProduct,
       name: String(newProduct.name || '').trim(),
       price: String(newProduct.price || '').trim(),
+      originalPrice: Number(newProduct.originalPrice || newProduct.mrp || 0),
+      mrp: Number(newProduct.originalPrice || newProduct.mrp || 0),
       category: String(newProduct.category || '').trim(),
       description: String(newProduct.description || '').trim(),
       specifications: String(newProduct.specifications || '').trim(),
@@ -646,6 +822,10 @@ const AdminDashboard = ({
       stoveWeight: String(newProduct.stoveWeight || '').trim(),
       dimensions: String(newProduct.dimensions || '').trim(),
       material: String(newProduct.material || '').trim(),
+      usage: String(newProduct.usage || '').trim(),
+      fuelType: String(newProduct.fuelType || '').trim(),
+      cookingSurface: String(newProduct.cookingSurface || '').trim(),
+      cookingCapacity: String(newProduct.cookingCapacity || '').trim(),
       stock: Number(newProduct.stock || 0),
       shippingCharge: Number(newProduct.shippingCharge || 0),
       gstPercent: Number(newProduct.gstPercent || 0),
@@ -665,7 +845,13 @@ const AdminDashboard = ({
       const savedProduct = await onAddProduct(payload);
       if (savedProduct) {
         alert('Product added successfully!');
-        setNewProduct({ name: '', price: '', description: '', specifications: '', howToUse: '', burnerSize: '', stoveWeight: '', dimensions: '', material: '', stock: 0, shippingCharge: 0, gstPercent: 0, discountPercent: 0, category: categories[0]?.slug || categories[0]?.name || 'stoves', icon: 'fa-box', isNewArrival: false, images: [], video: '' });
+        setNewProduct({
+          name: '', price: '', originalPrice: '', mrp: '', description: '', specifications: '', howToUse: '',
+          burnerSize: '', stoveWeight: '', dimensions: '', material: '',
+          usage: '', fuelType: '', cookingSurface: '', cookingCapacity: '',
+          stock: 0, shippingCharge: 0, gstPercent: 0, discountPercent: 0,
+          category: categories[0]?.slug || categories[0]?.name || 'stoves', icon: 'fa-box', isNewArrival: false, images: [], video: ''
+        });
 
       } else {
         alert('Failed to add product. Please try again.');
@@ -975,9 +1161,50 @@ const AdminDashboard = ({
             >
               <i className={`fa-solid ${item.icon}`}></i>
               <span>{item.name}</span>
+              {item.name === 'Stove Enquiries' && (leads || []).filter(l => (l.status || 'New') === 'New').length > 0 && (
+                <span style={{
+                  marginLeft: 'auto',
+                  background: '#EF4444',
+                  color: '#fff',
+                  borderRadius: '12px',
+                  padding: '2px 8px',
+                  fontSize: '0.72rem',
+                  fontWeight: 800,
+                  boxShadow: '0 2px 6px rgba(239, 68, 68, 0.4)'
+                }}>
+                  {(leads || []).filter(l => (l.status || 'New') === 'New').length}
+                </span>
+              )}
             </button>
           ))}
         </nav>
+        <button 
+          type="button"
+          className="admin-visit-website-btn" 
+          onClick={() => window.open('/', '_blank')}
+          title="Open customer live website in a new tab without logging out"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            width: 'calc(100% - 2rem)',
+            margin: '0 1rem 0.5rem 1rem',
+            padding: '0.7rem 1rem',
+            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+            color: '#ffffff',
+            border: 'none',
+            borderRadius: '10px',
+            fontWeight: 700,
+            fontSize: '0.88rem',
+            cursor: 'pointer',
+            boxShadow: '0 2px 8px rgba(16, 185, 129, 0.25)',
+            transition: 'all 0.2s ease'
+          }}
+        >
+          <i className="fa-solid fa-arrow-up-right-from-square"></i>
+          <span>Visit Website</span>
+        </button>
         <button className="admin-logout-btn" onClick={onLogout}>
           <i className="fa-solid fa-right-from-bracket"></i>
           <span>Logout</span>
@@ -995,6 +1222,29 @@ const AdminDashboard = ({
             </span>
           </h1>
           <div className="admin-profile">
+            <button 
+              type="button"
+              className="admin-header-visit-btn" 
+              onClick={() => window.open('/', '_blank')}
+              title="Open customer website in a new tab (session preserved)"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '0.45rem 0.9rem',
+                background: '#f0fdf4',
+                color: '#15803d',
+                border: '1.5px solid #86efac',
+                borderRadius: '8px',
+                fontWeight: 700,
+                fontSize: '0.82rem',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <i className="fa-solid fa-store"></i> Visit Website
+            </button>
+
             <button 
               className={`refresh-btn ${isRefreshing ? 'spinning' : ''}`} 
               onClick={onRefresh}
@@ -1029,6 +1279,16 @@ const AdminDashboard = ({
           {/* Stats for Overview at the Top */}
           {activeTab === 'Overview' && (
             <div className="admin-stats-grid">
+              <div className="stat-card" onClick={() => handleTabChange('Stove Enquiries')} style={{ cursor: 'pointer', borderLeft: '3px solid #ff7a00' }}>
+                <span className="stat-label">Stove Inquiries <i className="fa-solid fa-fire-burner" style={{ color: '#ff7a00' }}></i></span>
+                <span className="stat-value">{leads.length}</span>
+                <div style={{ width: '100%', height: '4px', background: 'rgba(0,0,0,0.06)', borderRadius: '2px', overflow: 'hidden', margin: '4px 0' }}>
+                  <div style={{ width: leads.length > 0 ? '75%' : '0%', height: '100%', background: 'linear-gradient(90deg, #ff7a00, #ff5500)', borderRadius: '2px' }}></div>
+                </div>
+                <span className="stat-change" style={{ color: '#ea580c', fontWeight: 600 }}>
+                  {leads.filter(l => (l.status || 'New') === 'New').length} new customer leads
+                </span>
+              </div>
               <div className="stat-card">
                 <span className="stat-label">Orders <i className="fa-solid fa-cart-shopping"></i></span>
                 <span className="stat-value">{orders.length}</span>
@@ -1148,21 +1408,162 @@ const AdminDashboard = ({
                           onChange={(e) => setEditProduct({ ...editProduct, name: e.target.value })}
                         />
                       </div>
-                      <div className="admin-form-group">
-                        <label htmlFor="editProductPrice">Price (₹)</label>
-                        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                          <span style={{ position: 'absolute', left: '1rem', color: 'var(--primary-color)', fontWeight: 'bold' }}>₹</span>
-                          <input
-                            id="editProductPrice"
-                            type="text"
-                            placeholder="e.g. 1499"
-                            required
-                            maxLength="6"
-                            value={editProduct.price}
-                            onChange={(e) => setEditProduct({ ...editProduct, price: e.target.value.replace(/\D/g, '').slice(0, 6) })}
-                            style={{ paddingLeft: '2rem', width: '100%' }}
-                          />
+                      {/* Product Pricing & Auto-Discount Calculator */}
+                      <div style={{
+                        gridColumn: '1 / -1',
+                        background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                        border: '1.5px solid #cbd5e1',
+                        borderRadius: '14px',
+                        padding: '1.25rem',
+                        marginBottom: '0.5rem',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                          <label style={{ fontWeight: '700', fontSize: '1rem', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                            <i className="fa-solid fa-calculator" style={{ color: 'var(--primary-color)' }}></i>
+                            Product Pricing & Auto-Discount Calculator
+                          </label>
+                          <span style={{ fontSize: '0.8rem', background: '#dbeafe', color: '#1e40af', padding: '3px 10px', borderRadius: '12px', fontWeight: 600 }}>
+                            E-Commerce Standard (MRP & Selling Price)
+                          </span>
                         </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
+                          {/* Product Price / MRP */}
+                          <div className="admin-form-group" style={{ margin: 0 }}>
+                            <label htmlFor="editProductOriginalPrice" style={{ fontWeight: 600, fontSize: '0.85rem', color: '#334155' }}>
+                              Product Price / MRP (₹) <span style={{ color: '#ef4444' }}>*</span>
+                            </label>
+                            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                              <span style={{ position: 'absolute', left: '0.9rem', color: '#64748b', fontWeight: 'bold' }}>₹</span>
+                              <input
+                                id="editProductOriginalPrice"
+                                type="text"
+                                placeholder="e.g. 5000"
+                                value={editProduct.originalPrice || editProduct.mrp || ''}
+                                onChange={(e) => handleEditProductPricingChange('originalPrice', e.target.value)}
+                                style={{ paddingLeft: '2rem', width: '100%', borderColor: '#94a3b8' }}
+                              />
+                            </div>
+                            <span style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '3px' }}>Original MRP (struck-through on store)</span>
+                          </div>
+
+                          {/* Selling Price */}
+                          <div className="admin-form-group" style={{ margin: 0 }}>
+                            <label htmlFor="editProductPrice" style={{ fontWeight: 600, fontSize: '0.85rem', color: '#0f172a' }}>
+                              Selling Price / Deal Price (₹) <span style={{ color: '#ef4444' }}>*</span>
+                            </label>
+                            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                              <span style={{ position: 'absolute', left: '0.9rem', color: '#16a34a', fontWeight: 'bold' }}>₹</span>
+                              <input
+                                id="editProductPrice"
+                                type="text"
+                                placeholder="e.g. 4500"
+                                required
+                                value={editProduct.price || ''}
+                                onChange={(e) => handleEditProductPricingChange('price', e.target.value)}
+                                style={{ paddingLeft: '2rem', width: '100%', borderColor: '#16a34a', fontWeight: 600 }}
+                              />
+                            </div>
+                            <span style={{ fontSize: '0.72rem', color: '#16a34a', marginTop: '3px', fontWeight: 500 }}>Actual price paid by customer</span>
+                          </div>
+
+                          {/* Discount Rate (%) */}
+                          <div className="admin-form-group" style={{ margin: 0 }}>
+                            <label htmlFor="editProductDiscountPercent" style={{ fontWeight: 600, fontSize: '0.85rem', color: '#334155' }}>
+                              Discount Rate (%) <span style={{ color: '#64748b', fontWeight: 400 }}>(Auto-calculated)</span>
+                            </label>
+                            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                              <input
+                                id="editProductDiscountPercent"
+                                type="number"
+                                min="0"
+                                max="100"
+                                placeholder="e.g. 10"
+                                value={editProduct.discountPercent ?? ''}
+                                onChange={(e) => handleEditProductPricingChange('discountPercent', e.target.value)}
+                                style={{ paddingRight: '2rem', width: '100%' }}
+                              />
+                              <span style={{ position: 'absolute', right: '0.9rem', color: '#64748b', fontWeight: 'bold' }}>%</span>
+                            </div>
+                            <span style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '3px' }}>Auto-calculates from MRP & Selling Price</span>
+                          </div>
+
+                          {/* Customer Saves (₹) */}
+                          <div className="admin-form-group" style={{ margin: 0 }}>
+                            <label style={{ fontWeight: 600, fontSize: '0.85rem', color: '#334155' }}>
+                              Customer Savings (₹)
+                            </label>
+                            {(() => {
+                              const mrpNum = parseFloat(editProduct.originalPrice || editProduct.mrp) || 0;
+                              const sellingNum = parseFloat(editProduct.price) || 0;
+                              const saveAmt = (mrpNum > sellingNum && sellingNum > 0) ? (mrpNum - sellingNum) : 0;
+                              return (
+                                <div style={{
+                                  padding: '0.65rem 1rem',
+                                  borderRadius: '8px',
+                                  background: saveAmt > 0 ? '#ecfdf5' : '#f1f5f9',
+                                  border: `1.5px solid ${saveAmt > 0 ? '#a7f3d0' : '#e2e8f0'}`,
+                                  color: saveAmt > 0 ? '#047857' : '#64748b',
+                                  fontWeight: 700,
+                                  fontSize: '0.95rem',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '6px'
+                                }}>
+                                  <i className={saveAmt > 0 ? 'fa-solid fa-badge-percent' : 'fa-regular fa-circle-question'}></i>
+                                  <span>{saveAmt > 0 ? `₹${saveAmt.toLocaleString('en-IN')} Saved` : 'No Savings (0%)'}</span>
+                                </div>
+                              );
+                            })()}
+                            <span style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '3px' }}>Difference between MRP and Selling Price</span>
+                          </div>
+                        </div>
+
+                        {/* Live E-Commerce Store Preview Banner */}
+                        {(() => {
+                          const mrpNum = parseFloat(editProduct.originalPrice || editProduct.mrp) || 0;
+                          const sellingNum = parseFloat(editProduct.price) || 0;
+                          const saveAmt = (mrpNum > sellingNum && sellingNum > 0) ? (mrpNum - sellingNum) : 0;
+                          const discNum = (mrpNum > sellingNum && sellingNum > 0) ? Math.round(((mrpNum - sellingNum) / mrpNum) * 100) : (Number(editProduct.discountPercent) || 0);
+                          return (
+                            <div style={{
+                              background: '#ffffff',
+                              border: '1px dashed #94a3b8',
+                              borderRadius: '10px',
+                              padding: '0.75rem 1rem',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              flexWrap: 'wrap',
+                              gap: '0.75rem'
+                            }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                <span style={{ fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: '#64748b', fontWeight: 700 }}>
+                                  Website Live Preview:
+                                </span>
+                                <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>
+                                  ₹{sellingNum.toLocaleString('en-IN')}
+                                </span>
+                                {saveAmt > 0 && (
+                                  <span style={{ textDecoration: 'line-through', color: '#94a3b8', fontSize: '0.95rem', fontWeight: 500 }}>
+                                    ₹{mrpNum.toLocaleString('en-IN')}
+                                  </span>
+                                )}
+                                {discNum > 0 && (
+                                  <span style={{ background: '#dcfce7', color: '#15803d', padding: '2px 8px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 700 }}>
+                                    {discNum}% OFF
+                                  </span>
+                                )}
+                              </div>
+                              {saveAmt > 0 && (
+                                <div style={{ background: '#fef3c7', color: '#b45309', padding: '3px 10px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                  <i className="fa-solid fa-circle-check"></i> Customer Saves ₹{saveAmt.toLocaleString('en-IN')}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </div>
                       <div className="admin-form-group">
                         <label htmlFor="editProductDescription">Description</label>
@@ -1209,6 +1610,28 @@ const AdminDashboard = ({
                         <label htmlFor="editProductMaterial">Material</label>
                         <input id="editProductMaterial" type="text" placeholder="e.g. Mild Steel (MS)" value={editProduct.material} onChange={(e) => setEditProduct({ ...editProduct, material: e.target.value })} />
                       </div>
+                      <div className="admin-form-group" style={{ gridColumn: '1 / -1' }}>
+                        <label htmlFor="editProductUsage">Usage (Crafted for / Suitable for)</label>
+                        <textarea
+                          id="editProductUsage"
+                          placeholder="e.g. Crafted for Temples, Hotels, Restaurants, Bakeries, Cafes, Tea Shops, Catering Services, Cloud Kitchens, Street Food Businesses, and Every Professional Kitchen."
+                          value={editProduct.usage}
+                          onChange={(e) => setEditProduct({ ...editProduct, usage: e.target.value })}
+                          style={{ minHeight: '75px' }}
+                        />
+                      </div>
+                      <div className="admin-form-group">
+                        <label htmlFor="editProductFuelType">Fuel Type</label>
+                        <input id="editProductFuelType" type="text" placeholder="e.g. Wood, Coconut shell & husk, Charcoal & Biomass" value={editProduct.fuelType} onChange={(e) => setEditProduct({ ...editProduct, fuelType: e.target.value })} />
+                      </div>
+                      <div className="admin-form-group">
+                        <label htmlFor="editProductCookingSurface">Cooking Surface</label>
+                        <input id="editProductCookingSurface" type="text" placeholder="e.g. Flat / Heavy-Duty Top" value={editProduct.cookingSurface} onChange={(e) => setEditProduct({ ...editProduct, cookingSurface: e.target.value })} />
+                      </div>
+                      <div className="admin-form-group">
+                        <label htmlFor="editProductCookingCapacity">Cooking Capacity</label>
+                        <input id="editProductCookingCapacity" type="text" placeholder="e.g. Up to 40 kg (40 - 75 Persons / Commercial & Hotels)" value={editProduct.cookingCapacity} onChange={(e) => setEditProduct({ ...editProduct, cookingCapacity: e.target.value })} />
+                      </div>
                       <div className="admin-form-group">
                         <label htmlFor="editProductStock">Stock</label>
                         <input
@@ -1241,18 +1664,6 @@ const AdminDashboard = ({
                           placeholder="e.g. 0 or 18"
                           value={editProduct.gstPercent}
                           onChange={(e) => setEditProduct({ ...editProduct, gstPercent: Number(e.target.value) })}
-                        />
-                      </div>
-                      <div className="admin-form-group">
-                        <label htmlFor="editProductDiscountPercent">Discount Rate (% - Optional)</label>
-                        <input
-                          id="editProductDiscountPercent"
-                          type="number"
-                          min="0"
-                          max="100"
-                          placeholder="e.g. 0 or 20"
-                          value={editProduct.discountPercent}
-                          onChange={(e) => setEditProduct({ ...editProduct, discountPercent: Number(e.target.value) })}
                         />
                       </div>
                       <div className="admin-form-group">
@@ -1477,21 +1888,162 @@ const AdminDashboard = ({
                         onChange={(e) => setNewProduct({...newProduct, name: e.target.value})}
                       />
                     </div>
-                    <div className="admin-form-group">
-                      <label htmlFor="newProductPrice">Price (₹)</label>
-                      <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                        <span style={{ position: 'absolute', left: '1rem', color: '#818cf8', fontWeight: 'bold' }}>₹</span>
-                        <input 
-                          id="newProductPrice"
-                          type="text" 
-                          placeholder="e.g. 1499" 
-                          required 
-                          maxLength="6"
-                          value={newProduct.price}
-                          onChange={(e) => setNewProduct({...newProduct, price: e.target.value.replace(/\D/g, '').slice(0, 6)})}
-                          style={{ paddingLeft: '2rem', width: '100%' }}
-                        />
+                    {/* Product Pricing & Auto-Discount Calculator */}
+                    <div style={{
+                      gridColumn: '1 / -1',
+                      background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                      border: '1.5px solid #cbd5e1',
+                      borderRadius: '14px',
+                      padding: '1.25rem',
+                      marginBottom: '0.5rem',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                        <label style={{ fontWeight: '700', fontSize: '1rem', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                          <i className="fa-solid fa-calculator" style={{ color: 'var(--primary-color)' }}></i>
+                          Product Pricing & Auto-Discount Calculator
+                        </label>
+                        <span style={{ fontSize: '0.8rem', background: '#dbeafe', color: '#1e40af', padding: '3px 10px', borderRadius: '12px', fontWeight: 600 }}>
+                          E-Commerce Standard (MRP & Selling Price)
+                        </span>
                       </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
+                        {/* Product Price / MRP */}
+                        <div className="admin-form-group" style={{ margin: 0 }}>
+                          <label htmlFor="newProductOriginalPrice" style={{ fontWeight: 600, fontSize: '0.85rem', color: '#334155' }}>
+                            Product Price / MRP (₹) <span style={{ color: '#ef4444' }}>*</span>
+                          </label>
+                          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                            <span style={{ position: 'absolute', left: '0.9rem', color: '#64748b', fontWeight: 'bold' }}>₹</span>
+                            <input
+                              id="newProductOriginalPrice"
+                              type="text"
+                              placeholder="e.g. 5000"
+                              value={newProduct.originalPrice || newProduct.mrp || ''}
+                              onChange={(e) => handleNewProductPricingChange('originalPrice', e.target.value)}
+                              style={{ paddingLeft: '2rem', width: '100%', borderColor: '#94a3b8' }}
+                            />
+                          </div>
+                          <span style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '3px' }}>Original MRP (struck-through on store)</span>
+                        </div>
+
+                        {/* Selling Price */}
+                        <div className="admin-form-group" style={{ margin: 0 }}>
+                          <label htmlFor="newProductPrice" style={{ fontWeight: 600, fontSize: '0.85rem', color: '#0f172a' }}>
+                            Selling Price / Deal Price (₹) <span style={{ color: '#ef4444' }}>*</span>
+                          </label>
+                          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                            <span style={{ position: 'absolute', left: '0.9rem', color: '#16a34a', fontWeight: 'bold' }}>₹</span>
+                            <input
+                              id="newProductPrice"
+                              type="text"
+                              placeholder="e.g. 4500"
+                              required
+                              value={newProduct.price || ''}
+                              onChange={(e) => handleNewProductPricingChange('price', e.target.value)}
+                              style={{ paddingLeft: '2rem', width: '100%', borderColor: '#16a34a', fontWeight: 600 }}
+                            />
+                          </div>
+                          <span style={{ fontSize: '0.72rem', color: '#16a34a', marginTop: '3px', fontWeight: 500 }}>Actual price paid by customer</span>
+                        </div>
+
+                        {/* Discount Rate (%) */}
+                        <div className="admin-form-group" style={{ margin: 0 }}>
+                          <label htmlFor="newProductDiscountPercent" style={{ fontWeight: 600, fontSize: '0.85rem', color: '#334155' }}>
+                            Discount Rate (%) <span style={{ color: '#64748b', fontWeight: 400 }}>(Auto-calculated)</span>
+                          </label>
+                          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                            <input
+                              id="newProductDiscountPercent"
+                              type="number"
+                              min="0"
+                              max="100"
+                              placeholder="e.g. 10"
+                              value={newProduct.discountPercent ?? ''}
+                              onChange={(e) => handleNewProductPricingChange('discountPercent', e.target.value)}
+                              style={{ paddingRight: '2rem', width: '100%' }}
+                            />
+                            <span style={{ position: 'absolute', right: '0.9rem', color: '#64748b', fontWeight: 'bold' }}>%</span>
+                          </div>
+                          <span style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '3px' }}>Auto-calculates from MRP & Selling Price</span>
+                        </div>
+
+                        {/* Customer Saves (₹) */}
+                        <div className="admin-form-group" style={{ margin: 0 }}>
+                          <label style={{ fontWeight: 600, fontSize: '0.85rem', color: '#334155' }}>
+                            Customer Savings (₹)
+                          </label>
+                          {(() => {
+                            const mrpNum = parseFloat(newProduct.originalPrice || newProduct.mrp) || 0;
+                            const sellingNum = parseFloat(newProduct.price) || 0;
+                            const saveAmt = (mrpNum > sellingNum && sellingNum > 0) ? (mrpNum - sellingNum) : 0;
+                            return (
+                              <div style={{
+                                padding: '0.65rem 1rem',
+                                borderRadius: '8px',
+                                background: saveAmt > 0 ? '#ecfdf5' : '#f1f5f9',
+                                border: `1.5px solid ${saveAmt > 0 ? '#a7f3d0' : '#e2e8f0'}`,
+                                color: saveAmt > 0 ? '#047857' : '#64748b',
+                                fontWeight: 700,
+                                fontSize: '0.95rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px'
+                              }}>
+                                <i className={saveAmt > 0 ? 'fa-solid fa-badge-percent' : 'fa-regular fa-circle-question'}></i>
+                                <span>{saveAmt > 0 ? `₹${saveAmt.toLocaleString('en-IN')} Saved` : 'No Savings (0%)'}</span>
+                              </div>
+                            );
+                          })()}
+                          <span style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '3px' }}>Difference between MRP and Selling Price</span>
+                        </div>
+                      </div>
+
+                      {/* Live E-Commerce Store Preview Banner */}
+                      {(() => {
+                        const mrpNum = parseFloat(newProduct.originalPrice || newProduct.mrp) || 0;
+                        const sellingNum = parseFloat(newProduct.price) || 0;
+                        const saveAmt = (mrpNum > sellingNum && sellingNum > 0) ? (mrpNum - sellingNum) : 0;
+                        const discNum = (mrpNum > sellingNum && sellingNum > 0) ? Math.round(((mrpNum - sellingNum) / mrpNum) * 100) : (Number(newProduct.discountPercent) || 0);
+                        return (
+                          <div style={{
+                            background: '#ffffff',
+                            border: '1px dashed #94a3b8',
+                            borderRadius: '10px',
+                            padding: '0.75rem 1rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            flexWrap: 'wrap',
+                            gap: '0.75rem'
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                              <span style={{ fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: '#64748b', fontWeight: 700 }}>
+                                Website Live Preview:
+                              </span>
+                              <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>
+                                ₹{sellingNum.toLocaleString('en-IN')}
+                              </span>
+                              {saveAmt > 0 && (
+                                <span style={{ textDecoration: 'line-through', color: '#94a3b8', fontSize: '0.95rem', fontWeight: 500 }}>
+                                  ₹{mrpNum.toLocaleString('en-IN')}
+                                </span>
+                              )}
+                              {discNum > 0 && (
+                                <span style={{ background: '#dcfce7', color: '#15803d', padding: '2px 8px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 700 }}>
+                                  {discNum}% OFF
+                                </span>
+                              )}
+                            </div>
+                            {saveAmt > 0 && (
+                              <div style={{ background: '#fef3c7', color: '#b45309', padding: '3px 10px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                <i className="fa-solid fa-circle-check"></i> Customer Saves ₹{saveAmt.toLocaleString('en-IN')}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
                     <div className="admin-form-group">
                       <label htmlFor="newProductDescription">Description</label>
@@ -1539,6 +2091,28 @@ const AdminDashboard = ({
                       <label htmlFor="newProductMaterial">Material</label>
                       <input id="newProductMaterial" type="text" placeholder="e.g. Mild Steel (MS)" value={newProduct.material} onChange={(e) => setNewProduct({ ...newProduct, material: e.target.value })} />
                     </div>
+                    <div className="admin-form-group" style={{ gridColumn: '1 / -1' }}>
+                      <label htmlFor="newProductUsage">Usage (Crafted for / Suitable for)</label>
+                      <textarea
+                        id="newProductUsage"
+                        placeholder="e.g. Crafted for Temples, Hotels, Restaurants, Bakeries, Cafes, Tea Shops, Catering Services, Cloud Kitchens, Street Food Businesses, and Every Professional Kitchen."
+                        value={newProduct.usage}
+                        onChange={(e) => setNewProduct({ ...newProduct, usage: e.target.value })}
+                        style={{ minHeight: '75px' }}
+                      />
+                    </div>
+                    <div className="admin-form-group">
+                      <label htmlFor="newProductFuelType">Fuel Type</label>
+                      <input id="newProductFuelType" type="text" placeholder="e.g. Wood, Coconut shell & husk, Charcoal & Biomass" value={newProduct.fuelType} onChange={(e) => setNewProduct({ ...newProduct, fuelType: e.target.value })} />
+                    </div>
+                    <div className="admin-form-group">
+                      <label htmlFor="newProductCookingSurface">Cooking Surface</label>
+                      <input id="newProductCookingSurface" type="text" placeholder="e.g. Flat / Heavy-Duty Top" value={newProduct.cookingSurface} onChange={(e) => setNewProduct({ ...newProduct, cookingSurface: e.target.value })} />
+                    </div>
+                    <div className="admin-form-group">
+                      <label htmlFor="newProductCookingCapacity">Cooking Capacity</label>
+                      <input id="newProductCookingCapacity" type="text" placeholder="e.g. Up to 40 kg (40 - 75 Persons / Commercial & Hotels)" value={newProduct.cookingCapacity} onChange={(e) => setNewProduct({ ...newProduct, cookingCapacity: e.target.value })} />
+                    </div>
                     <div className="admin-form-group">
                       <label htmlFor="newProductStock">Stock</label>
                       <input
@@ -1573,19 +2147,6 @@ const AdminDashboard = ({
                         onChange={(e) => setNewProduct({...newProduct, gstPercent: Number(e.target.value)})}
                       />
                       <span style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>Leave 0 to omit GST charge from customer checkout.</span>
-                    </div>
-                    <div className="admin-form-group">
-                      <label htmlFor="newProductDiscountPercent">Discount Rate (% - Optional)</label>
-                      <input
-                        id="newProductDiscountPercent"
-                        type="number"
-                        min="0"
-                        max="100"
-                        placeholder="e.g. 0 or 20"
-                        value={newProduct.discountPercent}
-                        onChange={(e) => setNewProduct({...newProduct, discountPercent: Number(e.target.value)})}
-                      />
-                      <span style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>Leave 0 for no discount during checkout.</span>
                     </div>
                     <div className="admin-form-group" style={{ gridColumn: '1 / -1', background: '#f8fafc', padding: '1rem', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
                       <label style={{ fontWeight: '700', fontSize: '0.95rem', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
@@ -2375,6 +2936,595 @@ const AdminDashboard = ({
               </div>
             </div>
           )}
+
+
+          {activeTab === 'Stove Enquiries' && (() => {
+            const allLeads = leads || [];
+            const newCount = allLeads.filter(l => (l.status || 'New') === 'New').length;
+            const contactedCount = allLeads.filter(l => l.status === 'Contacted').length;
+            const discussionCount = allLeads.filter(l => l.status === 'In Discussion').length;
+            const convertedCount = allLeads.filter(l => l.status === 'Converted').length;
+
+            const filteredLeads = allLeads.filter(lead => {
+              const matchesStatus = leadStatusFilter === 'All' ? true : (lead.status || 'New') === leadStatusFilter;
+              const q = leadSearchTerm.trim().toLowerCase();
+              if (!q) return matchesStatus;
+              const name = (lead.name || '').toLowerCase();
+              const phone = (lead.whatsapp || lead.phone || '').toLowerCase();
+              const city = (lead.location || '').toLowerCase();
+              const purpose = (lead.purpose || '').toLowerCase();
+              const stove = (lead.stoveModel || '').toLowerCase();
+              const fuel = (lead.fuelType || '').toLowerCase();
+              return matchesStatus && (name.includes(q) || phone.includes(q) || city.includes(q) || purpose.includes(q) || stove.includes(q) || fuel.includes(q));
+            });
+
+            const getPurposeColor = (pur = '') => {
+              const p = pur.toLowerCase();
+              if (p.includes('hotel') || p.includes('restaurant')) return { bg: '#EFF6FF', text: '#1D4ED8', border: '#BFDBFE' };
+              if (p.includes('temple') || p.includes('annadhanam')) return { bg: '#FEF3C7', text: '#B45309', border: '#FDE68A' };
+              if (p.includes('catering')) return { bg: '#F5F3FF', text: '#6D28D9', border: '#DDD6FE' };
+              if (p.includes('cloud') || p.includes('fast food')) return { bg: '#FDF2F8', text: '#BE185D', border: '#FBCFE8' };
+              if (p.includes('bakery') || p.includes('tea')) return { bg: '#ECFDF5', text: '#047857', border: '#A7F3D0' };
+              if (p.includes('domestic') || p.includes('farm')) return { bg: '#F0FDFA', text: '#0F766E', border: '#99F6E4' };
+              return { bg: '#F8FAFC', text: '#475569', border: '#E2E8F0' };
+            };
+
+            const getWhatsAppLink = (lead) => {
+              const rawNum = String(lead.whatsapp || lead.phone || '').replace(/[^0-9]/g, '');
+              const cleanPhone = rawNum.startsWith('91') && rawNum.length === 12 ? rawNum : (rawNum.length === 10 ? '91' + rawNum : rawNum);
+              const text = `Hello ${lead.name || 'Customer'}, thank you for contacting Sri Tech regarding your ${lead.stoveModel || 'Rocket Stove'} inquiry (${lead.purpose || 'Commercial'}). We would be glad to share catalog, pricing and delivery options with you.`;
+              return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`;
+            };
+
+            return (
+              <div className="admin-stove-enquiries" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                {/* Header & Quick Action */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+                  <div>
+                    <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0f172a', margin: '0 0 0.25rem' }}>
+                      Customer Stove Enquiries & Leads
+                    </h2>
+                    <p style={{ color: '#64748b', fontSize: '0.9rem', margin: 0 }}>
+                      Manage commercial kitchen inquiries, custom stove fabrication requests, and follow-ups.
+                    </p>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.75rem' }}>
+                    <button
+                      type="button"
+                      className="admin-btn"
+                      onClick={onRefresh}
+                      disabled={isRefreshing}
+                      style={{
+                        background: '#f8fafc',
+                        border: '1.5px solid #cbd5e1',
+                        color: '#334155',
+                        borderRadius: '10px',
+                        padding: '0.6rem 1.1rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem'
+                      }}
+                    >
+                      <i className={`fa-solid fa-arrows-rotate ${isRefreshing ? 'fa-spin' : ''}`}></i>
+                      Refresh
+                    </button>
+                  </div>
+                </div>
+
+                {/* KPI Metrics Cards */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+                  <div className="admin-card-glass" style={{ padding: '1.25rem', borderLeft: '4px solid #3B82F6', borderRadius: '16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ color: '#64748b', fontSize: '0.85rem', fontWeight: 600 }}>Total Enquiries</span>
+                      <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(59, 130, 246, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3B82F6' }}>
+                        <i className="fa-solid fa-clipboard-list"></i>
+                      </div>
+                    </div>
+                    <div style={{ fontSize: '1.85rem', fontWeight: 800, color: '#0f172a', marginTop: '0.4rem' }}>{allLeads.length}</div>
+                    <span style={{ fontSize: '0.78rem', color: '#64748b' }}>All received inquiries</span>
+                  </div>
+
+                  <div className="admin-card-glass" style={{ padding: '1.25rem', borderLeft: '4px solid #EF4444', borderRadius: '16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ color: '#64748b', fontSize: '0.85rem', fontWeight: 600 }}>New & Pending</span>
+                      <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(239, 68, 68, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#EF4444' }}>
+                        <i className="fa-solid fa-bell"></i>
+                      </div>
+                    </div>
+                    <div style={{ fontSize: '1.85rem', fontWeight: 800, color: '#DC2626', marginTop: '0.4rem' }}>{newCount}</div>
+                    <span style={{ fontSize: '0.78rem', color: '#EF4444', fontWeight: 600 }}>Requires attention</span>
+                  </div>
+
+                  <div className="admin-card-glass" style={{ padding: '1.25rem', borderLeft: '4px solid #8B5CF6', borderRadius: '16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ color: '#64748b', fontSize: '0.85rem', fontWeight: 600 }}>In Discussion</span>
+                      <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(139, 92, 246, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8B5CF6' }}>
+                        <i className="fa-solid fa-comments"></i>
+                      </div>
+                    </div>
+                    <div style={{ fontSize: '1.85rem', fontWeight: 800, color: '#7C3AED', marginTop: '0.4rem' }}>{contactedCount + discussionCount}</div>
+                    <span style={{ fontSize: '0.78rem', color: '#64748b' }}>Under active consultation</span>
+                  </div>
+
+                  <div className="admin-card-glass" style={{ padding: '1.25rem', borderLeft: '4px solid #10B981', borderRadius: '16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ color: '#64748b', fontSize: '0.85rem', fontWeight: 600 }}>Converted to Order</span>
+                      <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(16, 185, 129, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#10B981' }}>
+                        <i className="fa-solid fa-circle-check"></i>
+                      </div>
+                    </div>
+                    <div style={{ fontSize: '1.85rem', fontWeight: 800, color: '#059669', marginTop: '0.4rem' }}>{convertedCount}</div>
+                    <span style={{ fontSize: '0.78rem', color: '#10B981', fontWeight: 600 }}>Successful purchases</span>
+                  </div>
+                </div>
+
+                {/* Filter Tabs & Search Bar */}
+                <div className="admin-card-glass" style={{ padding: '1rem 1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', borderRadius: '16px' }}>
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    {['All', 'New', 'Contacted', 'In Discussion', 'Converted', 'Closed'].map(st => {
+                      const count = st === 'All' ? allLeads.length : allLeads.filter(l => (l.status || 'New') === st).length;
+                      const isActive = leadStatusFilter === st;
+                      return (
+                        <button
+                          key={st}
+                          type="button"
+                          onClick={() => setLeadStatusFilter(st)}
+                          style={{
+                            padding: '0.45rem 0.85rem',
+                            borderRadius: '10px',
+                            border: '1.5px solid',
+                            borderColor: isActive ? '#ff7a00' : '#e2e8f0',
+                            background: isActive ? '#fff7ed' : '#ffffff',
+                            color: isActive ? '#ea580c' : '#475569',
+                            fontWeight: isActive ? 700 : 500,
+                            fontSize: '0.84rem',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.4rem',
+                            transition: 'all 0.2s ease'
+                          }}
+                        >
+                          <span>{st}</span>
+                          <span style={{
+                            background: isActive ? '#ea580c' : '#f1f5f9',
+                            color: isActive ? '#ffffff' : '#64748b',
+                            borderRadius: '8px',
+                            padding: '1px 6px',
+                            fontSize: '0.72rem',
+                            fontWeight: 700
+                          }}>
+                            {count}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div style={{ position: 'relative', minWidth: '260px', flex: '1 1 260px', maxWidth: '420px' }}>
+                    <i className="fa-solid fa-magnifying-glass" style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }}></i>
+                    <input
+                      type="text"
+                      value={leadSearchTerm}
+                      onChange={e => setLeadSearchTerm(e.target.value)}
+                      placeholder="Search by name, phone, city, stove..."
+                      style={{
+                        width: '100%',
+                        padding: '0.6rem 1rem 0.6rem 2.5rem',
+                        borderRadius: '10px',
+                        border: '1.5px solid #cbd5e1',
+                        fontSize: '0.88rem',
+                        background: '#ffffff'
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Inquiries Table */}
+                <div className="admin-card-glass" style={{ padding: '0', borderRadius: '16px', overflow: 'hidden' }}>
+                  {filteredLeads.length > 0 ? (
+                    <div className="admin-table-wrapper" style={{ margin: 0 }}>
+                      <table className="admin-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <thead>
+                          <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', textAlign: 'left' }}>
+                            <th style={{ padding: '0.9rem 1rem', fontSize: '0.82rem', fontWeight: 700, color: '#475569' }}>Customer</th>
+                            <th style={{ padding: '0.9rem 1rem', fontSize: '0.82rem', fontWeight: 700, color: '#475569' }}>Purpose</th>
+                            <th style={{ padding: '0.9rem 1rem', fontSize: '0.82rem', fontWeight: 700, color: '#475569' }}>Requested Stove & Fuel</th>
+                            <th style={{ padding: '0.9rem 1rem', fontSize: '0.82rem', fontWeight: 700, color: '#475569' }}>Capacity & Location</th>
+                            <th style={{ padding: '0.9rem 1rem', fontSize: '0.82rem', fontWeight: 700, color: '#475569' }}>Date</th>
+                            <th style={{ padding: '0.9rem 1rem', fontSize: '0.82rem', fontWeight: 700, color: '#475569' }}>Status</th>
+                            <th style={{ padding: '0.9rem 1rem', fontSize: '0.82rem', fontWeight: 700, color: '#475569', textAlign: 'right' }}>Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredLeads.map((lead) => {
+                            const purposeStyle = getPurposeColor(lead.purpose);
+                            const leadStatus = lead.status || 'New';
+                            return (
+                              <tr
+                                key={lead._id || lead.id}
+                                style={{
+                                  borderBottom: '1px solid #f1f5f9',
+                                  transition: 'background 0.15s ease'
+                                }}
+                              >
+                                {/* Customer */}
+                                <td style={{ padding: '1rem' }}>
+                                  <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.92rem' }}>
+                                    {lead.name}
+                                  </div>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#16a34a', fontSize: '0.82rem', fontWeight: 600, marginTop: '2px' }}>
+                                    <i className="fa-brands fa-whatsapp"></i>
+                                    <span>{lead.whatsapp || lead.phone || '—'}</span>
+                                  </div>
+                                  {lead.email && (
+                                    <div style={{ color: '#64748b', fontSize: '0.78rem', marginTop: '1px' }}>
+                                      {lead.email}
+                                    </div>
+                                  )}
+                                </td>
+
+                                {/* Purpose */}
+                                <td style={{ padding: '1rem' }}>
+                                  <span style={{
+                                    display: 'inline-block',
+                                    background: purposeStyle.bg,
+                                    color: purposeStyle.text,
+                                    border: `1px solid ${purposeStyle.border}`,
+                                    borderRadius: '8px',
+                                    padding: '3px 8px',
+                                    fontSize: '0.8rem',
+                                    fontWeight: 700
+                                  }}>
+                                    {lead.purpose || 'Commercial'}
+                                  </span>
+                                </td>
+
+                                {/* Stove Model & Fuel */}
+                                <td style={{ padding: '1rem' }}>
+                                  <div style={{ fontWeight: 700, color: '#1e293b', fontSize: '0.88rem' }}>
+                                    {lead.stoveModel || 'Rocket Stove'}
+                                  </div>
+                                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', background: '#f1f5f9', color: '#475569', borderRadius: '6px', padding: '2px 6px', fontSize: '0.76rem', marginTop: '3px' }}>
+                                    <i className="fa-solid fa-fire" style={{ color: '#ea580c', fontSize: '0.7rem' }}></i>
+                                    <span>{lead.fuelType || 'Biomass'}</span>
+                                  </div>
+                                </td>
+
+                                {/* Capacity & Location */}
+                                <td style={{ padding: '1rem' }}>
+                                  <div style={{ color: '#0f172a', fontSize: '0.85rem', fontWeight: 600 }}>
+                                    {lead.capacity || 'Commercial'}
+                                  </div>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', color: '#64748b', fontSize: '0.8rem', marginTop: '2px' }}>
+                                    <i className="fa-solid fa-location-dot" style={{ color: '#ef4444', fontSize: '0.75rem' }}></i>
+                                    <span>{lead.location || 'Tamil Nadu'}</span>
+                                  </div>
+                                </td>
+
+                                {/* Date */}
+                                <td style={{ padding: '1rem', color: '#64748b', fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
+                                  {new Date(lead.createdAt || Date.now()).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                  <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                                    {new Date(lead.createdAt || Date.now()).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                                  </div>
+                                </td>
+
+                                {/* Status Selector */}
+                                <td style={{ padding: '1rem' }}>
+                                  <select
+                                    value={leadStatus}
+                                    onChange={(e) => onUpdateLeadStatus && onUpdateLeadStatus(lead._id || lead.id, e.target.value, lead.adminNotes)}
+                                    style={{
+                                      padding: '0.35rem 0.65rem',
+                                      borderRadius: '8px',
+                                      fontWeight: 700,
+                                      fontSize: '0.8rem',
+                                      cursor: 'pointer',
+                                      border: '1.5px solid',
+                                      borderColor: leadStatus === 'Converted' ? '#10B981' : leadStatus === 'New' ? '#EF4444' : leadStatus === 'Contacted' ? '#3B82F6' : leadStatus === 'In Discussion' ? '#8B5CF6' : '#64748B',
+                                      background: leadStatus === 'Converted' ? '#ECFDF5' : leadStatus === 'New' ? '#FEF2F2' : leadStatus === 'Contacted' ? '#EFF6FF' : leadStatus === 'In Discussion' ? '#F5F3FF' : '#F8FAFC',
+                                      color: leadStatus === 'Converted' ? '#047857' : leadStatus === 'New' ? '#B91C1C' : leadStatus === 'Contacted' ? '#1D4ED8' : leadStatus === 'In Discussion' ? '#6D28D9' : '#475569'
+                                    }}
+                                  >
+                                    <option value="New">🔴 New</option>
+                                    <option value="Contacted">🔵 Contacted</option>
+                                    <option value="In Discussion">🟣 In Discussion</option>
+                                    <option value="Converted">🟢 Converted</option>
+                                    <option value="Closed">⚪ Closed</option>
+                                  </select>
+                                </td>
+
+                                {/* Actions */}
+                                <td style={{ padding: '1rem', textAlign: 'right' }}>
+                                  <div style={{ display: 'inline-flex', gap: '0.4rem', alignItems: 'center' }}>
+                                    <a
+                                      href={getWhatsAppLink(lead)}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="admin-btn"
+                                      title="Chat on WhatsApp"
+                                      style={{
+                                        background: '#25D366',
+                                        color: '#fff',
+                                        padding: '0.4rem 0.65rem',
+                                        borderRadius: '8px',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '0.3rem',
+                                        fontSize: '0.78rem',
+                                        fontWeight: 700,
+                                        textDecoration: 'none'
+                                      }}
+                                    >
+                                      <i className="fa-brands fa-whatsapp"></i> WhatsApp
+                                    </a>
+
+                                    <a
+                                      href={`tel:${lead.whatsapp || lead.phone}`}
+                                      className="admin-btn"
+                                      title="Call Customer"
+                                      style={{
+                                        background: '#3B82F6',
+                                        color: '#fff',
+                                        padding: '0.4rem 0.6rem',
+                                        borderRadius: '8px',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '0.3rem',
+                                        fontSize: '0.78rem',
+                                        fontWeight: 700,
+                                        textDecoration: 'none'
+                                      }}
+                                    >
+                                      <i className="fa-solid fa-phone"></i>
+                                    </a>
+
+                                    <button
+                                      type="button"
+                                      className="admin-btn"
+                                      onClick={() => {
+                                        setSelectedLead(lead);
+                                        setLeadAdminNotesInput(lead.adminNotes || '');
+                                      }}
+                                      title="View Full Details"
+                                      style={{
+                                        background: '#F1F5F9',
+                                        color: '#334155',
+                                        padding: '0.4rem 0.6rem',
+                                        borderRadius: '8px',
+                                        border: '1px solid #CBD5E1',
+                                        cursor: 'pointer'
+                                      }}
+                                    >
+                                      <i className="fa-regular fa-eye"></i>
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      className="admin-btn"
+                                      onClick={() => {
+                                        if (window.confirm(`Delete inquiry from ${lead.name}?`)) {
+                                          onDeleteLead && onDeleteLead(lead._id || lead.id);
+                                        }
+                                      }}
+                                      title="Delete Inquiry"
+                                      style={{
+                                        background: '#FEE2E2',
+                                        color: '#DC2626',
+                                        padding: '0.4rem 0.6rem',
+                                        borderRadius: '8px',
+                                        border: '1px solid #FECACA',
+                                        cursor: 'pointer'
+                                      }}
+                                    >
+                                      <i className="fa-regular fa-trash-can"></i>
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div style={{ textAlign: 'center', padding: '3.5rem 1.5rem', color: '#64748b' }}>
+                      <div style={{ fontSize: '2.5rem', color: '#cbd5e1', marginBottom: '0.75rem' }}>
+                        <i className="fa-solid fa-inbox"></i>
+                      </div>
+                      <h4 style={{ color: '#1e293b', marginBottom: '0.4rem' }}>No Enquiries Found</h4>
+                      <p style={{ margin: 0, fontSize: '0.9rem' }}>
+                        {leadSearchTerm ? 'No inquiries matched your search filter.' : 'Customer stove inquiries will appear here automatically when submitted.'}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* View Details Modal */}
+                {selectedLead && (
+                  <div className="modal-overlay active" style={{ zIndex: 9999 }}>
+                    <div className="modal-content" style={{ maxWidth: '640px', width: '95%', borderRadius: '20px', padding: '2rem', maxHeight: '90vh', overflowY: 'auto' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem' }}>
+                        <div>
+                          <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#ff7a00', textTransform: 'uppercase' }}>Inquiry Details</span>
+                          <h3 style={{ margin: '0.2rem 0 0', color: '#0f172a', fontSize: '1.35rem' }}>{selectedLead.name}</h3>
+                        </div>
+                        <button
+                          type="button"
+                          className="close-modal"
+                          onClick={() => setSelectedLead(null)}
+                          style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', fontSize: '1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                        >
+                          &times;
+                        </button>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', marginBottom: '1.25rem' }}>
+                        <div style={{ background: '#f8fafc', padding: '0.85rem', borderRadius: '10px' }}>
+                          <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>CONTACT NUMBER</span>
+                          <div style={{ fontWeight: 700, color: '#0f172a', marginTop: '2px', fontSize: '0.95rem' }}>
+                            {selectedLead.whatsapp || selectedLead.phone || '—'}
+                          </div>
+                        </div>
+
+                        <div style={{ background: '#f8fafc', padding: '0.85rem', borderRadius: '10px' }}>
+                          <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>LOCATION / CITY</span>
+                          <div style={{ fontWeight: 700, color: '#0f172a', marginTop: '2px', fontSize: '0.95rem' }}>
+                            {selectedLead.location || 'Tamil Nadu'}
+                          </div>
+                        </div>
+
+                        <div style={{ background: '#f8fafc', padding: '0.85rem', borderRadius: '10px' }}>
+                          <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>PURPOSE OF USE</span>
+                          <div style={{ fontWeight: 700, color: '#2563eb', marginTop: '2px', fontSize: '0.95rem' }}>
+                            {selectedLead.purpose || 'Commercial Kitchen'}
+                          </div>
+                        </div>
+
+                        <div style={{ background: '#f8fafc', padding: '0.85rem', borderRadius: '10px' }}>
+                          <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>STOVE MODEL</span>
+                          <div style={{ fontWeight: 700, color: '#ea580c', marginTop: '2px', fontSize: '0.95rem' }}>
+                            {selectedLead.stoveModel || 'Rocket Stove'}
+                          </div>
+                        </div>
+
+                        <div style={{ background: '#f8fafc', padding: '0.85rem', borderRadius: '10px' }}>
+                          <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>FUEL PREFERENCE</span>
+                          <div style={{ fontWeight: 700, color: '#16a34a', marginTop: '2px', fontSize: '0.95rem' }}>
+                            {selectedLead.fuelType || 'Wood & Biomass'}
+                          </div>
+                        </div>
+
+                        <div style={{ background: '#f8fafc', padding: '0.85rem', borderRadius: '10px' }}>
+                          <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>COOKING CAPACITY</span>
+                          <div style={{ fontWeight: 700, color: '#0f172a', marginTop: '2px', fontSize: '0.95rem' }}>
+                            {selectedLead.capacity || 'Commercial'}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Customer Notes */}
+                      {selectedLead.notes && (
+                        <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', padding: '0.85rem 1rem', borderRadius: '10px', marginBottom: '1.25rem' }}>
+                          <span style={{ fontSize: '0.75rem', color: '#ea580c', fontWeight: 700 }}>CUSTOMER SPECIAL REQUIREMENTS</span>
+                          <p style={{ margin: '0.35rem 0 0', color: '#7c2d12', fontSize: '0.9rem', lineHeight: 1.5 }}>
+                            {selectedLead.notes}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Admin Internal Notes Form */}
+                      <div style={{ marginBottom: '1.25rem' }}>
+                        <label style={{ display: 'block', fontWeight: 700, fontSize: '0.85rem', color: '#334155', marginBottom: '0.4rem' }}>
+                          Internal Admin Follow-up Notes:
+                        </label>
+                        <textarea
+                          rows={3}
+                          value={leadAdminNotesInput}
+                          onChange={(e) => setLeadAdminNotesInput(e.target.value)}
+                          placeholder="e.g. Called customer on March 17. Sent 2-burner catalog PDF. Customer prefers delivery to Madurai hotel."
+                          style={{
+                            width: '100%',
+                            padding: '0.75rem',
+                            borderRadius: '10px',
+                            border: '1.5px solid #cbd5e1',
+                            fontSize: '0.9rem',
+                            resize: 'vertical'
+                          }}
+                        />
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.4rem' }}>
+                          <button
+                            type="button"
+                            className="admin-btn"
+                            onClick={() => {
+                              onUpdateLeadStatus && onUpdateLeadStatus(selectedLead._id || selectedLead.id, selectedLead.status, leadAdminNotesInput);
+                              setSelectedLead(prev => ({ ...prev, adminNotes: leadAdminNotesInput }));
+                              alert('Follow-up notes saved!');
+                            }}
+                            style={{
+                              background: '#15803D',
+                              color: '#fff',
+                              borderRadius: '8px',
+                              padding: '0.45rem 1rem',
+                              fontWeight: 700,
+                              fontSize: '0.82rem',
+                              border: 'none',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Save Notes
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Quick Contact & Status Bar */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', borderTop: '1px solid #e2e8f0', paddingTop: '1rem' }}>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <a
+                            href={getWhatsAppLink(selectedLead)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              background: '#25D366',
+                              color: '#fff',
+                              borderRadius: '10px',
+                              padding: '0.6rem 1.1rem',
+                              fontWeight: 700,
+                              fontSize: '0.88rem',
+                              textDecoration: 'none',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.4rem'
+                            }}
+                          >
+                            <i className="fa-brands fa-whatsapp"></i> Chat on WhatsApp
+                          </a>
+                          <a
+                            href={`tel:${selectedLead.whatsapp || selectedLead.phone}`}
+                            style={{
+                              background: '#3B82F6',
+                              color: '#fff',
+                              borderRadius: '10px',
+                              padding: '0.6rem 1.1rem',
+                              fontWeight: 700,
+                              fontSize: '0.88rem',
+                              textDecoration: 'none',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.4rem'
+                            }}
+                          >
+                            <i className="fa-solid fa-phone"></i> Call Customer
+                          </a>
+                        </div>
+
+                        <button
+                          type="button"
+                          className="admin-btn"
+                          onClick={() => setSelectedLead(null)}
+                          style={{
+                            background: '#f1f5f9',
+                            color: '#475569',
+                            borderRadius: '10px',
+                            padding: '0.6rem 1.25rem',
+                            fontWeight: 600,
+                            fontSize: '0.88rem',
+                            border: '1px solid #cbd5e1',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Close
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {activeTab === 'Coupons' && (
             <div className="admin-coupons-management" style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1.5rem' }}>

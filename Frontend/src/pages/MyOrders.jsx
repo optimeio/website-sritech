@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useLanguage } from '../LanguageContext';
 import './MyOrders.css';
 
 const API_URL = import.meta.env.VITE_API_URL || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? '/api' : 'https://website-sritech-refk.onrender.com/api');
@@ -13,11 +14,6 @@ const getInvoiceUrl = (order) => {
   if (path.startsWith('http')) return path;
   return `${BACKEND_URL}${path.startsWith('/') ? '' : '/'}${path}`;
 };
-
-const statusFilters = ['All Orders', 'Delivered', 'Shipped', 'Processing', 'Cancelled', 'Returned'];
-const dateFilters   = ['All Time', 'Last 30 Days', 'Last 6 Months'];
-const sortOptions   = ['Newest First', 'Oldest First'];
-const trackingSteps = ['Order Confirmed', 'Packed', 'Shipped', 'Out For Delivery', 'Delivered'];
 
 const normalizeOrderStatus = (status) => {
   const n = String(status || '').trim().toLowerCase();
@@ -44,13 +40,6 @@ const fmtDate = (v) => {
   if (!v) return '—';
   const d = new Date(v);
   return isNaN(d) ? String(v) : d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-};
-
-const getDeliveryLabel = (order) => {
-  const d = order.estimatedDelivery || order.deliveryDate || order.deliveredAt;
-  if (!d) return 'Delivery date TBD';
-  const formatted = fmtDate(d);
-  return normalizeOrderStatus(order.status) === 'Delivered' ? `✓ Delivered on ${formatted}` : `Est. delivery ${formatted}`;
 };
 
 const getProductImage = (item) => item?.image || item?.images?.[0] || item?.thumbnail || '';
@@ -80,9 +69,23 @@ const getOrderSummary = (order) => {
 };
 
 /* ── Sub-components ─────────────────────── */
-const StatusBadge = ({ status }) => (
-  <span className={`mo-badge ${getBadgeClass(status)}`}>{normalizeOrderStatus(status)}</span>
-);
+const StatusBadge = ({ status }) => {
+  const { t } = useLanguage();
+  const normalized = normalizeOrderStatus(status);
+  const labelMap = {
+    Delivered: t('myOrders.delivered', 'Delivered'),
+    Shipped: t('myOrders.shipped', 'Shipped'),
+    'Out for Delivery': t('myOrders.outForDelivery', 'Out for Delivery'),
+    Processing: t('myOrders.processing', 'Processing'),
+    Cancelled: t('myOrders.cancelled', 'Cancelled'),
+    Returned: t('myOrders.returned', 'Returned'),
+  };
+  return (
+    <span className={`mo-badge ${getBadgeClass(status)}`}>
+      {labelMap[normalized] || normalized}
+    </span>
+  );
+};
 
 const Skeleton = () => (
   <div className="mo-skeleton-card">
@@ -95,34 +98,48 @@ const Skeleton = () => (
   </div>
 );
 
-const EmptyOrders = ({ onShop }) => (
-  <div className="mo-empty">
-    <div className="mo-empty-icon">🛍️</div>
-    <h2>No orders yet</h2>
-    <p>Start shopping and your orders will appear here.</p>
-    <button className="mo-btn-track" style={{ width: 'auto', padding: '12px 28px', borderRadius: 12 }} onClick={onShop}>
-      Start Shopping
-    </button>
-  </div>
-);
+const EmptyOrders = ({ onShop }) => {
+  const { t } = useLanguage();
+  return (
+    <div className="mo-empty">
+      <div className="mo-empty-icon">🛍️</div>
+      <h2>{t('myOrders.noOrdersYet', 'No orders yet')}</h2>
+      <p>{t('myOrders.noOrdersDesc', 'Start shopping and your orders will appear here.')}</p>
+      <button className="mo-btn-track" style={{ width: 'auto', padding: '12px 28px', borderRadius: 12 }} onClick={onShop}>
+        {t('myOrders.startShopping', 'Start Shopping')}
+      </button>
+    </div>
+  );
+};
 
-const TrackingTimeline = ({ currentIndex }) => (
-  <div className="mo-timeline">
-    {trackingSteps.map((step, i) => {
-      const done = i <= currentIndex;
-      return (
-        <div key={step} className={`mo-timeline-step${done ? ' done' : ''}`}>
-          <div className="mo-timeline-dot">
-            {done ? <i className="fa-solid fa-check" /> : i + 1}
+const TrackingTimeline = ({ currentIndex }) => {
+  const { t } = useLanguage();
+  const trackingSteps = [
+    t('myOrders.orderConfirmed', 'Order Confirmed'),
+    t('myOrders.packed', 'Packed'),
+    t('myOrders.shipped', 'Shipped'),
+    t('myOrders.outForDelivery', 'Out For Delivery'),
+    t('myOrders.delivered', 'Delivered'),
+  ];
+  return (
+    <div className="mo-timeline">
+      {trackingSteps.map((step, i) => {
+        const done = i <= currentIndex;
+        return (
+          <div key={step} className={`mo-timeline-step${done ? ' done' : ''}`}>
+            <div className="mo-timeline-dot">
+              {done ? <i className="fa-solid fa-check" /> : i + 1}
+            </div>
+            <div className="mo-timeline-text">{step}</div>
           </div>
-          <div className="mo-timeline-text">{step}</div>
-        </div>
-      );
-    })}
-  </div>
-);
+        );
+      })}
+    </div>
+  );
+};
 
 const TrackingDrawer = ({ order, open, onClose }) => {
+  const { t } = useLanguage();
   if (!open || !order) return null;
   const currentIndex = getProgressIndex(order.status);
   const firstItem = (order.items || [])[0] || {};
@@ -136,7 +153,7 @@ const TrackingDrawer = ({ order, open, onClose }) => {
       <div className="mo-drawer" onClick={(e) => e.stopPropagation()}>
 
         <div className="mo-drawer-header">
-          <h2>Order Details</h2>
+          <h2>{t('myOrders.orderDetails', 'Order Details')}</h2>
           <button className="mo-drawer-close" onClick={onClose} aria-label="Close">×</button>
         </div>
 
@@ -150,8 +167,8 @@ const TrackingDrawer = ({ order, open, onClose }) => {
           </div>
           <div className="mo-drawer-product-info">
             <h3>{firstItem.name || firstItem.title || 'Product'}</h3>
-            <p>Order: {order.orderId || order._id || '—'}</p>
-            <p>{order.items?.length || 0} item(s) · {fmt(order.grandTotal ?? order.total ?? 0)}</p>
+            <p>{t('myOrders.orderId', 'Order')}: {order.orderId || order._id || '—'}</p>
+            <p>{order.items?.length || 0} {t('myOrders.items', 'item(s)')} · {fmt(order.grandTotal ?? order.total ?? 0)}</p>
           </div>
           <StatusBadge status={order.status} />
         </div>
@@ -160,7 +177,7 @@ const TrackingDrawer = ({ order, open, onClose }) => {
         <div>
           <h3 style={{ margin: '0 0 14px', fontSize: '0.92rem', fontWeight: 700, color: '#0f172a' }}>
             <i className="fa-solid fa-location-dot" style={{ marginRight: 8, color: '#6366f1' }} />
-            Tracking Timeline
+            {t('myOrders.trackingTimeline', 'Tracking Timeline')}
           </h3>
           <TrackingTimeline currentIndex={currentIndex} />
         </div>
@@ -169,22 +186,22 @@ const TrackingDrawer = ({ order, open, onClose }) => {
         <div className="mo-info-grid">
           {/* Shipping info */}
           <div className="mo-info-card">
-            <h4>📦 Shipping</h4>
-            <div className="mo-info-row"><span>Name</span><strong>{addr.name || order.customerName || '—'}</strong></div>
-            {addr.phone && <div className="mo-info-row"><span>Phone</span><strong>{addr.phone}</strong></div>}
-            <div className="mo-info-row"><span>Address</span><strong>{[addr.addressLine1, addr.city, addr.state].filter(Boolean).join(', ') || '—'}</strong></div>
-            <div className="mo-info-row"><span>Courier</span><strong>{order.courierPartner || 'SriTech Express'}</strong></div>
+            <h4>📦 {t('myOrders.shipping', 'Shipping')}</h4>
+            <div className="mo-info-row"><span>{t('myOrders.name', 'Name')}</span><strong>{addr.name || order.customerName || '—'}</strong></div>
+            {addr.phone && <div className="mo-info-row"><span>{t('myOrders.phone', 'Phone')}</span><strong>{addr.phone}</strong></div>}
+            <div className="mo-info-row"><span>{t('myOrders.address', 'Address')}</span><strong>{[addr.addressLine1, addr.city, addr.state].filter(Boolean).join(', ') || '—'}</strong></div>
+            <div className="mo-info-row"><span>{t('myOrders.courier', 'Courier')}</span><strong>{order.courierPartner || 'SriTech Express'}</strong></div>
           </div>
 
           {/* Order summary */}
           <div className="mo-info-card">
-            <h4>💳 Payment</h4>
-            <div className="mo-info-row"><span>Subtotal</span><strong>{fmt(summary.subTotal)}</strong></div>
-            {summary.discount > 0 && <div className="mo-info-row"><span>Discount</span><strong style={{ color: '#16a34a' }}>-{fmt(summary.discount)}</strong></div>}
-            <div className="mo-info-row"><span>Shipping</span><strong>{summary.shipping === 0 ? 'FREE' : fmt(summary.shipping)}</strong></div>
-            {summary.gst > 0 && <div className="mo-info-row"><span>GST</span><strong>{fmt(summary.gst)}</strong></div>}
-            <div className="mo-info-row mo-info-total"><span>Total</span><strong>{fmt(summary.total)}</strong></div>
-            <div className="mo-info-row" style={{ marginTop: 6 }}><span>Method</span><strong>{summary.paymentMethod}</strong></div>
+            <h4>💳 {t('myOrders.payment', 'Payment')}</h4>
+            <div className="mo-info-row"><span>{t('myOrders.subtotal', 'Subtotal')}</span><strong>{fmt(summary.subTotal)}</strong></div>
+            {summary.discount > 0 && <div className="mo-info-row"><span>{t('myOrders.discount', 'Discount')}</span><strong style={{ color: '#16a34a' }}>-{fmt(summary.discount)}</strong></div>}
+            <div className="mo-info-row"><span>{t('myOrders.shipping', 'Shipping')}</span><strong>{summary.shipping === 0 ? t('myOrders.free', 'FREE') : fmt(summary.shipping)}</strong></div>
+            {summary.gst > 0 && <div className="mo-info-row"><span>{t('myOrders.gst', 'GST')}</span><strong>{fmt(summary.gst)}</strong></div>}
+            <div className="mo-info-row mo-info-total"><span>{t('myOrders.total', 'Total')}</span><strong>{fmt(summary.total)}</strong></div>
+            <div className="mo-info-row" style={{ marginTop: 6 }}><span>{t('myOrders.method', 'Method')}</span><strong>{summary.paymentMethod}</strong></div>
           </div>
         </div>
 
@@ -193,7 +210,7 @@ const TrackingDrawer = ({ order, open, onClose }) => {
           {invoiceUrl && (
             <button className="mo-btn-outline" style={{ flex: 1 }} onClick={() => window.open(invoiceUrl, '_blank')}>
               <i className="fa-solid fa-file-invoice" style={{ marginRight: 6 }} />
-              Download Invoice
+              {t('myOrders.downloadInvoice', 'Download Invoice')}
             </button>
           )}
           <button
@@ -201,7 +218,7 @@ const TrackingDrawer = ({ order, open, onClose }) => {
             onClick={() => window.open(`mailto:support@thesritech.com?subject=Help - Order ${order.orderId || order._id || ''}`, '_self')}
           >
             <i className="fa-solid fa-headset" />
-            Contact Support
+            {t('myOrders.contactSupport', 'Contact Support')}
           </button>
         </div>
 
@@ -211,6 +228,7 @@ const TrackingDrawer = ({ order, open, onClose }) => {
 };
 
 const OrderCard = ({ order, onTrack }) => {
+  const { t } = useLanguage();
   const items = order.items || [];
   const firstItem = items[0] || {};
   const productImage = getProductImage(firstItem);
@@ -218,6 +236,15 @@ const OrderCard = ({ order, onTrack }) => {
   const price = order.grandTotal ?? order.total ?? 0;
   const qty = items.reduce((s, i) => s + (Number(i.quantity) || 1), 0);
   const orderId = order.orderId || order.invoiceNumber || order._id || order.id || '';
+
+  const getDeliveryLabel = (ord) => {
+    const d = ord.estimatedDelivery || ord.deliveryDate || ord.deliveredAt;
+    if (!d) return 'Delivery date TBD';
+    const formatted = fmtDate(d);
+    return normalizeOrderStatus(ord.status) === 'Delivered' 
+      ? `✓ ${t('myOrders.delivered', 'Delivered')} (${formatted})` 
+      : `Est. delivery ${formatted}`;
+  };
 
   return (
     <article className="mo-card">
@@ -244,8 +271,8 @@ const OrderCard = ({ order, onTrack }) => {
         <div className="mo-product-info">
           <h3>{productName}</h3>
           <div className="mo-product-meta">
-            <span className="mo-meta-pill">Qty: {qty}</span>
-            {items.length > 1 && <span className="mo-meta-pill">{items.length} items</span>}
+            <span className="mo-meta-pill">{t('myOrders.qty', 'Qty')}: {qty}</span>
+            {items.length > 1 && <span className="mo-meta-pill">{items.length} {t('myOrders.items', 'items')}</span>}
             <span className="mo-meta-pill">{order.paymentMethod || 'Razorpay'}</span>
           </div>
           <div className="mo-delivery-label">{getDeliveryLabel(order)}</div>
@@ -273,10 +300,10 @@ const OrderCard = ({ order, onTrack }) => {
           <div className="mo-price">{fmt(price)}</div>
           <button className="mo-btn-track" onClick={onTrack}>
             <i className="fa-solid fa-truck-fast" style={{ marginRight: 6 }} />
-            Track Order
+            {t('myOrders.trackOrder', 'Track Order')}
           </button>
           <button className="mo-btn-outline" onClick={onTrack}>
-            View Details
+            {t('myOrders.viewDetails', 'View Details')}
           </button>
           <button
             className="mo-btn-ghost"
@@ -286,7 +313,7 @@ const OrderCard = ({ order, onTrack }) => {
             }}
           >
             <i className="fa-solid fa-file-invoice" />
-            Invoice
+            {t('myOrders.invoice', 'Invoice')}
           </button>
         </div>
       </div>
@@ -296,6 +323,7 @@ const OrderCard = ({ order, onTrack }) => {
 
 /* ── Main Page Component ────────────────── */
 const MyOrders = () => {
+  const { t } = useLanguage();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -306,6 +334,26 @@ const MyOrders = () => {
   const [sortOrder, setSortOrder] = useState('Newest First');
   const [drawerOrderId, setDrawerOrderId] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+
+  const statusFilters = [
+    { key: 'All Orders', label: t('myOrders.allOrders', 'All Orders') },
+    { key: 'Delivered', label: t('myOrders.delivered', 'Delivered') },
+    { key: 'Shipped', label: t('myOrders.shipped', 'Shipped') },
+    { key: 'Processing', label: t('myOrders.processing', 'Processing') },
+    { key: 'Cancelled', label: t('myOrders.cancelled', 'Cancelled') },
+    { key: 'Returned', label: t('myOrders.returned', 'Returned') },
+  ];
+
+  const dateFilters = [
+    { key: 'All Time', label: t('myOrders.allTime', 'All Time') },
+    { key: 'Last 30 Days', label: t('myOrders.last30Days', 'Last 30 Days') },
+    { key: 'Last 6 Months', label: t('myOrders.last6Months', 'Last 6 Months') },
+  ];
+
+  const sortOptions = [
+    { key: 'Newest First', label: t('myOrders.newestFirst', 'Newest First') },
+    { key: 'Oldest First', label: t('myOrders.oldestFirst', 'Oldest First') },
+  ];
 
   const counts = useMemo(() => {
     const c = { total: orders.length, Delivered: 0, Shipped: 0, Processing: 0, Cancelled: 0, Returned: 0 };
@@ -376,11 +424,11 @@ const MyOrders = () => {
         {/* Header */}
         <div className="mo-header">
           <div className="mo-header-text">
-            <h1>My Orders</h1>
-            <p>Track deliveries, download invoices, and manage your purchases.</p>
+            <h1>{t('myOrders.title', 'My Orders')}</h1>
+            <p>{t('myOrders.subtitle', 'Track deliveries, download invoices, and manage your purchases.')}</p>
           </div>
           <div className="mo-header-badge">
-            <span>Total Orders</span>
+            <span>{t('myOrders.totalOrders', 'Total Orders')}</span>
             <strong>{counts.total}</strong>
           </div>
         </div>
@@ -389,23 +437,23 @@ const MyOrders = () => {
         <div className="mo-stats">
           <div className="mo-stat-card">
             <div className="mo-stat-icon delivered"><i className="fa-solid fa-circle-check" /></div>
-            <div className="mo-stat-info"><span>Delivered</span><strong>{counts.Delivered}</strong></div>
+            <div className="mo-stat-info"><span>{t('myOrders.delivered', 'Delivered')}</span><strong>{counts.Delivered}</strong></div>
           </div>
           <div className="mo-stat-card">
             <div className="mo-stat-icon shipped"><i className="fa-solid fa-truck" /></div>
-            <div className="mo-stat-info"><span>Shipped</span><strong>{counts.Shipped}</strong></div>
+            <div className="mo-stat-info"><span>{t('myOrders.shipped', 'Shipped')}</span><strong>{counts.Shipped}</strong></div>
           </div>
           <div className="mo-stat-card">
             <div className="mo-stat-icon processing"><i className="fa-solid fa-gear" /></div>
-            <div className="mo-stat-info"><span>Processing</span><strong>{counts.Processing}</strong></div>
+            <div className="mo-stat-info"><span>{t('myOrders.processing', 'Processing')}</span><strong>{counts.Processing}</strong></div>
           </div>
           <div className="mo-stat-card">
             <div className="mo-stat-icon cancelled"><i className="fa-solid fa-xmark" /></div>
-            <div className="mo-stat-info"><span>Cancelled</span><strong>{counts.Cancelled}</strong></div>
+            <div className="mo-stat-info"><span>{t('myOrders.cancelled', 'Cancelled')}</span><strong>{counts.Cancelled}</strong></div>
           </div>
           <div className="mo-stat-card">
             <div className="mo-stat-icon total"><i className="fa-solid fa-bag-shopping" /></div>
-            <div className="mo-stat-info"><span>All Orders</span><strong>{counts.total}</strong></div>
+            <div className="mo-stat-info"><span>{t('myOrders.allOrders', 'All Orders')}</span><strong>{counts.total}</strong></div>
           </div>
         </div>
 
@@ -416,7 +464,7 @@ const MyOrders = () => {
               className="mo-search-input"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search by Order ID or product name…"
+              placeholder={t('myOrders.searchPlaceholder', 'Search by Order ID or product name…')}
               aria-label="Search orders"
             />
             <button className="mo-search-btn" onClick={() => setPage(1)}>
@@ -425,26 +473,26 @@ const MyOrders = () => {
           </div>
 
           <div className="mo-filter-row">
-            <span className="mo-filter-label">Status</span>
+            <span className="mo-filter-label">{t('myOrders.status', 'Status')}</span>
             {statusFilters.map((s) => (
-              <button key={s} className={`mo-chip${statusFilter === s ? ' active' : ''}`} onClick={() => setStatusFilter(s)}>
-                {s}
+              <button key={s.key} className={`mo-chip${statusFilter === s.key ? ' active' : ''}`} onClick={() => setStatusFilter(s.key)}>
+                {s.label}
               </button>
             ))}
             <div className="mo-divider" />
-            <span className="mo-filter-label">Sort</span>
+            <span className="mo-filter-label">{t('myOrders.sort', 'Sort')}</span>
             {sortOptions.map((s) => (
-              <button key={s} className={`mo-chip${sortOrder === s ? ' active' : ''}`} onClick={() => setSortOrder(s)}>
-                {s}
+              <button key={s.key} className={`mo-chip${sortOrder === s.key ? ' active' : ''}`} onClick={() => setSortOrder(s.key)}>
+                {s.label}
               </button>
             ))}
           </div>
 
           <div className="mo-filter-row">
-            <span className="mo-filter-label">Date</span>
+            <span className="mo-filter-label">{t('myOrders.date', 'Date')}</span>
             {dateFilters.map((d) => (
-              <button key={d} className={`mo-chip${dateFilter === d ? ' active' : ''}`} onClick={() => setDateFilter(d)}>
-                {d}
+              <button key={d.key} className={`mo-chip${dateFilter === d.key ? ' active' : ''}`} onClick={() => setDateFilter(d.key)}>
+                {d.label}
               </button>
             ))}
           </div>
